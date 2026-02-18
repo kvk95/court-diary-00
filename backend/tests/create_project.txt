@@ -1,0 +1,25 @@
+
+Create a new project 
+> poetry new <project-name>
+> cd <project-name>
+
+Configure Poetry for in-project virtual environments
+> poetry config virtualenvs.in-project true --local
+> poetry config virtualenvs.create true
+
+
+Create the virtual environment and install dependencies
+> poetry install
+
+Alternatively, you can use poetry env use
+> poetry env use python3.x
+
+
+Activate the virtual environment 
+> poetry shell
+
+Add dependencies
+> poetry add requests
+
+Add .venv to .gitignore
+> echo ".venv" >> .gitignore

@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "court-diary-backend"
+version = "0.1.0"
+description = ""
+authors = ["manilokesh <mani.lokesh@gmail.com>", "vijaykrishnan <kvk95@yahoo.com"]
+readme = "README.md"
+packages = [{ include = "app" }] 
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.123.5"
+uvicorn = { extras = ["standard"], version = "^0.38.0" }
+sqlalchemy = "^2.0.44"
+aiomysql = "^0.3.2"
+pydantic = { extras = ["email"], version = "^2.12.4" }
+pydantic-settings = "^2.12.0"
+python-dotenv = "^1.2.1"
+cryptography = "^46.0.3"
+python-jose = {version = "^3.5.0", extras = ["cryptography"]}
+passlib = { extras = ["argon2"], version = "^1.7.4" }
+argon2-cffi = "^23.1.0"
+email-validator = "^2.3.0"
+python-multipart = "^0.0.20"
+jinja2 = "^3.1.6"
+weasyprint = "^67.0"
+faker = "^40.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+httpx = "^0.24.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+start = "app.main:run"
+dev = "app.main:run_dev"

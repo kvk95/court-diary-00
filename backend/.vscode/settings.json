@@ -1,0 +1,27 @@
+{
+    // ========== PYTHON ANALYSIS / PYLANCE ==========
+    "python.analysis.openFilesOnly": false, // Show errors for all files, not just open ones
+    "python.analysis.diagnosticMode": "workspace", // Full project scanning
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.autoIndent": true,
+    "python.analysis.enableColorPicker": true,
+    // Optional but recommended for stronger typing:
+    "python.analysis.typeCheckingMode": "basic",
+    // "python.analysis.typeCheckingMode": "strict",       // If you want strict mode
+    // ========== TYPESCRIPT / JAVASCRIPT ENHANCEMENTS ==========
+    "typescript.suggest.autoImports": true,
+    "typescript.format.enable": true,
+    "typescript.implementationsCodeLens.enabled": true,
+    "typescript.implementationsCodeLens.showOnInterfaceMethods": true,
+    "typescript.implementationsCodeLens.showOnAllClassMethods": true,
+    "typescript.suggest.completeJSDocs": true,
+    "typescript.referencesCodeLens.enabled": true,
+    "typescript.referencesCodeLens.showOnAllFunctions": true,
+    "typescript.suggest.classMemberSnippets.enabled": true,
+    "typescript.suggest.completeFunctionCalls": true,
+    // ========== DIFF & EDITOR SETTINGS ==========
+    "diffEditor.codeLens": true,
+    "editor.codeLensFontFamily": "courier",
+    // ========== XML ==========
+    "xml.format.maxLineWidth": 300
+}
