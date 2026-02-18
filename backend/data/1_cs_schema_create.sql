@@ -1,6 +1,6 @@
 -- =============================================================================
 -- COURT DIARY - FULL SCHEMA (Corrected & Production-Ready)
--- Unified style aligned with NYABUY POS conventions
+-- Unified style aligned with courtdiary conventions
 -- 2025/2026 version
 -- =============================================================================
 

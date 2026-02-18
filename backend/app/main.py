@@ -115,7 +115,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat() + "Z",
-        "service": "nyabuy-api",
+        "service": "courtdiary-api",
         "version": "1.0.0",
     }
 

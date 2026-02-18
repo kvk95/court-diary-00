@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Project Metadata
     # -------------------------------------------------------------------------
-    PROJECT_NAME: str = "Nyabuy FastAPI"
+    PROJECT_NAME: str = "Court Diary FastAPI"
     VERSION: str = "1.0"
-    DESCRIPTION: str = "Production-ready backend for Nyabuy POS"
+    DESCRIPTION: str = "Production-ready backend for Court Diary POS"
 
     DOCS_URL: Optional[str] = "/docs"
     REDOC_URL: Optional[str] = "/redoc"

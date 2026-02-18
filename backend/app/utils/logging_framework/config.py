@@ -9,9 +9,9 @@ from pydantic import BaseModel, ConfigDict
 def default_log_dir() -> str:
     system = platform.system().lower()
     return (
-        os.path.join("C:\\", "nyabuy", "logs")
+        os.path.join("C:\\", "courtdiary", "logs")
         if system == "windows"
-        else "/var/log/nyabuy"
+        else "/var/log/courtdiary"
     )
 
 
