@@ -112,6 +112,9 @@ INSERT IGNORE INTO refm_email_status (code, description, color_code, sort_order)
 ('F', 'Failed',    '#ef4444', 50),
 ('B', 'Bounced',   '#991b1b', 60);
 
+INSERT INTO refm_login_status (code, description, sort_order) VALUES 
+('S', 'Success', 1), ('F', 'Failed', 2);
+
 
 -- =============================================================================
 -- 2. CORE ENTITIES (CHAMBERS & USERS)
@@ -140,6 +143,52 @@ INSERT INTO users (chamber_id, email, password_hash, first_name, last_name, phon
 (1, 'priya@vkchamber.in',   @pwd_hash, 'Priya',   'Menon',    '8123456789', 'SEN', 1),
 (1, 'karthik@vkchamber.in', @pwd_hash, 'Karthik', 'Raja',     '9001234567', 'CLK', 1),
 (2, 'lokesh@vkchamber.in',  @pwd_hash, 'Lokesh',  'Mani',     '9445123456', 'ADM', 1);
+
+-- =============================================================================
+-- USER PROFILES
+-- (One profile per user - matches user_id from users table)
+-- =============================================================================
+
+INSERT INTO user_profiles (user_id, address, country, state, city, postal_code, 
+                           header_color, sidebar_color, primary_color, font_family, updated_by) VALUES
+-- User 1: Vijay Krishnan (Admin - VijayKrishnan & Associates)
+(1, 'No. 45, Anna Salai, Teynampet', 'IN', 'TN', 'Chennai', '600018',
+ '222 33% 10%', '222 40% 12%', '32.4 99% 63%', 'Nunito, sans-serif', 1),
+
+-- User 2: Priya Menon (Senior Advocate)
+(2, 'Flat 3B, Greenwoods Apartment, Adyar', 'IN', 'TN', 'Chennai', '600020',
+ '230 20% 15%', '230 25% 18%', '215 100% 55%', 'Inter, sans-serif', 1),
+
+-- User 3: Karthik Raja (Clerk)
+(3, '12/5, Gandhi Nagar, Chengalpattu', 'IN', 'TN', 'Chengalpattu', '603001',
+ '0 0% 12%', '0 0% 15%', '262 83% 58%', 'Nunito, sans-serif', 1),
+
+-- User 4: Lokesh Mani (Admin - Sundar Associates)
+(4, 'Plot 78, RS Puram', 'IN', 'TN', 'Coimbatore', '641002',
+ '225 30% 11%', '225 35% 14%', '142 76% 36%', 'Roboto, sans-serif', 4);
+ 
+-- =============================================================================
+-- CHAMBER MODULES - SAMPLE DATA INSERTS
+-- Run after refm_modules and chambers tables are populated
+-- =============================================================================
+
+INSERT INTO chamber_modules (chamber_id, module_code, is_active, created_by) VALUES
+(1, 'DASH',  TRUE, 1),  -- Dashboard
+(1, 'CASES', TRUE, 1),  -- Cases
+(1, 'HEAR',  TRUE, 1),  -- Hearings
+(1, 'CAL',   TRUE, 1),  -- Calendar
+(1, 'USERS', TRUE, 1),  -- User Management
+(1, 'RPT',   TRUE, 1),  -- Reports
+(1, 'SET',   TRUE, 1);  -- Settings
+
+INSERT INTO chamber_modules (chamber_id, module_code, is_active, created_by) VALUES
+(2, 'DASH',  TRUE, 4),  -- Dashboard
+(2, 'CASES', TRUE, 4),  -- Cases
+(2, 'HEAR',  TRUE, 4),  -- Hearings
+(2, 'CAL',   TRUE, 4),  -- Calendar
+(2, 'USERS', FALSE, 4), -- User Management (disabled for FREE)
+(2, 'RPT',   FALSE, 4), -- Reports (disabled for FREE)
+(2, 'SET',   TRUE, 4);  -- Settings
 
 
 -- =============================================================================
@@ -171,9 +220,40 @@ INSERT INTO user_roles (user_id, role_id, created_by) VALUES
 -- (Grant full access to Admin role for all modules)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO role_permissions (role_id, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by)
-SELECT 1, code, TRUE, TRUE, TRUE, TRUE, TRUE, 1
-FROM refm_modules;
+SET @cm1_dash  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'DASH');
+SET @cm1_cases = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'CASES');
+SET @cm1_hear  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'HEAR');
+SET @cm1_cal   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'CAL');
+SET @cm1_users = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'USERS');
+SET @cm1_rpt   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'RPT');
+SET @cm1_set   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = 1 AND module_code = 'SET');
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
+(1, @cm1_dash,  TRUE, TRUE, TRUE, TRUE, TRUE, 1),
+(1, @cm1_cases, TRUE, TRUE, TRUE, TRUE, TRUE, 1),
+(1, @cm1_hear,  TRUE, TRUE, TRUE, TRUE, TRUE, 1),
+(1, @cm1_cal,   TRUE, TRUE, TRUE, TRUE, TRUE, 1),
+(1, @cm1_users, TRUE, TRUE, TRUE, TRUE, TRUE, 1),
+(1, @cm1_rpt,   TRUE, TRUE, TRUE, TRUE, TRUE, 1),
+(1, @cm1_set,   TRUE, TRUE, TRUE, TRUE, TRUE, 1);
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
+(2, @cm1_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, 1),
+(2, @cm1_cases, FALSE, TRUE,  TRUE,  TRUE,  FALSE, 1),
+(2, @cm1_hear,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, 1),
+(2, @cm1_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, 1),
+(2, @cm1_users, FALSE, FALSE, FALSE, FALSE, FALSE, 1),
+(2, @cm1_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, 1),
+(2, @cm1_set,   FALSE, TRUE,  FALSE, FALSE, FALSE, 1);
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
+(3, @cm1_dash,  FALSE, TRUE, FALSE, FALSE, FALSE, 1),
+(3, @cm1_cases, FALSE, TRUE, FALSE, FALSE, FALSE, 1),
+(3, @cm1_hear,  FALSE, TRUE, FALSE, FALSE, FALSE, 1),
+(3, @cm1_cal,   FALSE, TRUE, FALSE, FALSE, FALSE, 1),
+(3, @cm1_users, FALSE, FALSE, FALSE, FALSE, FALSE, 1),
+(3, @cm1_rpt,   FALSE, FALSE, FALSE, FALSE, FALSE, 1),
+(3, @cm1_set,   FALSE, FALSE, FALSE, FALSE, FALSE, 1);
 
 
 -- =============================================================================
@@ -209,6 +289,27 @@ INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, n
 (1, 2, '2026-02-10', 'ADJ', 'Counter affidavit stage', 'Adjourned due to non-filing', '2026-02-28', 3),
 
 (2, 3, '2026-03-01', 'CMP', 'Framing of issues',    'Issues framed',               '2026-04-10', 4);
+
+-- =============================================================================
+-- CASE NOTES - SAMPLE DATA INSERTS
+-- Run after cases and users tables are populated
+-- =============================================================================
+
+
+INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, is_private, created_by) VALUES
+-- Case 1: Crl.O.P.No.234/2025 (VijayKrishnan & Associates)
+(1, 1, 2, 'Client mentioned new evidence - witness statement from neighbor. Follow up before next hearing.', FALSE, 2),
+(1, 1, 1, 'Internal: Consider settlement option if opposing party approaches. Max limit: 5 lakhs.', TRUE, 1),
+(1, 1, 3, 'Court fee receipt collected. Original filed in case file.', FALSE, 3),
+
+-- Case 2: W.P.(MD)No.5678/2025
+(1, 2, 2, 'Tahsildar office confirmed - patta cancellation was procedural error. Strong case for quashing.', FALSE, 2),
+(1, 2, 1, 'Client wants expedited hearing. File urgency petition if not listed in March.', TRUE, 1),
+
+-- Case 3: O.S.No.145/2024 (Sundar Associates)
+(2, 3, 4, 'Builder agreed to mediation. Schedule for mid-March before framing of issues.', FALSE, 4);
+
+SELECT '✅ Case notes inserted successfully!' AS status_message;
 
 
 -- =============================================================================
@@ -255,9 +356,11 @@ INSERT INTO email_templates (chamber_id, code, subject, content, is_customized, 
 -- 6.1 Login Audit
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO login_audit (chamber_id, user_id, email, ip_address, user_agent, status_ind, login_time) VALUES
-(1, 1, 'admin@vkchamber.in',  '117.192.45.12',  'Chrome / Windows', TRUE, '2026-02-18 09:15:22'),
-(1, 2, 'priya@vkchamber.in',  '49.204.123.88',  'Safari / Mac',     TRUE, '2026-02-18 10:02:45');
+INSERT INTO login_audit (chamber_id, user_id, email, ip_address, user_agent, status_code, login_time) VALUES
+(1, 1, 'admin@vkchamber.in',   '117.192.45.12', 'Chrome / Windows', 'S', '2026-02-18 09:15:22'),
+(1, 2, 'priya@vkchamber.in',   '49.204.123.88', 'Safari / Mac',     'S', '2026-02-18 10:02:45'),
+(1, 3, 'karthik@vkchamber.in', '103.25.45.67',  'Firefox / Linux',  'F', '2026-02-18 11:30:15'),
+(2, 4, 'lokesh@vkchamber.in',  '182.76.123.45', 'Chrome / Android', 'S', '2026-02-18 08:45:00');
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6.2 Activity Log

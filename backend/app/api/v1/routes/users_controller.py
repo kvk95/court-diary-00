@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import List
 
 from fastapi import Body, Depends, Path, Query
 
@@ -177,16 +177,3 @@ class UsersController(BaseController):
         return self.success(result={})
         # await service.users_delete(user_id)
         # return self.success(result={}, description="User deleted successfully")
-
-    @BaseController.put(
-        "/defaultstore",
-        summary="Set default store",
-        response_model=BaseOutDto[bool],
-    )
-    async def user_default_store(
-        self,
-        payload: Dict = Body(...),
-        service: UsersService = Depends(get_users_service),
-    ) -> BaseOutDto[bool]:
-        result: bool = await service.user_default_store(payload)
-        return self.success(result=result)

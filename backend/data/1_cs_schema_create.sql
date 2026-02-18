@@ -129,6 +129,14 @@ CREATE TABLE refm_user_deletion_status (
     status_ind    BOOLEAN DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Account deletion request statuses';
 
+-- refm_login_status
+DROP TABLE IF EXISTS refm_login_status;
+CREATE TABLE refm_login_status (
+    code CHAR(2) PRIMARY KEY,
+    description VARCHAR(20) NOT NULL,
+    sort_order INT NOT NULL
+) ENGINE = InnoDB COMMENT='Lookup table for Login status log';
+
 
 -- =============================================================================
 -- 2. DEPENDENT REFERENCE TABLES
@@ -221,6 +229,58 @@ CREATE TABLE users (
         FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Users (advocates, clerks, admins)';
 
+-- =============================================================================
+-- USER PROFILES
+-- (User personal details and UI preferences)
+-- =============================================================================
+
+DROP TABLE IF EXISTS user_profiles;
+CREATE TABLE user_profiles (
+    profile_id      BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id         BIGINT NOT NULL UNIQUE,
+    address         TEXT NULL,
+    country         CHAR(2) NULL,
+    state           CHAR(4) NULL,
+    city            VARCHAR(50) NULL,
+    postal_code     VARCHAR(20) NULL,
+    header_color    VARCHAR(20) DEFAULT '0 0% 100%',
+    sidebar_color   VARCHAR(20) DEFAULT '0 0% 100%',
+    primary_color   VARCHAR(20) DEFAULT '32.4 99% 63%',
+    font_family     VARCHAR(50) DEFAULT 'Nunito, sans-serif',
+    updated_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by      BIGINT NULL,
+    CONSTRAINT fk_profiles_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_profiles_updated_by
+        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='User personal details and preferences';
+
+-- =============================================================================
+-- 3. CHAMBER MODULES
+-- (Modules allocated per chamber - controls feature access)
+-- =============================================================================
+
+DROP TABLE IF EXISTS chamber_modules;
+CREATE TABLE chamber_modules (
+    chamber_module_id   INT AUTO_INCREMENT PRIMARY KEY,
+    chamber_id          BIGINT NOT NULL,
+    module_code         CHAR(8) NOT NULL,
+    is_active           BOOLEAN DEFAULT TRUE,
+    created_date        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by          BIGINT NULL,
+    updated_date        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by          BIGINT NULL,
+    CONSTRAINT uk_cmodule_chamber
+        UNIQUE KEY (chamber_id, module_code),
+    CONSTRAINT fk_cmodule_chamber
+        FOREIGN KEY (chamber_id) REFERENCES chambers(chamber_id) ON DELETE CASCADE,
+    CONSTRAINT fk_cmodule_module
+        FOREIGN KEY (module_code) REFERENCES refm_modules(code) ON DELETE RESTRICT,
+    CONSTRAINT fk_cmodule_created_by
+        FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_cmodule_updated_by
+        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Modules allocated per chamber';
 
 -- =============================================================================
 -- 4. SECURITY & PERMISSIONS
@@ -268,24 +328,28 @@ CREATE TABLE user_roles (
 
 DROP TABLE IF EXISTS role_permissions;
 CREATE TABLE role_permissions (
-    permission_id   BIGINT AUTO_INCREMENT PRIMARY KEY,
-    role_id         INT NOT NULL,
-    module_code     CHAR(8) NOT NULL,
-    allow_all_ind   BOOLEAN DEFAULT FALSE,
-    read_ind        BOOLEAN DEFAULT TRUE,
-    write_ind       BOOLEAN DEFAULT FALSE,
-    create_ind      BOOLEAN DEFAULT FALSE,
-    delete_ind      BOOLEAN DEFAULT FALSE,
-    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by      BIGINT NULL,
-    updated_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by      BIGINT NULL,
+    permission_id     BIGINT AUTO_INCREMENT PRIMARY KEY,
+    role_id           INT NOT NULL,
+    chamber_module_id INT NOT NULL,
+    allow_all_ind     BOOLEAN DEFAULT FALSE,
+    read_ind          BOOLEAN DEFAULT TRUE,
+    write_ind         BOOLEAN DEFAULT FALSE,
+    create_ind        BOOLEAN DEFAULT FALSE,
+    delete_ind        BOOLEAN DEFAULT FALSE,
+    created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by        BIGINT NULL,
+    updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by        BIGINT NULL,
     CONSTRAINT uk_role_module
-        UNIQUE KEY (role_id, module_code),
+        UNIQUE KEY (role_id, chamber_module_id),
     CONSTRAINT fk_role_permissions_role
         FOREIGN KEY (role_id) REFERENCES security_roles(role_id) ON DELETE CASCADE,
     CONSTRAINT fk_role_permissions_module
-        FOREIGN KEY (module_code) REFERENCES refm_modules(code) ON DELETE RESTRICT
+        FOREIGN KEY (chamber_module_id) REFERENCES chamber_modules(chamber_module_id) ON DELETE CASCADE,
+    CONSTRAINT fk_role_permissions_created_by
+        FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_role_permissions_updated_by
+        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Role-module permissions';
 
 
@@ -440,11 +504,43 @@ CREATE TABLE delete_account_requests (
         FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Account deletion requests';
 
+-- =============================================================================
+-- 6.4 CASE NOTES
+-- (Private/internal notes on cases - optional enhancement)
+-- =============================================================================
 
--- =============================================================================
--- 7. LOGGING & AUDIT
--- (Depend on users & chambers)
--- =============================================================================
+DROP TABLE IF EXISTS case_notes;
+CREATE TABLE case_notes (
+    note_id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    chamber_id      BIGINT NOT NULL,
+    case_id         BIGINT NOT NULL,
+    user_id         BIGINT NOT NULL,
+    note_text       TEXT NOT NULL,
+    is_private      BOOLEAN DEFAULT FALSE,
+    is_deleted      BOOLEAN DEFAULT FALSE,
+    deleted_date    TIMESTAMP NULL,
+    deleted_by      BIGINT NULL,
+    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by      BIGINT NULL,
+    updated_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by      BIGINT NULL,
+    CONSTRAINT fk_notes_chamber
+        FOREIGN KEY (chamber_id) REFERENCES chambers(chamber_id) ON DELETE CASCADE,
+    CONSTRAINT fk_notes_case
+        FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE,
+    CONSTRAINT fk_notes_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_notes_deleted_by
+        FOREIGN KEY (deleted_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_notes_created_by
+        FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_notes_updated_by
+        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_notes_case (case_id),
+    INDEX idx_notes_user (user_id),
+    INDEX idx_notes_chamber_date (chamber_id, created_date DESC)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Private/internal notes on cases';
+
 
 -- =============================================================================
 -- 7. LOGGING & AUDIT

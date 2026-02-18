@@ -10,14 +10,14 @@ from app.database.models.base.base_model import BaseModel
 class RefmCaseStatus(BaseModel):
     __tablename__ = 'refm_case_status'
 
-    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
-    # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    description: Mapped[str] = mapped_column(String(50), nullable=False)
+    # description : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
+    description: Mapped[str] = mapped_column(String(60), nullable=False)
 
-    # color_code : VARCHAR(7) COLLATE "utf8mb4_unicode_ci"
-    color_code: Mapped[Optional[str]] = mapped_column(String(7), default='#64748b')
+    # color_code : CHAR(7) COLLATE "utf8mb4_unicode_ci"
+    color_code: Mapped[Optional[str]] = mapped_column(CHAR(7), default='#64748b')
 
     # sort_order : INTEGER
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -32,3 +32,10 @@ class RefmCaseStatus(BaseModel):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
+
+class RefmCaseStatusConstants:
+    ACTIVE = 'AC'
+    ADJOURNED = 'ADJ'
+    DISPOSED = 'DIS'
+    CLOSED = 'CLO'
+    OVERDUE = 'OVD'

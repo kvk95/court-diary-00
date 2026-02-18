@@ -10,11 +10,11 @@ from app.database.models.base.base_model import BaseModel
 class RefmPlanTypes(BaseModel):
     __tablename__ = 'refm_plan_types'
 
-    # plan_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    plan_code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
-    # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    description: Mapped[str] = mapped_column(String(50), nullable=False)
+    # description : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
+    description: Mapped[str] = mapped_column(String(60), nullable=False)
 
     # max_users : INTEGER
     max_users: Mapped[Optional[int]] = mapped_column(Integer)
@@ -22,14 +22,14 @@ class RefmPlanTypes(BaseModel):
     # max_cases : INTEGER
     max_cases: Mapped[Optional[int]] = mapped_column(Integer)
 
-    # price_monthly : DECIMAL(10, 2)
-    price_monthly: Mapped[Optional[float]] = mapped_column(Numeric, default='0.00')
+    # price_monthly_amt : DECIMAL(12, 2)
+    price_monthly_amt: Mapped[Optional[float]] = mapped_column(Numeric, default='0.00')
 
-    # price_annual : DECIMAL(10, 2)
-    price_annual: Mapped[Optional[float]] = mapped_column(Numeric, default='0.00')
+    # price_annual_amt : DECIMAL(12, 2)
+    price_annual_amt: Mapped[Optional[float]] = mapped_column(Numeric, default='0.00')
 
-    # currency : CHAR(3) COLLATE "utf8mb4_unicode_ci"
-    currency: Mapped[Optional[str]] = mapped_column(CHAR(3), default='INR')
+    # currency_code : CHAR(3) COLLATE "utf8mb4_unicode_ci"
+    currency_code: Mapped[Optional[str]] = mapped_column(CHAR(3), default='INR')
 
     # sort_order : INTEGER
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -44,3 +44,8 @@ class RefmPlanTypes(BaseModel):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
+
+class RefmPlanTypesConstants:
+    FREE = 'FREE'
+    PRO = 'PRO'
+    ENTERPRISE = 'ENT'

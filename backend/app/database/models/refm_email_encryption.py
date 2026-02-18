@@ -1,4 +1,4 @@
-"""refm_hearing_status"""
+"""refm_email_encryption"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -7,17 +7,14 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmHearingStatus(BaseModel):
-    __tablename__ = 'refm_hearing_status'
+class RefmEmailEncryption(BaseModel):
+    __tablename__ = 'refm_email_encryption'
 
-    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
+    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
 
-    # description : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
-    description: Mapped[str] = mapped_column(String(60), nullable=False)
-
-    # color_code : CHAR(7) COLLATE "utf8mb4_unicode_ci"
-    color_code: Mapped[Optional[str]] = mapped_column(CHAR(7), default='#64748b')
+    # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
+    description: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # sort_order : INTEGER
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -33,9 +30,8 @@ class RefmHearingStatus(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmHearingStatusConstants:
-    UPCOMING = 'UP'
-    COMPLETED = 'CMP'
-    ADJOURNED = 'ADJ'
-    ORDER_RESERVED = 'OR'
-    DISPOSED = 'DIS'
+class RefmEmailEncryptionConstants:
+    NONE = 'N'
+    TLS = 'T'
+    SSL = 'S'
+    BOTH = 'B'

@@ -9,7 +9,6 @@ from app.database.repositories.role_permissions_repository import (
 )
 from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.user_roles_repository import UserRolesRepository
-from app.database.repositories.stores_repository import StoresRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.users_dto import (
@@ -42,14 +41,12 @@ class UsersService(BaseSecuredService):
         role_permission_repo: Optional[RolePermissionsRepository] = None,
         users_repo: Optional[UsersRepository] = None,
         user_roles_repo: Optional[UserRolesRepository] = None,
-        stores_repo: Optional[StoresRepository] = None,
     ):
         super().__init__(session)
         self.security_roles_repo:SecurityRolesRepository = security_roles_repo or SecurityRolesRepository()
         self.role_permission_repo:RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
         self.users_repo:UsersRepository = users_repo or UsersRepository()
         self.user_roles_repo:UserRolesRepository = user_roles_repo or UserRolesRepository()
-        self.stores_repo:StoresRepository = stores_repo or StoresRepository()
 
     # ── Roles ─────────────────────────────────────────────
     async def security_roles_get_paged(
@@ -327,48 +324,5 @@ class UsersService(BaseSecuredService):
                     "start_date": datetime.now(),
                 },
             )
-
-        return True
-    
-    async def user_default_store(self, payload: dict) -> bool:
-
-        store_id:int = int(payload.get("store_id", 0))
-
-        if not store_id:
-            raise ValidationErrorDetail(
-                code=ErrorCodes.VALIDATION_ERROR, message="Store ID is required"
-            )
-
-        user = await self.users_repo.get_by_id(
-            session=self.session,
-            id_values=self.user_id,
-        )
-        if not user:
-            raise ValidationErrorDetail(
-                code=ErrorCodes.VALIDATION_ERROR, message="User not found"
-            )
-        
-        store = await self.stores_repo.get_by_id(
-            session=self.session,
-            id_values=store_id,
-        )
-        if not store:
-            raise ValidationErrorDetail(
-                code=ErrorCodes.VALIDATION_ERROR, message="Invalid store"
-            )
-        
-        # TODO: validate store_id along with USER_STORE table
-
-        # Prepare upsert data - only override what's provided
-        upsert_data = {
-            "store_id": payload.get("store_id"),
-        }
-
-        # Perform upsert
-        await self.users_repo.upsert(
-            session=self.session,
-            id_values=self.user_id,
-            data=upsert_data,
-        )
 
         return True

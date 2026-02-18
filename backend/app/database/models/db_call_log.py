@@ -1,6 +1,7 @@
-"""activity_log"""
+"""db_call_log"""
 
-from sqlalchemy import ForeignKey, BigInteger, Date, DateTime, JSON, String
+from sqlalchemy import ForeignKey, BigInteger, DOUBLE, Date, DateTime, JSON, String
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -9,14 +10,14 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class ActivityLog(BaseModel):
-    __tablename__ = 'activity_log'
+class DbCallLog(BaseModel):
+    __tablename__ = 'db_call_log'
 
     # id : BIGINT
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="SET NULL"))
 
     # user_id : BIGINT
     user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
@@ -24,17 +25,26 @@ class ActivityLog(BaseModel):
     # timestamp : DATETIME
     timestamp: Mapped[date] = mapped_column(Date, nullable=False)
 
-    # action : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
-    action: Mapped[str] = mapped_column(String(255), nullable=False)
+    # duration_ms : DOUBLE
+    duration_ms: Mapped[float] = mapped_column(DOUBLE, nullable=False)
 
-    # target : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
-    target: Mapped[Optional[str]] = mapped_column(String(255))
+    # raw_query : LONGTEXT
+    raw_query: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
+
+    # params : JSON
+    params: Mapped[Optional[Any]] = mapped_column(JSON, default=[])
+
+    # final_query : LONGTEXT
+    final_query: Mapped[Optional[str]] = mapped_column(LONGTEXT)
+
+    # repo : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
+    repo: Mapped[Optional[str]] = mapped_column(String(255))
+
+    # error : LONGTEXT
+    error: Mapped[Optional[str]] = mapped_column(LONGTEXT)
 
     # metadata_json : JSON
     metadata_json: Mapped[Optional[Any]] = mapped_column(JSON, default=[])
-
-    # ip_address : VARCHAR(45) COLLATE "utf8mb4_unicode_ci"
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
 
     # created_date : TIMESTAMP
     created_date: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
@@ -45,25 +55,25 @@ class ActivityLog(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # activity_log.chamber_id -> chambers.chamber_id
-    activity_log_chamber_id_chambers = relationship(
+    # db_call_log.chamber_id -> chambers.chamber_id
+    db_call_log_chamber_id_chambers = relationship(
         "Chambers",
         foreign_keys=[chamber_id], 
-        backref=backref("activity_log_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("db_call_log_chamber_id_chamberss", cascade="all, delete-orphan")
     )
 
-    # activity_log.user_id -> users.user_id
-    activity_log_user_id_users = relationship(
+    # db_call_log.user_id -> users.user_id
+    db_call_log_user_id_users = relationship(
         "Users",
         foreign_keys=[user_id], 
-        backref=backref("activity_log_user_id_userss", cascade="all, delete-orphan")
+        backref=backref("db_call_log_user_id_userss", cascade="all, delete-orphan")
     )
 
-    # activity_log.created_by -> users.user_id
-    activity_log_created_by_users = relationship(
+    # db_call_log.created_by -> users.user_id
+    db_call_log_created_by_users = relationship(
         "Users",
         foreign_keys=[created_by], 
-        backref=backref("activity_log_created_by_userss", cascade="all, delete-orphan")
+        backref=backref("db_call_log_created_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

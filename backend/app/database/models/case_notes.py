@@ -1,9 +1,10 @@
 """case_notes"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, Text
+from sqlalchemy import ForeignKey, BigInteger, Boolean, DateTime, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
+from datetime import datetime
 from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
@@ -16,19 +17,34 @@ class CaseNotes(BaseModel, TimestampMixin):
     note_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # case_id : BIGINT
-    case_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cases.case_id"), nullable=False)
+    case_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=False)
 
     # user_id : BIGINT
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
     # note_text : TEXT COLLATE "utf8mb4_unicode_ci"
     note_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     # is_private : TINYINT
     is_private: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+
+    # is_deleted : TINYINT
+    is_deleted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+
+    # deleted_date : TIMESTAMP
+    deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # deleted_by : BIGINT
+    deleted_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    # created_by : BIGINT
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    # updated_by : BIGINT
+    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
@@ -52,6 +68,27 @@ class CaseNotes(BaseModel, TimestampMixin):
         "Users",
         foreign_keys=[user_id], 
         backref=backref("case_notes_user_id_userss", cascade="all, delete-orphan")
+    )
+
+    # case_notes.deleted_by -> users.user_id
+    case_notes_deleted_by_users = relationship(
+        "Users",
+        foreign_keys=[deleted_by], 
+        backref=backref("case_notes_deleted_by_userss", cascade="all, delete-orphan")
+    )
+
+    # case_notes.created_by -> users.user_id
+    case_notes_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], 
+        backref=backref("case_notes_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # case_notes.updated_by -> users.user_id
+    case_notes_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], 
+        backref=backref("case_notes_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

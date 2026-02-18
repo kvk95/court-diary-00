@@ -1,6 +1,6 @@
 """refm_modules"""
 
-from sqlalchemy import Boolean, CHAR, Integer, String
+from sqlalchemy import Boolean, CHAR, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -10,17 +10,17 @@ from app.database.models.base.base_model import BaseModel
 class RefmModules(BaseModel):
     __tablename__ = 'refm_modules'
 
-    # module_id : INTEGER
-    module_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    # code : CHAR(8) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(8), primary_key=True, nullable=False)
 
-    # module_code : CHAR(20) COLLATE "utf8mb4_unicode_ci"
-    module_code: Mapped[str] = mapped_column(CHAR(20), nullable=False)
+    # name : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
 
-    # module_name : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
-    module_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # description : TEXT COLLATE "utf8mb4_unicode_ci"
+    description: Mapped[Optional[str]] = mapped_column(Text)
 
     # sort_order : INTEGER
-    sort_order: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # status_ind : TINYINT
     status_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
@@ -32,3 +32,12 @@ class RefmModules(BaseModel):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
+
+class RefmModulesConstants:
+    DASHBOARD = 'DASH'
+    CASES = 'CASES'
+    HEARINGS = 'HEAR'
+    CALENDAR = 'CAL'
+    USER_MANAGEMENT = 'USERS'
+    REPORTS = 'RPT'
+    SETTINGS = 'SET'

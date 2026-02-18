@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmCaseTypes(BaseModel):
     __tablename__ = 'refm_case_types'
 
-    # type_code : CHAR(3) COLLATE "utf8mb4_unicode_ci"
-    type_code: Mapped[str] = mapped_column(CHAR(3), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -29,3 +29,12 @@ class RefmCaseTypes(BaseModel):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
+
+class RefmCaseTypesConstants:
+    CRIMINAL = 'CRIM'
+    CIVIL_SUIT = 'CIVL'
+    WRIT_PETITION = 'WRIT'
+    FAMILY_MATTER = 'FAM'
+    LABOUR_CASE = 'LAB'
+    TAX_MATTER = 'TAX'
+    CONSUMER_CASE = 'CON'

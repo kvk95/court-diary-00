@@ -17,25 +17,25 @@ class Users(BaseModel, TimestampMixin):
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
 
-    # email : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
-    email: Mapped[str] = mapped_column(String(100), nullable=False)
+    # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
+    email: Mapped[str] = mapped_column(String(120), nullable=False)
 
     # password_hash : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # first_name : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    first_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    # first_name : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
+    first_name: Mapped[str] = mapped_column(String(60), nullable=False)
 
-    # last_name : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    last_name: Mapped[Optional[str]] = mapped_column(String(50))
+    # last_name : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
+    last_name: Mapped[Optional[str]] = mapped_column(String(60))
 
     # phone : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
     phone: Mapped[Optional[str]] = mapped_column(String(20))
 
-    # role_code : CHAR(3) COLLATE "utf8mb4_unicode_ci"
-    role_code: Mapped[Optional[str]] = mapped_column(CHAR(3), default='MEM')
+    # role_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    role_code: Mapped[Optional[str]] = mapped_column(CHAR(4), default='MEMB')
 
     # status_ind : TINYINT
     status_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
@@ -43,17 +43,23 @@ class Users(BaseModel, TimestampMixin):
     # is_deleted : TINYINT
     is_deleted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
-    # email_verified : TINYINT
-    email_verified: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # deleted_date : TIMESTAMP
+    deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    # phone_verified : TINYINT
-    phone_verified: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # deleted_by : BIGINT
+    deleted_by: Mapped[Optional[int]] = mapped_column(BigInteger)
 
-    # two_factor_enabled : TINYINT
-    two_factor_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # email_verified_ind : TINYINT
+    email_verified_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
-    # google_auth_connected : TINYINT
-    google_auth_connected: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # phone_verified_ind : TINYINT
+    phone_verified_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+
+    # two_factor_ind : TINYINT
+    two_factor_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+
+    # google_auth_ind : TINYINT
+    google_auth_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # last_login_date : TIMESTAMP
     last_login_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -62,16 +68,10 @@ class Users(BaseModel, TimestampMixin):
     password_changed_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger)
-
-    # deleted_date : TIMESTAMP
-    deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
-
-    # deleted_by : BIGINT
-    deleted_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
@@ -81,6 +81,20 @@ class Users(BaseModel, TimestampMixin):
         "Chambers",
         foreign_keys=[chamber_id], 
         backref=backref("users_chamber_id_chamberss", cascade="all, delete-orphan")
+    )
+
+    # users.created_by -> users.user_id
+    users_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], remote_side=[user_id], 
+        backref=backref("users_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # users.updated_by -> users.user_id
+    users_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], remote_side=[user_id], 
+        backref=backref("users_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

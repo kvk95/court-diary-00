@@ -19,8 +19,8 @@ class Chambers(BaseModel, TimestampMixin):
     # chamber_name : VARCHAR(150) COLLATE "utf8mb4_unicode_ci"
     chamber_name: Mapped[str] = mapped_column(String(150), nullable=False)
 
-    # email : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
-    email: Mapped[Optional[str]] = mapped_column(String(100))
+    # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
+    email: Mapped[Optional[str]] = mapped_column(String(120))
 
     # phone : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
     phone: Mapped[Optional[str]] = mapped_column(String(20))
@@ -31,20 +31,20 @@ class Chambers(BaseModel, TimestampMixin):
     # address_line2 : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     address_line2: Mapped[Optional[str]] = mapped_column(String(255))
 
-    # city : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    city: Mapped[Optional[str]] = mapped_column(String(50))
+    # city : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
+    city: Mapped[Optional[str]] = mapped_column(String(80))
 
-    # state_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    state_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_states.state_code"), default='TN')
+    # state_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    state_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_states.code", ondelete="RESTRICT"), default='TN')
 
-    # postal_code : VARCHAR(10) COLLATE "utf8mb4_unicode_ci"
-    postal_code: Mapped[Optional[str]] = mapped_column(String(10))
+    # postal_code : VARCHAR(12) COLLATE "utf8mb4_unicode_ci"
+    postal_code: Mapped[Optional[str]] = mapped_column(String(12))
 
     # country_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    country_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_countries.country_code"), default='IN')
+    country_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_countries.code", ondelete="RESTRICT"), default='IN')
 
-    # plan_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    plan_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_plan_types.plan_code"), default='FR')
+    # plan_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    plan_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_plan_types.code", ondelete="RESTRICT"), default='FREE')
 
     # subscription_start : DATE
     subscription_start: Mapped[Optional[date]] = mapped_column(Date)
@@ -52,8 +52,8 @@ class Chambers(BaseModel, TimestampMixin):
     # subscription_end : DATE
     subscription_end: Mapped[Optional[date]] = mapped_column(Date)
 
-    # is_active : TINYINT
-    is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    # status_ind : TINYINT
+    status_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
 
     # is_deleted : TINYINT
     is_deleted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
@@ -61,34 +61,58 @@ class Chambers(BaseModel, TimestampMixin):
     # deleted_date : TIMESTAMP
     deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    # deleted_by : BIGINT
+    deleted_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+
     # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # chambers.state_code -> refm_states.state_code
+    # chambers.state_code -> refm_states.code
     chambers_state_code_refm_states = relationship(
         "RefmStates",
         foreign_keys=[state_code], 
         backref=backref("chambers_state_code_refm_statess", cascade="all, delete-orphan")
     )
 
-    # chambers.country_code -> refm_countries.country_code
+    # chambers.country_code -> refm_countries.code
     chambers_country_code_refm_countries = relationship(
         "RefmCountries",
         foreign_keys=[country_code], 
         backref=backref("chambers_country_code_refm_countriess", cascade="all, delete-orphan")
     )
 
-    # chambers.plan_code -> refm_plan_types.plan_code
+    # chambers.plan_code -> refm_plan_types.code
     chambers_plan_code_refm_plan_types = relationship(
         "RefmPlanTypes",
         foreign_keys=[plan_code], 
         backref=backref("chambers_plan_code_refm_plan_typess", cascade="all, delete-orphan")
+    )
+
+    # chambers.deleted_by -> users.user_id
+    chambers_deleted_by_users = relationship(
+        "Users",
+        foreign_keys=[deleted_by], 
+        backref=backref("chambers_deleted_by_userss", cascade="all, delete-orphan")
+    )
+
+    # chambers.created_by -> users.user_id
+    chambers_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], 
+        backref=backref("chambers_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # chambers.updated_by -> users.user_id
+    chambers_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], 
+        backref=backref("chambers_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

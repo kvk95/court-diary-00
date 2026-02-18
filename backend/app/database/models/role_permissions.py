@@ -18,8 +18,8 @@ class RolePermissions(BaseModel, TimestampMixin):
     # role_id : INTEGER
     role_id: Mapped[int] = mapped_column(Integer, ForeignKey("security_roles.role_id", ondelete="CASCADE"), nullable=False)
 
-    # module_id : INTEGER
-    module_id: Mapped[int] = mapped_column(Integer, ForeignKey("refm_modules.module_id", ondelete="CASCADE"), nullable=False)
+    # chamber_module_id : INTEGER
+    chamber_module_id: Mapped[int] = mapped_column(Integer, ForeignKey("chamber_modules.chamber_module_id", ondelete="CASCADE"), nullable=False)
 
     # allow_all_ind : TINYINT
     allow_all_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
@@ -37,10 +37,10 @@ class RolePermissions(BaseModel, TimestampMixin):
     delete_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
@@ -52,11 +52,25 @@ class RolePermissions(BaseModel, TimestampMixin):
         backref=backref("role_permissions_role_id_security_roless", cascade="all, delete-orphan")
     )
 
-    # role_permissions.module_id -> refm_modules.module_id
-    role_permissions_module_id_refm_modules = relationship(
-        "RefmModules",
-        foreign_keys=[module_id], 
-        backref=backref("role_permissions_module_id_refm_moduless", cascade="all, delete-orphan")
+    # role_permissions.chamber_module_id -> chamber_modules.chamber_module_id
+    role_permissions_chamber_module_id_chamber_modules = relationship(
+        "ChamberModules",
+        foreign_keys=[chamber_module_id], 
+        backref=backref("role_permissions_chamber_module_id_chamber_moduless", cascade="all, delete-orphan")
+    )
+
+    # role_permissions.created_by -> users.user_id
+    role_permissions_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], 
+        backref=backref("role_permissions_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # role_permissions.updated_by -> users.user_id
+    role_permissions_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], 
+        backref=backref("role_permissions_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
