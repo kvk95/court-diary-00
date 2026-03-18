@@ -23,7 +23,7 @@ class RefmUserDeletionStatus(BaseModel):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # status_ind : TINYINT
-    status_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
@@ -36,3 +36,4 @@ class RefmUserDeletionStatus(BaseModel):
 class RefmUserDeletionStatusConstants:
     PENDING = 'P'
     DELETED = 'D'
+    REJECTED = 'R'

@@ -65,7 +65,7 @@ class CasesService(BaseSecuredService):
 
     @property
     def chamber_id(self) -> int:
-        return self.company_id   # BaseSecuredService uses company_id context key
+        return self.chamber_id   # BaseSecuredService uses company_id context key
 
     # ─────────────────────────────────────────────────────────────────────
     # CASES — Stats

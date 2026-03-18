@@ -43,7 +43,7 @@ class EmailSettings(BaseModel, TimestampMixin):
     is_default: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # status_ind : TINYINT
-    status_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # created_by : BIGINT
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))

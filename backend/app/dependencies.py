@@ -10,6 +10,11 @@ from app.services.auth_service import AuthService
 from app.services.cases_service import CasesService
 from app.services.users_service import UsersService
 
+from app.services.role_permissions_service import RolePermissionsService
+from app.services.roles_service import RolesService
+from app.services.users_service import UsersService
+
+
 
 def get_anonymous_service(
     session: AsyncSession = Depends(get_session),
@@ -26,9 +31,29 @@ def get_cases_service(
 ) -> CasesService:
     return CasesService(session=session)
 
-def get_users_service(
+
+async def get_roles_service(
     session: AsyncSession = Depends(get_session),
-    # Ensures the route is authenticated without passing user explicitly
+    _=Depends(get_current_user),
+) -> RolesService:
+    return RolesService(
+        session=session,
+    )
+
+
+async def get_role_permissions_service(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(get_current_user),
+) -> RolePermissionsService:
+    return RolePermissionsService(
+        session=session,
+    )
+
+
+async def get_users_service(
+    session: AsyncSession = Depends(get_session),
     _=Depends(get_current_user),
 ) -> UsersService:
-    return UsersService(session=session)
+    return UsersService(
+        session=session
+    )

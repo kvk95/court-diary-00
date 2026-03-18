@@ -73,7 +73,7 @@ INSERT INTO refm_login_status (code, description, sort_order) VALUES
 ('S', 'Success', 1), ('F', 'Failed', 2);
 
 INSERT INTO refm_user_deletion_status (code, description, sort_order) VALUES 
-('P', 'Pending', 1), ('D', 'Deleted', 2);
+('P', 'Pending', 1), ('D', 'Deleted', 2), ('R', 'Rejected', 2);
 
 INSERT IGNORE INTO refm_billing_status (code, description, color_code, sort_order) VALUES
 ('PN', 'Pending', '#f97316', 10), ('PD', 'Paid', '#22c55e', 20),
@@ -107,7 +107,7 @@ INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, cr
 ('Sundar Associates', 'office@sundarlaw.in', '9445123456', 'Coimbatore', 'TN', 'FREE', NULL);
 
 -- Users (NO chamber_id - chamber-agnostic)
-SET @pwd_hash = '$argon2id$v=19$m=65536,t=3,p=4$Z2lBWE9sVjF3L1h4eQ$7JQ4wq5mZy3b8s8u5O8l5G1Y3c3S6J0JY5c1q8P0o7A';
+SET @pwd_hash = '$argon2id$v=19$m=65536,t=3,p=4$hfCeE0IoZay1lhLifA+BkA$3rA1GrCAkdhLzYyGi2S7lc422/W2eEPIqW3MD4u1B48';
 
 INSERT INTO users (email, password_hash, first_name, last_name, phone, role_code, created_by) VALUES
 ('admin@vkchamber.in',   @pwd_hash, 'Vijay',   'Krishnan', '9876543210', 'ADM', NULL),

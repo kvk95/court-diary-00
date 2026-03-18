@@ -28,7 +28,7 @@ CREATE TABLE refm_countries (
     description   VARCHAR(100) NOT NULL,
     phone_code    VARCHAR(8) NULL,
     sort_order    INT NOT NULL DEFAULT 0,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Countries';
 
 DROP TABLE IF EXISTS refm_states;
@@ -37,7 +37,7 @@ CREATE TABLE refm_states (
     description   VARCHAR(100) NOT NULL,
     country_code  CHAR(2) NOT NULL,
     sort_order    INT NOT NULL DEFAULT 0,
-    status_ind    BOOLEAN DEFAULT TRUE,
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT fk_states_country
         FOREIGN KEY (country_code) REFERENCES refm_countries(code) ON DELETE RESTRICT
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='States / Union Territories';
@@ -50,7 +50,7 @@ CREATE TABLE refm_courts (
     court_type    VARCHAR(60) NULL,
     address       TEXT NULL,
     sort_order    INT NOT NULL DEFAULT 0,
-    status_ind    BOOLEAN DEFAULT TRUE,
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE,
     created_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_courts_state
@@ -67,7 +67,7 @@ CREATE TABLE refm_case_status (
     description   VARCHAR(60) NOT NULL,
     color_code    CHAR(7) DEFAULT '#64748b',
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Case status';
 
 DROP TABLE IF EXISTS refm_hearing_status;
@@ -76,7 +76,7 @@ CREATE TABLE refm_hearing_status (
     description   VARCHAR(60) NOT NULL,
     color_code    CHAR(7) DEFAULT '#64748b',
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Hearing status';
 
 DROP TABLE IF EXISTS refm_case_types;
@@ -84,7 +84,7 @@ CREATE TABLE refm_case_types (
     code          CHAR(4) PRIMARY KEY,
     description   VARCHAR(100) NOT NULL,
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Case types';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ CREATE TABLE refm_plan_types (
     price_annual_amt  DECIMAL(12,2) DEFAULT 0,
     currency_code     CHAR(3) DEFAULT 'INR',
     sort_order        INT NOT NULL,
-    status_ind        BOOLEAN DEFAULT TRUE
+    status_ind        BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Subscription plans';
 
 DROP TABLE IF EXISTS refm_modules;
@@ -110,7 +110,7 @@ CREATE TABLE refm_modules (
     name          VARCHAR(100) NOT NULL,
     description   TEXT NULL,
     sort_order    INT NOT NULL DEFAULT 0,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='System modules for permissions';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ CREATE TABLE refm_email_encryption (
     code          CHAR(2) PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Email encryption methods';
 
 DROP TABLE IF EXISTS refm_email_status;
@@ -141,7 +141,7 @@ CREATE TABLE refm_email_templates (
     category      VARCHAR(50) NULL,
     description   VARCHAR(255) NULL,
     sort_order    INT NOT NULL DEFAULT 100,
-    status_ind    BOOLEAN DEFAULT TRUE,
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE,
     created_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='System default email templates';
@@ -159,7 +159,7 @@ CREATE TABLE refm_comm_status (
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7) DEFAULT '#64748b',
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Communication status codes';
 
 DROP TABLE IF EXISTS refm_billing_status;
@@ -168,7 +168,7 @@ CREATE TABLE refm_billing_status (
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7) DEFAULT '#64748b',
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Billing status codes';
 
 DROP TABLE IF EXISTS refm_user_deletion_status;
@@ -177,7 +177,7 @@ CREATE TABLE refm_user_deletion_status (
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7) DEFAULT '#64748b',
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Account deletion request statuses';
 
 DROP TABLE IF EXISTS refm_party_roles;
@@ -186,7 +186,7 @@ CREATE TABLE refm_party_roles (
     description   VARCHAR(60) NOT NULL,
     category      VARCHAR(30) NULL COMMENT 'PARTY=Main Party, REP=Representative, OTHR=Other',
     sort_order    INT NOT NULL,
-    status_ind    BOOLEAN DEFAULT TRUE
+    status_ind    BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Party roles in cases';
 
 -- =============================================================================
@@ -212,7 +212,7 @@ CREATE TABLE chamber (
     plan_code           CHAR(4) DEFAULT 'FREE',
     subscription_start  DATE NULL,
     subscription_end    DATE NULL,
-    status_ind          BOOLEAN DEFAULT TRUE,
+    status_ind          BOOLEAN NOT NULL DEFAULT TRUE,
     is_deleted          BOOLEAN DEFAULT FALSE,
     deleted_date        TIMESTAMP NULL,
     deleted_by          BIGINT NULL,
@@ -246,7 +246,7 @@ CREATE TABLE users (
     
     -- Global defaults (can be overridden per chamber link)
     role_code             CHAR(4) DEFAULT 'MEMB',
-    status_ind            BOOLEAN DEFAULT TRUE,
+    status_ind            BOOLEAN NOT NULL DEFAULT TRUE,
     
     -- Audit & soft-delete
     is_deleted            BOOLEAN DEFAULT FALSE,
@@ -323,7 +323,7 @@ CREATE TABLE user_chamber_link (
     display_name_override   VARCHAR(100) NULL COMMENT 'How user appears in this chamber',
     
     -- Status & Audit
-    status_ind              BOOLEAN DEFAULT TRUE,
+    status_ind              BOOLEAN NOT NULL DEFAULT TRUE,
     created_date            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by              BIGINT NULL,
     updated_date            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -387,7 +387,7 @@ CREATE TABLE security_roles (
     role_name       VARCHAR(80) NOT NULL,
     role_code       CHAR(4) NOT NULL,
     description     TEXT NULL,
-    status_ind      BOOLEAN DEFAULT TRUE,
+    status_ind      BOOLEAN NOT NULL DEFAULT TRUE,
     is_deleted      BOOLEAN DEFAULT FALSE,
     deleted_date    TIMESTAMP NULL,
     deleted_by      BIGINT NULL,
@@ -408,11 +408,11 @@ CREATE TABLE role_permissions (
     permission_id     BIGINT AUTO_INCREMENT PRIMARY KEY,
     role_id           INT NOT NULL,
     chamber_module_id INT NOT NULL,
-    allow_all_ind     BOOLEAN DEFAULT FALSE,
-    read_ind          BOOLEAN DEFAULT TRUE,
-    write_ind         BOOLEAN DEFAULT FALSE,
-    create_ind        BOOLEAN DEFAULT FALSE,
-    delete_ind        BOOLEAN DEFAULT FALSE,
+    allow_all_ind     BOOLEAN NOT NULL DEFAULT FALSE,
+    read_ind          BOOLEAN NOT NULL DEFAULT TRUE,
+    write_ind         BOOLEAN NOT NULL DEFAULT FALSE,
+    create_ind        BOOLEAN NOT NULL DEFAULT FALSE,
+    delete_ind        BOOLEAN NOT NULL DEFAULT FALSE,
     created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by        BIGINT NULL,
     updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -614,7 +614,7 @@ CREATE TABLE clients (
     notes               TEXT NULL,
     
     -- Status & Audit
-    status_ind          BOOLEAN DEFAULT TRUE,
+    status_ind          BOOLEAN NOT NULL DEFAULT TRUE,
     is_deleted          BOOLEAN DEFAULT FALSE,
     deleted_date        TIMESTAMP NULL,
     deleted_by          BIGINT NULL,
@@ -947,7 +947,7 @@ CREATE TABLE email_settings (
     encryption_code     CHAR(2) NOT NULL DEFAULT 'T',
     auth_required_ind   BOOLEAN DEFAULT TRUE,
     is_default          BOOLEAN DEFAULT FALSE,
-    status_ind          BOOLEAN DEFAULT TRUE,
+    status_ind          BOOLEAN NOT NULL DEFAULT TRUE,
     created_date        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by          BIGINT NULL,
     updated_date        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1033,16 +1033,18 @@ CREATE TABLE login_audit (
     user_id         BIGINT NULL,
     chamber_id      BIGINT NOT NULL,
     email           VARCHAR(120) NULL,
-    ip_address      VARCHAR(45),
-    user_agent      TEXT,
-    status_ind      BOOLEAN NOT NULL DEFAULT TRUE,
+    status_code     CHAR(2) NULL,
     failure_reason  VARCHAR(255) NULL,
     login_time      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address      VARCHAR(45),
+    user_agent      TEXT,
     INDEX idx_login_time (login_time DESC),
     CONSTRAINT fk_login_user
         FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
     CONSTRAINT fk_login_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE
+        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
+    CONSTRAINT fk_login_audit_status_code
+        FOREIGN KEY (status_code) REFERENCES refm_login_status(code) ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Login attempts log';
 
 DROP TABLE IF EXISTS db_call_log;

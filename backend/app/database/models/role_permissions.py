@@ -22,19 +22,19 @@ class RolePermissions(BaseModel, TimestampMixin):
     chamber_module_id: Mapped[int] = mapped_column(Integer, ForeignKey("chamber_modules.chamber_module_id", ondelete="CASCADE"), nullable=False)
 
     # allow_all_ind : TINYINT
-    allow_all_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    allow_all_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # read_ind : TINYINT
-    read_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    read_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # write_ind : TINYINT
-    write_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    write_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # create_ind : TINYINT
-    create_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    create_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # delete_ind : TINYINT
-    delete_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    delete_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # created_by : BIGINT
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))

@@ -26,11 +26,6 @@ class BaseSecuredService(BaseService):
         return cast(int, ctx.get("user_id"))
 
     @property
-    def company_id(self) -> int:
+    def chamber_id(self) -> int:
         ctx = get_request_context()
-        return cast(int, ctx.get("company_id"))
-
-    @property
-    def store_id(self) -> int:
-        ctx = get_request_context()
-        return cast(int, ctx.get("store_id"))
+        return cast(int, ctx.get("chamber_id"))

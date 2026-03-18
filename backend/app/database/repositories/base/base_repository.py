@@ -1,3 +1,5 @@
+# app\database\repositories\base\base_repository.py
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

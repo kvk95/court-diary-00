@@ -25,7 +25,7 @@ class SecurityRoles(BaseModel, TimestampMixin):
     description: Mapped[Optional[str]] = mapped_column(Text)
 
     # status_ind : TINYINT
-    status_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # is_deleted : TINYINT
     is_deleted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)

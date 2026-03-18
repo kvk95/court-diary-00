@@ -1,6 +1,6 @@
 """login_audit"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, DateTime, String, Text
+from sqlalchemy import ForeignKey, BigInteger, CHAR, DateTime, String, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -24,20 +24,20 @@ class LoginAudit(BaseModel):
     # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     email: Mapped[Optional[str]] = mapped_column(String(120))
 
-    # ip_address : VARCHAR(45) COLLATE "utf8mb4_unicode_ci"
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
-
-    # user_agent : TEXT COLLATE "utf8mb4_unicode_ci"
-    user_agent: Mapped[Optional[str]] = mapped_column(Text)
-
-    # status_ind : TINYINT
-    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_login_status.code", ondelete="SET NULL"))
 
     # failure_reason : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     failure_reason: Mapped[Optional[str]] = mapped_column(String(255))
 
     # login_time : TIMESTAMP
     login_time: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
+
+    # ip_address : VARCHAR(45) COLLATE "utf8mb4_unicode_ci"
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45))
+
+    # user_agent : TEXT COLLATE "utf8mb4_unicode_ci"
+    user_agent: Mapped[Optional[str]] = mapped_column(Text)
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
@@ -54,6 +54,13 @@ class LoginAudit(BaseModel):
         "Chamber",
         foreign_keys=[chamber_id], 
         backref=backref("login_audit_chamber_id_chambers", cascade="all, delete-orphan")
+    )
+
+    # login_audit.status_code -> refm_login_status.code
+    login_audit_status_code_refm_login_status = relationship(
+        "RefmLoginStatus",
+        foreign_keys=[status_code], 
+        backref=backref("login_audit_status_code_refm_login_statuss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
