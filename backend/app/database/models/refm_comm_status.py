@@ -1,4 +1,4 @@
-"""refm_user_deletion_status"""
+"""refm_comm_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -7,11 +7,11 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmUserDeletionStatus(BaseModel):
-    __tablename__ = 'refm_user_deletion_status'
+class RefmCommStatus(BaseModel):
+    __tablename__ = 'refm_comm_status'
 
-    # code : CHAR(1) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(1), primary_key=True, nullable=False)
+    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
 
     # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -33,6 +33,9 @@ class RefmUserDeletionStatus(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmUserDeletionStatusConstants:
-    PENDING = 'P'
-    DELETED = 'D'
+class RefmCommStatusConstants:
+    PENDING = 'PN'
+    SENT = 'SN'
+    DELIVERED = 'DL'
+    READ = 'RD'
+    FAILED = 'FD'

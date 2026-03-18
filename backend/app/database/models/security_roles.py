@@ -1,7 +1,6 @@
 """security_roles"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, CHAR, DateTime, Integer, String, Text
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import BigInteger, Boolean, CHAR, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from datetime import datetime
@@ -15,9 +14,6 @@ class SecurityRoles(BaseModel, TimestampMixin):
 
     # role_id : INTEGER
     role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
-
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # role_name : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
     role_name: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -49,12 +45,7 @@ class SecurityRoles(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # security_roles.chamber_id -> chambers.chamber_id
-    security_roles_chamber_id_chambers = relationship(
-        "Chambers",
-        foreign_keys=[chamber_id], 
-        backref=backref("security_roles_chamber_id_chamberss", cascade="all, delete-orphan")
-    )
+    #    -- No relationships defined. --
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 

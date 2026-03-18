@@ -19,7 +19,7 @@ class LoginAudit(BaseModel):
     user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     email: Mapped[Optional[str]] = mapped_column(String(120))
@@ -49,11 +49,11 @@ class LoginAudit(BaseModel):
         backref=backref("login_audit_user_id_userss", cascade="all, delete-orphan")
     )
 
-    # login_audit.chamber_id -> chambers.chamber_id
-    login_audit_chamber_id_chambers = relationship(
-        "Chambers",
+    # login_audit.chamber_id -> chamber.chamber_id
+    login_audit_chamber_id_chamber = relationship(
+        "Chamber",
         foreign_keys=[chamber_id], 
-        backref=backref("login_audit_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("login_audit_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

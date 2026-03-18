@@ -1,4 +1,4 @@
-"""refm_user_deletion_status"""
+"""refm_party_roles"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -7,17 +7,17 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmUserDeletionStatus(BaseModel):
-    __tablename__ = 'refm_user_deletion_status'
+class RefmPartyRoles(BaseModel):
+    __tablename__ = 'refm_party_roles'
 
-    # code : CHAR(1) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(1), primary_key=True, nullable=False)
+    # code : CHAR(3) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(3), primary_key=True, nullable=False)
 
-    # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    description: Mapped[str] = mapped_column(String(50), nullable=False)
+    # description : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
+    description: Mapped[str] = mapped_column(String(60), nullable=False)
 
-    # color_code : CHAR(7) COLLATE "utf8mb4_unicode_ci"
-    color_code: Mapped[Optional[str]] = mapped_column(CHAR(7), default='#64748b')
+    # category : VARCHAR(30) COLLATE "utf8mb4_unicode_ci"
+    category: Mapped[Optional[str]] = mapped_column(String(30))
 
     # sort_order : INTEGER
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -33,6 +33,11 @@ class RefmUserDeletionStatus(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmUserDeletionStatusConstants:
-    PENDING = 'P'
-    DELETED = 'D'
+class RefmPartyRolesConstants:
+    PETITIONER = 'PET'
+    RESPONDENT = 'RES'
+    APPELLANT = 'APP'
+    DEFENDANT = 'DEF'
+    PLAINTIFF = 'PLT'
+    WITNESS = 'WIT'
+    ADVOCATE_ON_RECORD = 'AOR'

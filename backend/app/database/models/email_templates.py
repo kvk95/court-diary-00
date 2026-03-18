@@ -17,7 +17,7 @@ class EmailTemplates(BaseModel, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # code : CHAR(30) COLLATE "utf8mb4_unicode_ci"
     code: Mapped[str] = mapped_column(CHAR(30), ForeignKey("refm_email_templates.code", ondelete="RESTRICT"), nullable=False)
@@ -46,11 +46,11 @@ class EmailTemplates(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # email_templates.chamber_id -> chambers.chamber_id
-    email_templates_chamber_id_chambers = relationship(
-        "Chambers",
+    # email_templates.chamber_id -> chamber.chamber_id
+    email_templates_chamber_id_chamber = relationship(
+        "Chamber",
         foreign_keys=[chamber_id], 
-        backref=backref("email_templates_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("email_templates_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
     # email_templates.code -> refm_email_templates.code

@@ -16,7 +16,7 @@ class ActivityLog(BaseModel):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # user_id : BIGINT
     user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
@@ -45,11 +45,11 @@ class ActivityLog(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # activity_log.chamber_id -> chambers.chamber_id
-    activity_log_chamber_id_chambers = relationship(
-        "Chambers",
+    # activity_log.chamber_id -> chamber.chamber_id
+    activity_log_chamber_id_chamber = relationship(
+        "Chamber",
         foreign_keys=[chamber_id], 
-        backref=backref("activity_log_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("activity_log_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
     # activity_log.user_id -> users.user_id

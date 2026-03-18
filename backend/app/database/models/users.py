@@ -16,9 +16,6 @@ class Users(BaseModel, TimestampMixin):
     # user_id : BIGINT
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
-
     # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     email: Mapped[str] = mapped_column(String(120), nullable=False)
 
@@ -75,13 +72,6 @@ class Users(BaseModel, TimestampMixin):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
-
-    # users.chamber_id -> chambers.chamber_id
-    users_chamber_id_chambers = relationship(
-        "Chambers",
-        foreign_keys=[chamber_id], 
-        backref=backref("users_chamber_id_chamberss", cascade="all, delete-orphan")
-    )
 
     # users.created_by -> users.user_id
     users_created_by_users = relationship(

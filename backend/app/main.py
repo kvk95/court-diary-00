@@ -14,7 +14,6 @@ from app.core.config import settings
 from app.database.models.base.session import async_engine
 from app.middleware.request_context_middleware import RequestContextMiddleware
 from app.middleware.exception_handler import add_exception_handlers
-from app.services.jobs.fx_rates_service import FxRatesService
 from app.utils.logging_framework.queue_manager import get_queue_manager
 from app.utils.logging_framework.sqlalchemy_listeners import attach_listeners
 
@@ -46,14 +45,15 @@ async def lifespan(app: FastAPI):
     # ✅ Just await the async startup job
     # 🔑 Create DB session manually (no user, no Depends)
     async with async_sessionmaker(bind=async_engine)() as session:
-        try:
-            async with session.begin():  # 🔒 atomic transaction
-                service = FxRatesService(session)
-                _ = await service.run_fx_startup_job()
-            # commit happens automatically here
-        except Exception:
-            # rollback happens automatically
-            raise
+        # try:
+        #     async with session.begin():  # 🔒 atomic transaction
+        #         service = FxRatesService(session)
+        #         _ = await service.run_fx_startup_job()
+        #     # commit happens automatically here
+        # except Exception:
+        #     # rollback happens automatically
+        #     raise
+        pass
 
     # FastAPI lifecycle enters running state
     # App is now ready to serve requests

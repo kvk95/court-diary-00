@@ -23,5 +23,7 @@
     "diffEditor.codeLens": true,
     "editor.codeLensFontFamily": "courier",
     // ========== XML ==========
-    "xml.format.maxLineWidth": 300
+    "xml.format.maxLineWidth": 300,
+    "python-envs.defaultEnvManager": "ms-python.python:poetry",
+    "python-envs.defaultPackageManager": "ms-python.python:poetry"
 }

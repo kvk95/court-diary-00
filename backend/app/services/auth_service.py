@@ -46,6 +46,7 @@ class AuthService(BaseService):
         - Issues tokens with authoritative claims from DB
         """
         # Find active user by email
+        print(f"LoginRequest:{loginRequest}")
         user = await self.users_repo.get_first(
             self.session,
             filters={self.users_repo.model.email: loginRequest.email},

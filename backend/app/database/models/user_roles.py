@@ -16,8 +16,8 @@ class UserRoles(BaseModel, TimestampMixin):
     # user_role_id : BIGINT
     user_role_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
-    # user_id : BIGINT
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    # link_id : BIGINT
+    link_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("user_chamber_link.link_id", ondelete="CASCADE"), nullable=False)
 
     # role_id : INTEGER
     role_id: Mapped[int] = mapped_column(Integer, ForeignKey("security_roles.role_id", ondelete="CASCADE"), nullable=False)
@@ -29,19 +29,19 @@ class UserRoles(BaseModel, TimestampMixin):
     end_date: Mapped[Optional[date]] = mapped_column(Date)
 
     # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # user_roles.user_id -> users.user_id
-    user_roles_user_id_users = relationship(
-        "Users",
-        foreign_keys=[user_id], 
-        backref=backref("user_roles_user_id_userss", cascade="all, delete-orphan")
+    # user_roles.link_id -> user_chamber_link.link_id
+    user_roles_link_id_user_chamber_link = relationship(
+        "UserChamberLink",
+        foreign_keys=[link_id], 
+        backref=backref("user_roles_link_id_user_chamber_links", cascade="all, delete-orphan")
     )
 
     # user_roles.role_id -> security_roles.role_id
@@ -49,6 +49,20 @@ class UserRoles(BaseModel, TimestampMixin):
         "SecurityRoles",
         foreign_keys=[role_id], 
         backref=backref("user_roles_role_id_security_roless", cascade="all, delete-orphan")
+    )
+
+    # user_roles.created_by -> users.user_id
+    user_roles_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], 
+        backref=backref("user_roles_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # user_roles.updated_by -> users.user_id
+    user_roles_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], 
+        backref=backref("user_roles_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

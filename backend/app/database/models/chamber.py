@@ -1,4 +1,4 @@
-"""chambers"""
+"""chamber"""
 
 from sqlalchemy import ForeignKey, BigInteger, Boolean, CHAR, Date, DateTime, String
 from sqlalchemy.orm import relationship, backref
@@ -10,8 +10,8 @@ from typing import Any, Optional
 from app.database.models.base.base_model import BaseModel
 from app.database.models.base.timestampmixin import TimestampMixin
 
-class Chambers(BaseModel, TimestampMixin):
-    __tablename__ = 'chambers'
+class Chamber(BaseModel, TimestampMixin):
+    __tablename__ = 'chamber'
 
     # chamber_id : BIGINT
     chamber_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
@@ -73,46 +73,46 @@ class Chambers(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # chambers.state_code -> refm_states.code
-    chambers_state_code_refm_states = relationship(
+    # chamber.state_code -> refm_states.code
+    chamber_state_code_refm_states = relationship(
         "RefmStates",
         foreign_keys=[state_code], 
-        backref=backref("chambers_state_code_refm_statess", cascade="all, delete-orphan")
+        backref=backref("chamber_state_code_refm_statess", cascade="all, delete-orphan")
     )
 
-    # chambers.country_code -> refm_countries.code
-    chambers_country_code_refm_countries = relationship(
+    # chamber.country_code -> refm_countries.code
+    chamber_country_code_refm_countries = relationship(
         "RefmCountries",
         foreign_keys=[country_code], 
-        backref=backref("chambers_country_code_refm_countriess", cascade="all, delete-orphan")
+        backref=backref("chamber_country_code_refm_countriess", cascade="all, delete-orphan")
     )
 
-    # chambers.plan_code -> refm_plan_types.code
-    chambers_plan_code_refm_plan_types = relationship(
+    # chamber.plan_code -> refm_plan_types.code
+    chamber_plan_code_refm_plan_types = relationship(
         "RefmPlanTypes",
         foreign_keys=[plan_code], 
-        backref=backref("chambers_plan_code_refm_plan_typess", cascade="all, delete-orphan")
+        backref=backref("chamber_plan_code_refm_plan_typess", cascade="all, delete-orphan")
     )
 
-    # chambers.deleted_by -> users.user_id
-    chambers_deleted_by_users = relationship(
+    # chamber.deleted_by -> users.user_id
+    chamber_deleted_by_users = relationship(
         "Users",
         foreign_keys=[deleted_by], 
-        backref=backref("chambers_deleted_by_userss", cascade="all, delete-orphan")
+        backref=backref("chamber_deleted_by_userss", cascade="all, delete-orphan")
     )
 
-    # chambers.created_by -> users.user_id
-    chambers_created_by_users = relationship(
+    # chamber.created_by -> users.user_id
+    chamber_created_by_users = relationship(
         "Users",
         foreign_keys=[created_by], 
-        backref=backref("chambers_created_by_userss", cascade="all, delete-orphan")
+        backref=backref("chamber_created_by_userss", cascade="all, delete-orphan")
     )
 
-    # chambers.updated_by -> users.user_id
-    chambers_updated_by_users = relationship(
+    # chamber.updated_by -> users.user_id
+    chamber_updated_by_users = relationship(
         "Users",
         foreign_keys=[updated_by], 
-        backref=backref("chambers_updated_by_userss", cascade="all, delete-orphan")
+        backref=backref("chamber_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

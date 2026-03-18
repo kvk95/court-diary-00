@@ -16,7 +16,7 @@ class ChamberModules(BaseModel, TimestampMixin):
     chamber_module_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # module_code : CHAR(8) COLLATE "utf8mb4_unicode_ci"
     module_code: Mapped[str] = mapped_column(CHAR(8), ForeignKey("refm_modules.code", ondelete="RESTRICT"), nullable=False)
@@ -33,11 +33,11 @@ class ChamberModules(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # chamber_modules.chamber_id -> chambers.chamber_id
-    chamber_modules_chamber_id_chambers = relationship(
-        "Chambers",
+    # chamber_modules.chamber_id -> chamber.chamber_id
+    chamber_modules_chamber_id_chamber = relationship(
+        "Chamber",
         foreign_keys=[chamber_id], 
-        backref=backref("chamber_modules_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("chamber_modules_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
     # chamber_modules.module_code -> refm_modules.code

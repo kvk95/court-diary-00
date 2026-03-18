@@ -17,7 +17,7 @@ class Cases(BaseModel, TimestampMixin):
     case_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # case_number : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     case_number: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -70,11 +70,11 @@ class Cases(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # cases.chamber_id -> chambers.chamber_id
-    cases_chamber_id_chambers = relationship(
-        "Chambers",
+    # cases.chamber_id -> chamber.chamber_id
+    cases_chamber_id_chamber = relationship(
+        "Chamber",
         foreign_keys=[chamber_id], 
-        backref=backref("cases_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("cases_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
     # cases.court_id -> refm_courts.court_id

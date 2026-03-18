@@ -17,7 +17,7 @@ class DeleteAccountRequests(BaseModel, TimestampMixin):
     request_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
 
     # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chambers.chamber_id", ondelete="CASCADE"), nullable=False)
+    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # request_no : VARCHAR(30) COLLATE "utf8mb4_unicode_ci"
     request_no: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -43,11 +43,11 @@ class DeleteAccountRequests(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # delete_account_requests.chamber_id -> chambers.chamber_id
-    delete_account_requests_chamber_id_chambers = relationship(
-        "Chambers",
+    # delete_account_requests.chamber_id -> chamber.chamber_id
+    delete_account_requests_chamber_id_chamber = relationship(
+        "Chamber",
         foreign_keys=[chamber_id], 
-        backref=backref("delete_account_requests_chamber_id_chamberss", cascade="all, delete-orphan")
+        backref=backref("delete_account_requests_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
     # delete_account_requests.user_id -> users.user_id
