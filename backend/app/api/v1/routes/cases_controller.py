@@ -53,7 +53,7 @@ class CasesController(BaseController):
     # ─────────────────────────────────────────────────────────────────────
 
     @BaseController.get(
-        "/paged",
+        "/paged/cases",
         summary="Get cases (paginated, with search and filters)",
         response_model=BaseOutDto[PagingData[CaseListOut]],
     )
@@ -298,3 +298,59 @@ class CasesController(BaseController):
     ) -> BaseOutDto[dict]:
         data = await service.case_notes_delete(payload=payload)
         return self.success(result=data)
+    
+@BaseController.post(
+    "/{case_id}/clients/link",
+    summary="Link a client to a case",
+    response_model=BaseOutDto[dict],
+)
+async def link_client_to_case(
+    self,
+    case_id: int = Path(..., description="Case ID"),
+    payload: dict = Body(..., description="Client link data"),
+    service: CasesService = Depends(get_cases_service),
+) -> BaseOutDto[dict]:
+    result = await service.link_client_to_case(
+        case_id=case_id,
+        client_id=payload["client_id"],
+        party_role=payload["party_role"],
+        is_primary=payload.get("is_primary", False),
+        engagement_type=payload.get("engagement_type"),
+    )
+    return self.success(result=result)
+
+# ─────────────────────────────────────────────────────────────────────────
+# CASE CLIENTS — Unlink client
+# ─────────────────────────────────────────────────────────────────────────
+@BaseController.delete(
+    "/{case_id}/clients/{client_id}/unlink",
+    summary="Unlink a client from a case",
+    response_model=BaseOutDto[dict],
+)
+async def unlink_client_from_case(
+    self,
+    case_id: int = Path(..., description="Case ID"),
+    client_id: int = Path(..., description="Client ID"),
+    service: CasesService = Depends(get_cases_service),
+) -> BaseOutDto[dict]:
+    result = await service.unlink_client_from_case(
+        case_id=case_id,
+        client_id=client_id,
+    )
+    return self.success(result=result)
+
+# ─────────────────────────────────────────────────────────────────────────
+# CASE CLIENTS — Get clients
+# ─────────────────────────────────────────────────────────────────────────
+@BaseController.get(
+    "/{case_id}/clients",
+    summary="Get all clients linked to a case",
+    response_model=BaseOutDto[List[dict]],
+)
+async def get_case_clients(
+    self,
+    case_id: int = Path(..., description="Case ID"),
+    service: CasesService = Depends(get_cases_service),
+) -> BaseOutDto[List[dict]]:
+    result = await service.get_case_clients(case_id=case_id)
+    return self.success(result=result)

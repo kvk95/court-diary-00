@@ -1,23 +1,22 @@
-# app\services\cases_service.py
-
 from datetime import date
 from typing import List, Optional
-
 from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.cases import Cases
 from app.database.models.hearings import Hearings
 from app.database.models.case_notes import CaseNotes
+from app.database.models.case_clients import CaseClients
 from app.database.models.users import Users
 from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_case_types import RefmCaseTypes
-from app.database.models.refm_case_status import RefmCaseStatus
+from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.activity_log import ActivityLog
 from app.database.repositories.cases_repository import CasesRepository
 from app.database.repositories.hearings_repository import HearingsRepository
 from app.database.repositories.case_notes_repository import CaseNotesRepository
+from app.database.repositories.case_clients_repository import CaseClientsRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.cases_dto import (
     CaseCreate,
@@ -42,6 +41,7 @@ from app.validators import ErrorCodes, ValidationErrorDetail
 
 
 def _full_name(first: Optional[str], last: Optional[str]) -> Optional[str]:
+    """Helper to concatenate first and last name."""
     parts = [p for p in [first, last] if p]
     return " ".join(parts) if parts else None
 
@@ -53,57 +53,57 @@ class CasesService(BaseSecuredService):
         cases_repo: Optional[CasesRepository] = None,
         hearings_repo: Optional[HearingsRepository] = None,
         case_notes_repo: Optional[CaseNotesRepository] = None,
+        case_clients_repo: Optional[CaseClientsRepository] = None,
     ):
         super().__init__(session)
         self.cases_repo: CasesRepository = cases_repo or CasesRepository()
         self.hearings_repo: HearingsRepository = hearings_repo or HearingsRepository()
         self.case_notes_repo: CaseNotesRepository = case_notes_repo or CaseNotesRepository()
+        self.case_clients_repo: CaseClientsRepository = case_clients_repo or CaseClientsRepository()
 
-    # ─────────────────────────────────────────────────────────────────────
-    # HELPERS — property aliasing company_id → chamber_id
-    # ─────────────────────────────────────────────────────────────────────
-
-    @property
-    def chamber_id(self) -> int:
-        return self.chamber_id   # BaseSecuredService uses company_id context key
-
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASES — Stats
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_get_stats(self) -> CaseSummaryStats:
         """
         Returns the four stat cards: total, active, adjourned, overdue.
         Overdue = next_hearing_date < today AND status still active.
         """
         today = date.today()
-        chamber = self.chamber_id
+        chamber_id = self.chamber_id
 
+        # Total cases
         total_q = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == chamber,
+                Cases.chamber_id == chamber_id,
                 Cases.is_deleted.is_(False),
             )
         )
+
+        # Active cases (status_code = 'AC')
         active_q = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == chamber,
+                Cases.chamber_id == chamber_id,
                 Cases.is_deleted.is_(False),
-                Cases.status_code == "AC",
+                Cases.status_code == RefmCaseStatusConstants.ACTIVE,
             )
         )
+
+        # Adjourned cases (status_code = 'ADJ')
         adjourned_q = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == chamber,
+                Cases.chamber_id == chamber_id,
                 Cases.is_deleted.is_(False),
-                Cases.status_code == "AD",
+                Cases.status_code == RefmCaseStatusConstants.ADJOURNED,
             )
         )
+
+        # Overdue cases (next_hearing_date < today AND status is active)
         overdue_q = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == chamber,
+                Cases.chamber_id == chamber_id,
                 Cases.is_deleted.is_(False),
-                Cases.status_code == "AC",
+                Cases.status_code == RefmCaseStatusConstants.ACTIVE,
                 Cases.next_hearing_date < today,
             )
         )
@@ -115,10 +115,9 @@ class CasesService(BaseSecuredService):
             overdue=overdue_q or 0,
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASES — Paginated list
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_get_paged(
         self,
         page: int,
@@ -138,7 +137,7 @@ class CasesService(BaseSecuredService):
         ]
 
         if status_code and status_code.upper() != "ALL":
-            conditions.append(Cases.status_code == status_code)
+            conditions.append(Cases.status_code == status_code.upper())
 
         if court_id:
             conditions.append(Cases.court_id == court_id)
@@ -153,11 +152,13 @@ class CasesService(BaseSecuredService):
                 )
             )
 
-        order_col = Cases.updated_date.desc()
+        # Determine sort order
         if sort_by == "hearing_date":
             order_col = Cases.next_hearing_date.asc()
         elif sort_by == "case_number":
             order_col = Cases.case_number.asc()
+        else:
+            order_col = Cases.updated_date.desc()
 
         cases, total = await self.cases_repo.list_paginated(
             session=self.session,
@@ -207,10 +208,9 @@ class CasesService(BaseSecuredService):
         builder = PagingBuilder(total_records=total, page=page, limit=limit)
         return builder.build(records=records)
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASES — Detail
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_get_by_id(self, case_id: int) -> CaseDetailOut:
         case = await self.cases_repo.get_by_id(
             session=self.session,
@@ -257,6 +257,14 @@ class CasesService(BaseSecuredService):
             )
         ) or 0
 
+        # Count linked clients
+        client_count = await self.session.scalar(
+            select(func.count(CaseClients.case_client_id)).where(
+                CaseClients.case_id == case_id,
+                CaseClients.is_deleted.is_(False),
+            )
+        ) or 0
+
         return CaseDetailOut(
             case_id=case.case_id,
             chamber_id=case.chamber_id,
@@ -278,14 +286,13 @@ class CasesService(BaseSecuredService):
             created_date=case.created_date,
             updated_date=case.updated_date,
             total_hearings=hearing_count,
-            linked_clients=0,       # client management is a paid feature; placeholder
+            linked_clients=client_count,
             total_notes=note_count,
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASES — Create
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_add(self, payload: CaseCreate) -> CaseDetailOut:
         # Duplicate case number check within chamber
         existing = await self.cases_repo.get_first(
@@ -317,10 +324,9 @@ class CasesService(BaseSecuredService):
 
         return await self.cases_get_by_id(case.case_id)
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASES — Update
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_edit(self, payload: CaseEdit) -> CaseDetailOut:
         case = await self.cases_repo.get_by_id(
             session=self.session,
@@ -348,10 +354,9 @@ class CasesService(BaseSecuredService):
 
         return await self.cases_get_by_id(payload.case_id)
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASES — Delete (soft)
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_delete(self, payload: CaseDelete) -> dict:
         case = await self.cases_repo.get_by_id(
             session=self.session,
@@ -375,10 +380,9 @@ class CasesService(BaseSecuredService):
 
         return {"case_id": payload.case_id, "deleted": True}
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # HEARINGS — List for a case
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def hearings_get_by_case(self, case_id: int) -> List[HearingOut]:
         """All hearings for a case, newest first (by hearing_date DESC)."""
         # Verify case belongs to this chamber
@@ -441,10 +445,9 @@ class CasesService(BaseSecuredService):
             for h in hearings
         ]
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # HEARINGS — Add
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def hearings_add(self, payload: HearingCreate) -> HearingOut:
         # Verify case belongs to this chamber
         case = await self.cases_repo.get_by_id(
@@ -498,10 +501,9 @@ class CasesService(BaseSecuredService):
             updated_date=hearing.updated_date,
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # HEARINGS — Edit
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def hearings_edit(self, payload: HearingEdit) -> HearingOut:
         hearing = await self.hearings_repo.get_by_id(
             session=self.session,
@@ -548,10 +550,9 @@ class CasesService(BaseSecuredService):
             updated_date=updated.updated_date,
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # HEARINGS — Delete
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def hearings_delete(self, payload: HearingDelete) -> dict:
         hearing = await self.hearings_repo.get_by_id(
             session=self.session,
@@ -578,10 +579,9 @@ class CasesService(BaseSecuredService):
 
         return {"hearing_id": payload.hearing_id, "deleted": True}
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASE NOTES — List
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def case_notes_get_by_case(self, case_id: int) -> List[CaseNoteOut]:
         case = await self.cases_repo.get_by_id(
             session=self.session,
@@ -627,10 +627,9 @@ class CasesService(BaseSecuredService):
             for n in notes
         ]
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASE NOTES — Add
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def case_notes_add(self, payload: CaseNoteCreate) -> CaseNoteOut:
         case = await self.cases_repo.get_by_id(
             session=self.session,
@@ -665,10 +664,9 @@ class CasesService(BaseSecuredService):
             updated_date=note.updated_date,
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASE NOTES — Edit
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def case_notes_edit(self, payload: CaseNoteEdit) -> CaseNoteOut:
         note = await self.case_notes_repo.get_by_id(
             session=self.session,
@@ -712,10 +710,9 @@ class CasesService(BaseSecuredService):
             updated_date=updated.updated_date,
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # CASE NOTES — Delete
-    # ─────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────
     async def case_notes_delete(self, payload: CaseNoteDelete) -> dict:
         note = await self.case_notes_repo.get_by_id(
             session=self.session,
@@ -737,10 +734,176 @@ class CasesService(BaseSecuredService):
 
         return {"note_id": payload.note_id, "deleted": True}
 
-    # ─────────────────────────────────────────────────────────────────────
-    # RECENT ACTIVITY — Case detail sidebar
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+    # CASE CLIENTS — Link client to case
+    # ─────────────────────────────────────────────────────────────────────────
+    async def link_client_to_case(
+        self,
+        case_id: int,
+        client_id: int,
+        party_role: str,
+        is_primary: bool = False,
+        engagement_type: Optional[str] = None,
+    ) -> dict:
+        """Link a client to a case."""
+        # Verify case belongs to this chamber
+        case = await self.cases_repo.get_by_id(
+            session=self.session,
+            filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
+        )
+        if not case:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND, message="Case not found"
+            )
 
+        # Check if client already linked with this role
+        existing = await self.case_clients_repo.get_first(
+            session=self.session,
+            filters={
+                CaseClients.case_id: case_id,
+                CaseClients.client_id: client_id,
+                CaseClients.party_role: party_role,
+            },
+        )
+        if existing:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message=f"Client already linked to this case as {party_role}",
+            )
+
+        # Create link
+        await self.case_clients_repo.create(
+            session=self.session,
+            data={
+                "chamber_id": self.chamber_id,
+                "case_id": case_id,
+                "client_id": client_id,
+                "party_role": party_role,
+                "is_primary": is_primary,
+                "engagement_type": engagement_type,
+            },
+        )
+
+        await log_activity(
+            action=f"Client {client_id} linked to case",
+            target=f"case:{case_id}",
+            metadata={
+                "case_id": case_id,
+                "client_id": client_id,
+                "party_role": party_role,
+            },
+        )
+
+        return {
+            "case_id": case_id,
+            "client_id": client_id,
+            "party_role": party_role,
+            "message": "Client linked successfully",
+        }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CASE CLIENTS — Unlink client from case
+    # ─────────────────────────────────────────────────────────────────────────
+    async def unlink_client_from_case(
+        self,
+        case_id: int,
+        client_id: int,
+    ) -> dict:
+        """Remove a client from a case."""
+        # Verify case belongs to this chamber
+        case = await self.cases_repo.get_by_id(
+            session=self.session,
+            filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
+        )
+        if not case:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND, message="Case not found"
+            )
+
+        # Find the link
+        link = await self.case_clients_repo.get_first(
+            session=self.session,
+            filters={
+                CaseClients.case_id: case_id,
+                CaseClients.client_id: client_id,
+            },
+        )
+        if not link:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Client not linked to this case",
+            )
+
+        await self.case_clients_repo.delete(
+            session=self.session,
+            id_values=link.case_client_id,
+            soft=True,
+        )
+
+        await log_activity(
+            action=f"Client {client_id} unlinked from case",
+            target=f"case:{case_id}",
+            metadata={"case_id": case_id, "client_id": client_id},
+        )
+
+        return {
+            "case_id": case_id,
+            "client_id": client_id,
+            "message": "Client unlinked successfully",
+        }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CASE CLIENTS — Get clients for a case
+    # ─────────────────────────────────────────────────────────────────────────
+    async def get_case_clients(self, case_id: int) -> List[dict]:
+        """Get all clients linked to a case."""
+        # Verify case belongs to this chamber
+        case = await self.cases_repo.get_by_id(
+            session=self.session,
+            filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
+        )
+        if not case:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND, message="Case not found"
+            )
+
+        # Get clients
+        from app.database.models.clients import Clients
+
+        rows = await self.session.execute(
+            select(
+                CaseClients,
+                Clients.client_name,
+                Clients.client_type,
+                Clients.email,
+                Clients.phone,
+            )
+            .join(Clients, CaseClients.client_id == Clients.client_id)
+            .where(
+                CaseClients.case_id == case_id,
+                CaseClients.chamber_id == self.chamber_id,
+                CaseClients.is_deleted.is_(False),
+            )
+        )
+
+        return [
+            {
+                "case_client_id": row.CaseClients.case_client_id,
+                "client_id": row.CaseClients.client_id,
+                "client_name": row.client_name,
+                "client_type": row.client_type,
+                "party_role": row.CaseClients.party_role,
+                "is_primary": row.CaseClients.is_primary,
+                "engagement_type": row.CaseClients.engagement_type,
+                "email": row.email,
+                "phone": row.phone,
+            }
+            for row in rows
+        ]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # RECENT ACTIVITY — Case detail sidebar
+    # ─────────────────────────────────────────────────────────────────────────
     async def cases_get_recent_activity(
         self, case_id: int, limit: int = 10
     ) -> List[RecentActivityItem]:
