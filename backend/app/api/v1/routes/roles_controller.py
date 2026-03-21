@@ -1,3 +1,4 @@
+from typing import List, Optional
 
 from fastapi import Body, Depends, Path, Query
 
@@ -9,8 +10,8 @@ from app.dtos.roles_dto import (
     RoleCreate,
     RoleOut,
     RoleUpdate,
-    RoleWithStatsOut,
     RoleUserCountOut,
+    RoleWithStatsOut,
 )
 from app.services.roles_service import RolesService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
@@ -19,7 +20,6 @@ from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAG
 class RolesController(BaseController):
     CONTROLLER_NAME = "roles"
 
-    # ── Roles Listing ─────────────────────────────────────────────────────
     @BaseController.get(
         "/paged",
         summary="Get roles (paginated with stats)",
@@ -27,23 +27,29 @@ class RolesController(BaseController):
     )
     async def roles_get_paged(
         self,
-        page: int = Query(
-            PAGINATION_DEFAULT_PAGE, ge=1, le=10_000, description="Page number"
-        ),
-        limit: int = Query(
-            PAGINATION_DEFAULT_LIMIT, ge=1, le=1000, description="Items per page"
-        ),
-        search: str | None = Query(None, description="Search by role name"),
-        status: bool | None = Query(None, description="Filter by status"),
+        page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1, le=10_000),
+        limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=1000),
+        search: Optional[str] = Query(None, description="Search by role name"),
+        status: Optional[bool] = Query(None, description="Filter by active status"),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[PagingData[RoleWithStatsOut]]:
-        data: PagingData[RoleWithStatsOut] = await service.roles_get_paged(
-            page, limit, search, status
-        )
+        data = await service.roles_get_paged(page, limit, search, status)
         return self.success(result=data)
 
     @BaseController.get(
-        "/roles/{role_id}",
+        "/all",
+        summary="Get all active roles (for dropdowns)",
+        response_model=BaseOutDto[List[RoleOut]],
+    )
+    async def get_all_roles(
+        self,
+        service: RolesService = Depends(get_roles_service),
+    ) -> BaseOutDto[List[RoleOut]]:
+        result = await service.get_all_roles()
+        return self.success(result=result)
+
+    @BaseController.get(
+        "/{role_id}",
         summary="Get role by ID",
         response_model=BaseOutDto[RoleOut],
     )
@@ -52,39 +58,39 @@ class RolesController(BaseController):
         role_id: int = Path(..., gt=0, description="Role ID"),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[RoleOut]:
-        result: RoleOut = await service.get_role_by_id(role_id)
+        result = await service.get_role_by_id(role_id)
         return self.success(result=result)
 
     @BaseController.post(
-        "/roles/add",
+        "/add",
         summary="Add new role",
         response_model=BaseOutDto[RoleOut],
     )
     async def roles_add(
         self,
-        payload: RoleCreate = Body(..., description="Role creation data"),
+        payload: RoleCreate = Body(...),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[RoleOut]:
-        result: RoleOut = await service.roles_add(payload)
+        result = await service.roles_add(payload)
         return self.success(result=result)
 
     @BaseController.put(
-        "/roles/{role_id}/edit",
+        "/{role_id}/edit",
         summary="Update role",
         response_model=BaseOutDto[RoleOut],
     )
     async def roles_update(
         self,
         role_id: int = Path(..., gt=0, description="Role ID"),
-        payload: RoleUpdate = Body(..., description="Updated role data"),
+        payload: RoleUpdate = Body(...),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[RoleOut]:
-        result: RoleOut = await service.roles_update(role_id, payload)
+        result = await service.roles_update(role_id, payload)
         return self.success(result=result)
 
     @BaseController.delete(
-        "/roles/{role_id}/delete",
-        summary="Delete role (soft delete)",
+        "/{role_id}/delete",
+        summary="Delete role (soft delete, blocked if users assigned)",
         response_model=BaseOutDto[bool],
     )
     async def roles_delete(
@@ -92,12 +98,12 @@ class RolesController(BaseController):
         role_id: int = Path(..., gt=0, description="Role ID"),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[bool]:
-        result:bool = await service.roles_delete(role_id)
-        return self.success(result)
+        result = await service.roles_delete(role_id)
+        return self.success(result=result)
 
     @BaseController.get(
-        "/roles/{role_id}/stats",
-        summary="Get role statistics",
+        "/{role_id}/stats",
+        summary="Get role statistics (user count)",
         response_model=BaseOutDto[RoleUserCountOut],
     )
     async def get_role_stats(
@@ -105,5 +111,5 @@ class RolesController(BaseController):
         role_id: int = Path(..., gt=0, description="Role ID"),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[RoleUserCountOut]:
-        result: RoleUserCountOut = await service.get_role_stats(role_id)
+        result = await service.get_role_stats(role_id)
         return self.success(result=result)

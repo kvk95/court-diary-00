@@ -8,7 +8,9 @@ from app.database.models.base.session import get_session
 from app.services.anonymous_service import AnonymousService
 from app.services.auth_service import AuthService
 from app.services.cases_service import CasesService
-from app.services.users_service import UsersService
+from app.services.clients_service import ClientsService
+from app.services.invitations_service import InvitationsService
+
 
 from app.services.role_permissions_service import RolePermissionsService
 from app.services.roles_service import RolesService
@@ -55,5 +57,21 @@ async def get_users_service(
     _=Depends(get_current_user),
 ) -> UsersService:
     return UsersService(
+        session=session
+    )
+
+async def get_clients_service(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(get_current_user),
+) -> ClientsService:
+    return ClientsService(
+        session=session
+    )
+
+async def get_invitations_service(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(get_current_user),
+) -> InvitationsService:
+    return InvitationsService(
         session=session
     )

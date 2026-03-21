@@ -1,63 +1,15 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
 
 from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 
-# ----- Role DTOs -----
-class RoleOut(BaseInData):
-    role_id: int
-    role_name: str
-    status_ind: bool = False
-    created_date: Optional[datetime] = None
+# ─────────────────────────────────────────────────────────────────────────────
+# USER DTOs
+# ─────────────────────────────────────────────────────────────────────────────
 
-
-class RoleCreate(BaseInData):
-    role_name: str
-    status_ind: bool = False
-    description: Optional[str] = None
-
-
-class RoleUpdate(BaseInData):
-    role_id: int
-    role_name: Optional[str] = None
-    status_ind: bool = False
-    description: Optional[str] = None
-
-
-class RoleDelete(BaseInData):
-    role_id: int
-
-
-# ----- Permission DTOs -----
-class RolePermissionOut(BaseRecordData):
-    company_module_id: int
-    module_name: str
-    description: Optional[str] = None
-    is_active: bool
-    allow_all_ind: bool
-    read_ind: bool
-    write_ind: bool
-    create_ind: bool
-    delete_ind: bool
-    import_ind: bool
-    export_ind: bool
-
-
-class RolePermissionEdit(BaseInData):
-    company_module_id: int
-    allow_all_ind: bool | None = None
-    read_ind: bool | None = None
-    write_ind: bool | None = None
-    create_ind: bool | None = None
-    delete_ind: bool | None = None
-    import_ind: bool | None = None
-    export_ind: bool | None = None
-
-
-# ----- User DTOs -----
 class UserOut(BaseRecordData):
     user_id: int
     full_name: Optional[str] = None
@@ -65,29 +17,67 @@ class UserOut(BaseRecordData):
     last_name: Optional[str] = None
     email: EmailStr
     phone: Optional[str] = None
-    role_id: int | None = None
+    role_id: Optional[int] = None
     role_name: Optional[str] = None
-    status_ind: bool = False
+    status_ind: bool = True
     image: Optional[str] = None
+    created_date: Optional[datetime] = None
 
 
 class UserCreate(BaseInData):
-    email: str | None = None
-    first_name: str | None = None
-    last_name: str | None = None
-    phone: str | None = None
-    status_ind: bool = False
-    image: str | None = None
-    role_id: int | None = None
-    password: str 
+    email: str
+    first_name: str
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    password: str
+    status_ind: bool = True
+    role_id: Optional[int] = None
+
+    @field_validator("email")
+    @classmethod
+    def email_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Email is required")
+        return v.strip().lower()
+
+    @field_validator("first_name")
+    @classmethod
+    def first_name_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("First name is required")
+        return v.strip()
 
 
 class UserEdit(BaseInData):
-    email: str | None = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
-    status_ind: bool = False
-    image: Optional[str] = None
+    status_ind: Optional[bool] = None
     role_id: Optional[int] = None
-    password: str | None = None
+    # Email and password are separate dedicated endpoints for security
+
+
+class UserStatusToggle(BaseInData):
+    """Toggle a user's active/inactive status."""
+    user_id: int
+    status_ind: bool
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DELETION REQUEST DTOs
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DeletionRequestOut(BaseRecordData):
+    request_id: int
+    request_no: str
+    user_id: int
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    request_date: Optional[datetime] = None
+    status_code: Optional[str] = None
+    notes: Optional[str] = None
+    created_by: Optional[int] = None
+
+
+class DeletionRejectPayload(BaseInData):
+    notes: Optional[str] = None

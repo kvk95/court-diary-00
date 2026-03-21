@@ -1,9 +1,10 @@
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_modules import ChamberModules
+from app.database.models.refm_modules import RefmModules
 from app.database.models.role_permissions import RolePermissions
 from app.database.models.security_roles import SecurityRoles
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
@@ -29,18 +30,26 @@ class RolePermissionsService(BaseSecuredService):
     async def get_permission_matrix(
         self,
         role_id: int,
-        module_name: str | None = None,
-    ) -> list[RolePermissionModuleOut]:
+        module_name: Optional[str] = None,
+    ) -> List[RolePermissionModuleOut]:
         """
-        Get permission matrix for a role (all modules with permissions).
-        This is for SS 2 - showing the toggle matrix.
+        All active chamber modules for this chamber, each annotated with the
+        role's current permission flags (or all-False if no row yet).
+        Joins refm_modules to get the human-readable module name.
         """
-        # Get all active modules for this chamber
         stmt = (
             select(
-                ChamberModules,
-                RolePermissions,
+                ChamberModules.chamber_module_id,
+                ChamberModules.module_code,
+                RefmModules.name.label("module_name"),
+                RolePermissions.permission_id,
+                RolePermissions.allow_all_ind,
+                RolePermissions.read_ind,
+                RolePermissions.write_ind,
+                RolePermissions.create_ind,
+                RolePermissions.delete_ind,
             )
+            .join(RefmModules, ChamberModules.module_code == RefmModules.code)
             .outerjoin(
                 RolePermissions,
                 and_(
@@ -50,78 +59,72 @@ class RolePermissionsService(BaseSecuredService):
             )
             .where(
                 ChamberModules.chamber_id == self.chamber_id,
-                ChamberModules.is_active == True,
+                ChamberModules.is_active.is_(True),
             )
-            .order_by(ChamberModules.module_code.asc())
+            .order_by(RefmModules.sort_order.asc(), ChamberModules.module_code.asc())
         )
 
-        if module_name:
-            stmt = stmt.where(ChamberModules.module_code.ilike(f"%{module_name}%"))
+        if module_name and module_name.strip():
+            stmt = stmt.where(RefmModules.name.ilike(f"%{module_name.strip()}%"))
 
         result = await self.session.execute(stmt)
         rows = result.all()
 
-        # Build response
-        permissions = []
-        for chamber_module, role_perm in rows:
-            permissions.append(RolePermissionModuleOut(
-                chamber_module_id=chamber_module.chamber_module_id,
-                module_code=chamber_module.module_code,
-                module_name=chamber_module.module_code,  # You can join refm_modules for name
-                permission_id=role_perm.permission_id if role_perm else None,
-                allow_all_ind=role_perm.allow_all_ind if role_perm else False,
-                read_ind=role_perm.read_ind if role_perm else False,
-                write_ind=role_perm.write_ind if role_perm else False,
-                create_ind=role_perm.create_ind if role_perm else False,
-                delete_ind=role_perm.delete_ind if role_perm else False,
-                # Add import/export if you have those columns
-                # import_ind=role_perm.import_ind if role_perm else False,
-                # export_ind=role_perm.export_ind if role_perm else False,
-            ))
-
-        return permissions
+        return [
+            RolePermissionModuleOut(
+                chamber_module_id=row.chamber_module_id,
+                module_code=row.module_code,
+                module_name=row.module_name or row.module_code,
+                permission_id=row.permission_id,
+                allow_all_ind=bool(row.allow_all_ind) if row.allow_all_ind is not None else False,
+                read_ind=bool(row.read_ind) if row.read_ind is not None else False,
+                write_ind=bool(row.write_ind) if row.write_ind is not None else False,
+                create_ind=bool(row.create_ind) if row.create_ind is not None else False,
+                delete_ind=bool(row.delete_ind) if row.delete_ind is not None else False,
+            )
+            for row in rows
+        ]
 
     async def role_permissions_edit(
         self,
         role_id: int,
-        payload: list[RolePermissionEdit],
+        payload: List[RolePermissionEdit],
     ) -> bool:
         """
-        Update permissions for a role (bulk update from matrix).
+        Bulk upsert permissions for a role from the toggle matrix.
+        Validates role existence and that each module belongs to this chamber.
         """
-        # Verify role exists
-        role_stmt = select(SecurityRoles).where(
-            SecurityRoles.role_id == role_id,
-            SecurityRoles.is_deleted.is_(False),
+        # Verify role exists and is not deleted
+        role_result = await self.session.execute(
+            select(SecurityRoles).where(
+                SecurityRoles.role_id == role_id,
+                SecurityRoles.is_deleted.is_(False),
+            )
         )
-        role_result = await self.session.execute(role_stmt)
         role = role_result.scalars().first()
-
         if not role:
             raise ValidationErrorDetail(
-                code=ErrorCodes.NOT_FOUND,
-                message=f"Role {role_id} not found"
+                code=ErrorCodes.NOT_FOUND, message=f"Role {role_id} not found"
             )
 
-        # Process each permission update
         for dto in payload:
-            # Verify chamber_module exists and belongs to this chamber
-            module_stmt = select(ChamberModules).where(
-                and_(
-                    ChamberModules.chamber_module_id == dto.chamber_module_id,
-                    ChamberModules.chamber_id == self.chamber_id,
+            # Verify module belongs to this chamber
+            module_result = await self.session.execute(
+                select(ChamberModules).where(
+                    and_(
+                        ChamberModules.chamber_module_id == dto.chamber_module_id,
+                        ChamberModules.chamber_id == self.chamber_id,
+                        ChamberModules.is_active.is_(True),
+                    )
                 )
             )
-            module_result = await self.session.execute(module_stmt)
             module = module_result.scalars().first()
-
             if not module:
                 raise ValidationErrorDetail(
                     code=ErrorCodes.VALIDATION_ERROR,
-                    message=f"Module {dto.chamber_module_id} not found in your chamber"
+                    message=f"Module {dto.chamber_module_id} not found or inactive in your chamber",
                 )
 
-            # Prepare permission data
             perm_data = {
                 "role_id": role_id,
                 "chamber_module_id": dto.chamber_module_id,
@@ -130,12 +133,8 @@ class RolePermissionsService(BaseSecuredService):
                 "write_ind": dto.write_ind,
                 "create_ind": dto.create_ind,
                 "delete_ind": dto.delete_ind,
-                # Add import/export if you have those columns
-                # "import_ind": dto.import_ind,
-                # "export_ind": dto.export_ind,
             }
 
-            # Upsert permission
             await self.role_permissions_repo.upsert(
                 session=self.session,
                 filters={
@@ -147,31 +146,22 @@ class RolePermissionsService(BaseSecuredService):
 
         return True
 
-    async def get_role_permissions_summary(
-        self,
-        role_id: int,
-    ) -> RolePermissionMatrixOut:
-        """
-        Get complete permission matrix for a role with role info.
-        """
-        # Get role info
-        role = await self.session.execute(
+    async def get_role_permissions_summary(self, role_id: int) -> RolePermissionMatrixOut:
+        """Full permission matrix + role info (for the detail page)."""
+        role_result = await self.session.execute(
             select(SecurityRoles).where(SecurityRoles.role_id == role_id)
         )
-        role_result = role.scalars().first()
-
-        if not role_result:
+        role = role_result.scalars().first()
+        if not role:
             raise ValidationErrorDetail(
-                code=ErrorCodes.NOT_FOUND,
-                message=f"Role {role_id} not found"
+                code=ErrorCodes.NOT_FOUND, message=f"Role {role_id} not found"
             )
 
-        # Get permissions
         permissions = await self.get_permission_matrix(role_id)
 
         return RolePermissionMatrixOut(
             role_id=role_id,
-            role_name=role_result.role_name,
-            role_code=role_result.role_code,
+            role_name=role.role_name,
+            role_code=role.role_code,
             permissions=permissions,
         )

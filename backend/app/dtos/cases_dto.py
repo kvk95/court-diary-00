@@ -1,7 +1,7 @@
-# app\dtos\cases_dto.py
+"""cases_dto.py — DTOs for Cases, Hearings, Case Notes, Case Clients"""
 
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import field_validator
 
@@ -9,33 +9,23 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# COURT (reference — used inside case responses)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class CourtOut(BaseRecordData):
-    court_id: int
-    court_name: str
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # CASES — List / Detail
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CaseListOut(BaseRecordData):
-    """Compact row shown in the Cases list screen."""
     case_id: int
     case_number: str
     status_code: Optional[str] = None
-    court_name: Optional[str] = None          # joined from refm_courts
+    status_description: Optional[str] = None
+    court_name: Optional[str] = None
     petitioner: str
     respondent: str
-    aor_name: Optional[str] = None            # joined from users (first_name + last_name)
+    aor_name: Optional[str] = None
     next_hearing_date: Optional[date] = None
     updated_date: Optional[datetime] = None
 
 
 class CaseDetailOut(BaseRecordData):
-    """Full case detail for the Case Detail screen."""
     case_id: int
     chamber_id: int
     case_number: str
@@ -55,14 +45,12 @@ class CaseDetailOut(BaseRecordData):
     last_hearing_date: Optional[date] = None
     created_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
-    # Counts for overview panel
     total_hearings: int = 0
     linked_clients: int = 0
     total_notes: int = 0
 
 
 class CaseSummaryStats(BaseRecordData):
-    """Stats for the top-of-page stat cards."""
     total: int = 0
     active: int = 0
     adjourned: int = 0
@@ -80,7 +68,6 @@ class CaseCreate(BaseInData):
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
-    aor_name: Optional[str] = None            # free-text AOR (stored in petitioner/respondent or used to find user)
     aor_user_id: Optional[int] = None
     case_summary: Optional[str] = None
     status_code: str = "AC"
@@ -127,11 +114,10 @@ class CaseDelete(BaseInData):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HEARINGS — List / Detail
+# HEARINGS
 # ─────────────────────────────────────────────────────────────────────────────
 
 class HearingOut(BaseRecordData):
-    """Single hearing record — used in hearing history list."""
     hearing_id: int
     case_id: int
     hearing_date: date
@@ -141,19 +127,15 @@ class HearingOut(BaseRecordData):
     notes: Optional[str] = None
     order_details: Optional[str] = None
     next_hearing_date: Optional[date] = None
-    created_by_name: Optional[str] = None     # user who created/recorded this hearing
+    created_by_name: Optional[str] = None
     created_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# HEARINGS — Create / Edit
-# ─────────────────────────────────────────────────────────────────────────────
-
 class HearingCreate(BaseInData):
     case_id: int
     hearing_date: date
-    status_code: str = "SC"                   # SC=Scheduled by default
+    status_code: str = "SC"
     purpose: Optional[str] = None
     notes: Optional[str] = None
     order_details: Optional[str] = None
@@ -175,23 +157,19 @@ class HearingDelete(BaseInData):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CASE NOTES — List / Detail
+# CASE NOTES
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CaseNoteOut(BaseRecordData):
     note_id: int
     case_id: int
     user_id: int
-    author_name: Optional[str] = None         # first_name + last_name of user
+    author_name: Optional[str] = None
     note_text: str
     is_private: bool = False
     created_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CASE NOTES — Create / Edit
-# ─────────────────────────────────────────────────────────────────────────────
 
 class CaseNoteCreate(BaseInData):
     case_id: int
@@ -217,7 +195,42 @@ class CaseNoteDelete(BaseInData):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ACTIVITY LOG — Recent activity shown in sidebar of case detail
+# CASE CLIENTS (link client to case)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CaseClientOut(BaseRecordData):
+    case_client_id: int
+    client_id: int
+    client_name: str
+    client_type: str
+    party_role: str
+    party_role_description: Optional[str] = None
+    is_primary: bool = False
+    engagement_type: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class CaseClientLinkPayload(BaseInData):
+    client_id: int
+    party_role: str
+    is_primary: bool = False
+    engagement_type: Optional[str] = None
+
+    @field_validator("party_role")
+    @classmethod
+    def party_role_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Party role is required")
+        return v.strip().upper()
+
+
+class CaseClientUnlinkPayload(BaseInData):
+    case_client_id: int
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RECENT ACTIVITY
 # ─────────────────────────────────────────────────────────────────────────────
 
 class RecentActivityItem(BaseRecordData):
