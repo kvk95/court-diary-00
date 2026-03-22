@@ -60,3 +60,8 @@ from app.services.aor_service import AorService
 
 async def get_aor_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> AorService:
     return AorService(session=session)
+
+from app.services.dashboard_service import DashboardService
+
+async def get_dashboard_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> DashboardService:
+    return DashboardService(session=session)
