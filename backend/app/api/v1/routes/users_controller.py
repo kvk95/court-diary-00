@@ -175,3 +175,18 @@ class UsersController(BaseController):
             request_id=request_id, payload=payload
         )
         return self.success(result=result)
+
+    # ── Remove from Chamber (soft-delete link) ────────────────────────────
+
+    @BaseController.delete(
+        "/{user_id}/remove-from-chamber",
+        summary="Remove user from this chamber (preserves user account)",
+        response_model=BaseOutDto[dict],
+    )
+    async def users_remove_from_chamber(
+        self,
+        user_id: int = Path(..., gt=0, description="User ID"),
+        service: UsersService = Depends(get_users_service),
+    ) -> BaseOutDto[dict]:
+        result = await service.users_remove_from_chamber(user_id=user_id)
+        return self.success(result=result)

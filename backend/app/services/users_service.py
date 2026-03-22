@@ -512,3 +512,46 @@ class UsersService(BaseSecuredService):
 
         builder = PagingBuilder(total_records=total, page=page, limit=limit)
         return builder.build(records=records)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # REMOVE FROM CHAMBER (soft-delete the link, not the user)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def users_remove_from_chamber(self, user_id: int) -> dict:
+        """
+        Soft-removes a user from this chamber by setting left_date on the
+        user_chamber_link and marking status_ind=False.
+        The user record itself is NOT deleted — they can still belong to other chambers.
+        """
+        if user_id == self.user_id:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="You cannot remove yourself from the chamber.",
+            )
+
+        link = await self._get_active_link(user_id)
+        if not link:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message=f"User {user_id} is not an active member of this chamber",
+            )
+
+        user = await self.users_repo.get_by_id(session=self.session, id_values=user_id)
+
+        # Close the link
+        await self.user_chamber_link_repo.update(
+            session=self.session,
+            id_values=link.link_id,
+            data={
+                "left_date": date.today(),
+                "status_ind": False,
+                "updated_by": self.user_id,
+            },
+        )
+
+        return {
+            "user_id": user_id,
+            "user_email": user.email if user else None,
+            "removed": True,
+            "message": "User has been removed from this chamber. Their account is preserved.",
+        }

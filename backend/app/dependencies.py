@@ -4,6 +4,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user
+
 from app.database.models.base.session import get_session
 from app.services.anonymous_service import AnonymousService
 from app.services.auth_service import AuthService
@@ -11,6 +12,7 @@ from app.services.billing_service import BillingService
 from app.services.calendar_service import CalendarService
 from app.services.cases_service import CasesService
 from app.services.clients_service import ClientsService
+from app.services.collaborations_service import CollaborationsService
 from app.services.invitations_service import InvitationsService
 from app.services.reports_service import ReportsService
 from app.services.role_permissions_service import RolePermissionsService
@@ -39,6 +41,9 @@ async def get_calendar_service(session: AsyncSession = Depends(get_session), _=D
 async def get_reports_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> ReportsService:
     return ReportsService(session=session)
 
+async def get_collaborations_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> CollaborationsService:
+    return CollaborationsService(session=session)
+
 async def get_invitations_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> InvitationsService:
     return InvitationsService(session=session)
 
@@ -50,3 +55,8 @@ async def get_role_permissions_service(session: AsyncSession = Depends(get_sessi
 
 async def get_users_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> UsersService:
     return UsersService(session=session)
+
+from app.services.aor_service import AorService
+
+async def get_aor_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> AorService:
+    return AorService(session=session)
