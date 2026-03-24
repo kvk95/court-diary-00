@@ -4,7 +4,6 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_modules import ChamberModules
-from app.database.models.refm_modules import RefmModules
 from app.database.models.role_permissions import RolePermissions
 from app.database.models.security_roles import SecurityRoles
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
@@ -32,55 +31,27 @@ class RolePermissionsService(BaseSecuredService):
         role_id: int,
         module_name: Optional[str] = None,
     ) -> List[RolePermissionModuleOut]:
-        """
-        All active chamber modules for this chamber, each annotated with the
-        role's current permission flags (or all-False if no row yet).
-        Joins refm_modules to get the human-readable module name.
-        """
-        stmt = (
-            select(
-                ChamberModules.chamber_module_id,
-                ChamberModules.module_code,
-                RefmModules.name.label("module_name"),
-                RolePermissions.permission_id,
-                RolePermissions.allow_all_ind,
-                RolePermissions.read_ind,
-                RolePermissions.write_ind,
-                RolePermissions.create_ind,
-                RolePermissions.delete_ind,
-            )
-            .join(RefmModules, ChamberModules.module_code == RefmModules.code)
-            .outerjoin(
-                RolePermissions,
-                and_(
-                    ChamberModules.chamber_module_id == RolePermissions.chamber_module_id,
-                    RolePermissions.role_id == role_id,
-                ),
-            )
-            .where(
-                ChamberModules.chamber_id == self.chamber_id,
-                ChamberModules.is_active.is_(True),
-            )
-            .order_by(RefmModules.sort_order.asc(), ChamberModules.module_code.asc())
+        rows = await self.role_permissions_repo.get_role_permission_matrix(
+            session=self.session,
+            role_id=role_id,
+            chamber_id=self.chamber_id,
+            module_name=module_name,
         )
-
-        if module_name and module_name.strip():
-            stmt = stmt.where(RefmModules.name.ilike(f"%{module_name.strip()}%"))
-
-        result = await self.session.execute(stmt)
-        rows = result.all()
 
         return [
             RolePermissionModuleOut(
-                chamber_module_id=row.chamber_module_id,
-                module_code=row.module_code,
-                module_name=row.module_name or row.module_code,
-                permission_id=row.permission_id,
-                allow_all_ind=bool(row.allow_all_ind) if row.allow_all_ind is not None else False,
-                read_ind=bool(row.read_ind) if row.read_ind is not None else False,
-                write_ind=bool(row.write_ind) if row.write_ind is not None else False,
-                create_ind=bool(row.create_ind) if row.create_ind is not None else False,
-                delete_ind=bool(row.delete_ind) if row.delete_ind is not None else False,
+                chamber_module_id=row["chamber_module_id"],
+                chamber_id=row["chamber_id"],
+                chamber_name=row["chamber_name"],
+                module_code=row["module_code"],
+                module_name=row["module_name"] or row["module_code"],
+                permission_id=row.get("permission_id"),
+                role_id=role_id,
+                allow_all_ind=bool(row.get("allow_all_ind")) if row.get("allow_all_ind") is not None else False,
+                read_ind=bool(row.get("read_ind")) if row.get("read_ind") is not None else False,
+                write_ind=bool(row.get("write_ind")) if row.get("write_ind") is not None else False,
+                create_ind=bool(row.get("create_ind")) if row.get("create_ind") is not None else False,
+                delete_ind=bool(row.get("delete_ind")) if row.get("delete_ind") is not None else False,
             )
             for row in rows
         ]

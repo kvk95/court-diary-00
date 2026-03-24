@@ -1,3 +1,4 @@
+# app\services\users_service.py
 from datetime import date, datetime
 from typing import Optional, List
 import uuid
@@ -176,9 +177,12 @@ class UsersService(BaseSecuredService):
         permissions = [
             RolePermissionModuleOut(
                 chamber_module_id=p["chamber_module_id"],
+                chamber_id=p["chamber_id"],
+                chamber_name=p["chamber_name"],
                 module_code=p["module_code"],
                 module_name=p["module_name"],
                 permission_id=p.get("permission_id"),
+                role_id=p["role_id"],
                 allow_all_ind=p["allow_all_ind"],
                 read_ind=p["read_ind"],
                 write_ind=p["write_ind"],
@@ -228,10 +232,10 @@ class UsersService(BaseSecuredService):
         for user_data in users:
             # Get permissions for each user
             if user_data.get("role"):
-                perm_rows = await self.role_permissions_repo.get_permissions_for_login(
+                perm_rows = await self.role_permissions_repo.get_role_permissions(
                     session=self.session,
-                    role_id=user_data["role"]["role_id"],
                     chamber_id=self.chamber_id,
+                    user_id=user_data["user_id"]
                 )
                 user_data["permissions"] = perm_rows
             else:

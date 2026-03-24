@@ -10,10 +10,8 @@ from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.models.chamber import Chamber
-from app.database.models.chamber_modules import ChamberModules
-from app.database.models.role_permissions import RolePermissions
-from app.database.models.refm_modules import RefmModules
 from app.database.repositories.base.base_repository import BaseRepository
+from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
 
@@ -105,10 +103,11 @@ class UsersRepository(BaseRepository[Users]):
             return None
 
         # Get permissions for this role in this chamber
-        permissions = await self._get_role_permissions(
+        role_permissions_repo = RolePermissionsRepository()
+        permissions = await role_permissions_repo.get_role_permissions(
             session=session,
-            role_id=row.role_id,
             chamber_id=chamber_id,
+            user_id=row.user_id,
         )
 
         return {
@@ -138,65 +137,6 @@ class UsersRepository(BaseRepository[Users]):
             },
             "permissions": permissions,
         }
-
-    async def _get_role_permissions(
-        self,
-        session: AsyncSession,
-        role_id: int,
-        chamber_id: int,
-    ) -> List[Dict[str, Any]]:
-        """
-        Get permissions for a role in a specific chamber.
-        Helper method for get_user_full_details.
-        """
-        if not role_id:
-            return []
-
-        stmt = (
-            select(
-                ChamberModules.chamber_module_id,
-                RefmModules.code.label("module_code"),
-                RefmModules.name.label("module_name"),
-                RolePermissions.permission_id,
-                RolePermissions.allow_all_ind,
-                RolePermissions.read_ind,
-                RolePermissions.write_ind,
-                RolePermissions.create_ind,
-                RolePermissions.delete_ind,
-            )
-            .join(
-                RolePermissions,
-                ChamberModules.chamber_module_id == RolePermissions.chamber_module_id,
-            )
-            .join(
-                RefmModules,
-                ChamberModules.module_code == RefmModules.code,
-            )
-            .where(
-                RolePermissions.role_id == role_id,
-                ChamberModules.chamber_id == chamber_id,
-                ChamberModules.is_active.is_(True),
-            )
-        )
-
-        self._log_stmt(stmt, session)
-        result = await session.execute(stmt)
-        rows = result.all()
-
-        return [
-            {
-                "chamber_module_id": row.chamber_module_id,
-                "module_code": row.module_code,
-                "module_name": row.module_name,
-                "permission_id": row.permission_id,
-                "allow_all_ind": row.allow_all_ind,
-                "read_ind": row.read_ind,
-                "write_ind": row.write_ind,
-                "create_ind": row.create_ind,
-                "delete_ind": row.delete_ind,
-            }
-            for row in rows
-        ]
 
     # ─────────────────────────────────────────────────────────────────────────
     # Paginated List (Returns raw dicts, NOT DTOs)

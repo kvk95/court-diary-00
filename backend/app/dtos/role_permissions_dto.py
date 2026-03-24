@@ -21,9 +21,12 @@ class RolePermissionEdit(RolePermissionBase):
 
 class RolePermissionModuleOut(BaseModel):
     chamber_module_id: int
+    chamber_id: int
+    chamber_name: str
     module_code: str
     module_name: str
     permission_id: Optional[int] = None
+    role_id:int
     allow_all_ind: bool
     read_ind: bool
     write_ind: bool

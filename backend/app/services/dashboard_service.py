@@ -1,9 +1,10 @@
-"""dashboard_service.py — Business logic for Main Dashboard and Admin Dashboard"""
+"""dashboard_service.py"""
 
 from datetime import date, datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.repositories.dashboard_repository import DashboardRepository
@@ -34,10 +35,10 @@ def _full_name(first: Optional[str], last: Optional[str]) -> str:
 
 
 def _trend_pct(current: int, previous: int) -> Optional[float]:
-    """Month-over-month % change. Returns None when previous is 0."""
+    """Calculate month-over-month percentage change. Returns None if previous is 0."""
     if previous == 0:
         return None
-    return round((current - previous) / previous * 100, 1)
+    return round(((current - previous) / previous) * 100, 1)
 
 
 class DashboardService(BaseSecuredService):
@@ -49,24 +50,22 @@ class DashboardService(BaseSecuredService):
         super().__init__(session)
         self.repo = dashboard_repo or DashboardRepository()
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ===================================================================
     # HELPERS
-    # ─────────────────────────────────────────────────────────────────────
+    # ===================================================================
 
-    async def _get_status_color_map(self) -> dict:
-        """Load hearing status colors once per request."""
-        from sqlalchemy import select
-        rows = await self.session.execute(
-            select(RefmHearingStatus.code, RefmHearingStatus.color_code)
-        )
-        return {r.code: r.color_code for r in rows}
-
-    async def _get_status_desc_map(self) -> dict:
-        from sqlalchemy import select
-        rows = await self.session.execute(
+    async def _get_hearing_status_maps(self):
+        """Load both description and color maps once."""
+        desc_rows = await self.session.execute(
             select(RefmHearingStatus.code, RefmHearingStatus.description)
         )
-        return {r.code: r.description for r in rows}
+        color_rows = await self.session.execute(
+            select(RefmHearingStatus.code, RefmHearingStatus.color_code)
+        )
+        return (
+            {r.code: r.description for r in desc_rows},
+            {r.code: r.color_code for r in color_rows},
+        )
 
     def _to_hearing_item(self, r, desc_map: dict, color_map: dict) -> DashboardHearingItem:
         return DashboardHearingItem(
@@ -79,13 +78,13 @@ class DashboardService(BaseSecuredService):
             hearing_date=r.hearing_date,
             purpose=r.purpose,
             status_code=r.status_code,
-            status_description=desc_map.get(r.status_code) if r.status_code else None,
-            color=color_map.get(r.status_code) if r.status_code else None,
+            status_description=desc_map.get(r.status_code),
+            color=color_map.get(r.status_code),
         )
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ===================================================================
     # MAIN DASHBOARD
-    # ─────────────────────────────────────────────────────────────────────
+    # ===================================================================
 
     async def get_main_dashboard(self, user_first_name: str) -> MainDashboardOut:
         today = date.today()
@@ -93,12 +92,12 @@ class DashboardService(BaseSecuredService):
         cid = self.chamber_id
         hour = datetime.now().hour
 
-        # All dashboard queries via repo
+        # Fetch all data from repository
         overview = await self.repo.get_practice_overview(
             session=self.session, chamber_id=cid, today=today
         )
         chamber_stats = await self.repo.get_chamber_management_stats(
-            session=self.session, chamber_id=cid
+            session=self.session, chamber_id=cid, today=today
         )
         overdue_rows = await self.repo.get_overdue_cases(
             session=self.session, chamber_id=cid, today=today
@@ -110,8 +109,7 @@ class DashboardService(BaseSecuredService):
             session=self.session, chamber_id=cid, hearing_date=tomorrow
         )
 
-        desc_map = await self._get_status_desc_map()
-        color_map = await self._get_status_color_map()
+        desc_map, color_map = await self._get_hearing_status_maps()
 
         overdue_cases = [
             OverdueCaseItem(
@@ -121,8 +119,8 @@ class DashboardService(BaseSecuredService):
                 petitioner=r["petitioner"],
                 respondent=r["respondent"],
                 next_hearing_date=r["next_hearing_date"],
-                days_overdue=(today - r["next_hearing_date"]).days if r["next_hearing_date"] else 0,
-                last_hearing_purpose=r["last_hearing_purpose"],
+                days_overdue=(today - r["next_hearing_date"]).days if r.get("next_hearing_date") else 0,
+                last_hearing_purpose=r.get("last_hearing_purpose"),
             )
             for r in overdue_rows
         ]
@@ -131,8 +129,6 @@ class DashboardService(BaseSecuredService):
             greeting=_greeting(hour),
             user_first_name=user_first_name,
             today=today,
-            active_cases_count=overview["active_cases"],
-            today_hearings_count=overview["today_hearings"],
             practice_overview=PracticeOverviewStats(
                 active_cases=overview["active_cases"],
                 today_hearings=overview["today_hearings"],
@@ -151,27 +147,18 @@ class DashboardService(BaseSecuredService):
             tomorrows_hearings=[self._to_hearing_item(r, desc_map, color_map) for r in tomorrow_rows],
         )
 
-    # ─────────────────────────────────────────────────────────────────────
-    # ADMIN DASHBOARD
-    # ─────────────────────────────────────────────────────────────────────
+    # ===================================================================
+    # ADMIN DASHBOARD — FIXED TREND LOGIC
+    # ===================================================================
 
     async def get_admin_dashboard(self) -> AdminDashboardOut:
         today = date.today()
-        month_start = date(today.year, today.month, 1)
         cid = self.chamber_id
 
-        # Stat cards (reuse chamber management stats)
+        # All stats + trends in ONE repository call
         chamber_stats = await self.repo.get_chamber_management_stats(
-            session=self.session, chamber_id=cid
+            session=self.session, chamber_id=cid, today=today
         )
-
-        # MoM trends for users
-        prev_total = await self.repo.get_users_last_month_count(
-            session=self.session, chamber_id=cid, month_start=month_start
-        )
-        users_trend = _trend_pct(chamber_stats["total_users"], prev_total)
-        # active_users trend approximated from same base
-        active_trend = _trend_pct(chamber_stats["active_users"], max(prev_total - 1, 0))
 
         invitations_rows = await self.repo.get_pending_invitations(
             session=self.session, chamber_id=cid
@@ -181,24 +168,16 @@ class DashboardService(BaseSecuredService):
         )
 
         pending_invitations = [
-            PendingInvitationItem(
-                invitation_id=r.invitation_id,
-                email=r.email,
-                role_name=r.role_name,
-                invited_date=r.invited_date,
-                expires_date=r.expires_date,
-                status_code=r.status_code,
-            )
-            for r in invitations_rows
+            PendingInvitationItem(**r) for r in invitations_rows
         ]
 
         recent_activity = [
             RecentActivityItem(
-                activity_id=r.id,
-                action=r.action,
-                target=r.target,
-                actor_name=_full_name(r.first_name, r.last_name),
-                created_date=r.created_date,
+                activity_id=r["activity_id"],
+                action=r["action"],
+                target=r["target"],
+                actor_name=_full_name(r.get("first_name"), r.get("last_name")),
+                created_date=r["created_date"],
             )
             for r in activity_rows
         ]
@@ -209,8 +188,8 @@ class DashboardService(BaseSecuredService):
                 active_users=chamber_stats["active_users"],
                 roles_defined=chamber_stats["roles_count"],
                 pending_invites=chamber_stats["pending_invites"],
-                users_trend_pct=users_trend,
-                active_users_trend_pct=active_trend,
+                users_trend_pct=chamber_stats["users_trend_pct"],
+                active_users_trend_pct=chamber_stats["active_users_trend_pct"],
             ),
             pending_invitations=pending_invitations,
             recent_activity=recent_activity,
