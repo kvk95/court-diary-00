@@ -1,4 +1,4 @@
-"""dashboard_service.py"""
+# app/services/dashboard_service.py
 
 from datetime import date, datetime, timedelta
 from typing import Optional
@@ -67,19 +67,20 @@ class DashboardService(BaseSecuredService):
             {r.code: r.color_code for r in color_rows},
         )
 
-    def _to_hearing_item(self, r, desc_map: dict, color_map: dict) -> DashboardHearingItem:
+    def _to_hearing_item(self, r: dict, desc_map: dict, color_map: dict) -> DashboardHearingItem:
+        """Convert dict row to DashboardHearingItem DTO."""
         return DashboardHearingItem(
-            hearing_id=r.hearing_id,
-            case_id=r.case_id,
-            case_number=r.case_number,
-            court_name=r.court_name,
-            petitioner=r.petitioner,
-            respondent=r.respondent,
-            hearing_date=r.hearing_date,
-            purpose=r.purpose,
-            status_code=r.status_code,
-            status_description=desc_map.get(r.status_code),
-            color=color_map.get(r.status_code),
+            hearing_id=r["hearing_id"],
+            case_id=r["case_id"],
+            case_number=r["case_number"],
+            court_name=r["court_name"],
+            petitioner=r["petitioner"],
+            respondent=r["respondent"],
+            hearing_date=r["hearing_date"],
+            purpose=r["purpose"],
+            status_code=r["status_code"],
+            status_description=desc_map.get(r["status_code"]),
+            color=color_map.get(r["status_code"]),
         )
 
     # ===================================================================
@@ -111,6 +112,7 @@ class DashboardService(BaseSecuredService):
 
         desc_map, color_map = await self._get_hearing_status_maps()
 
+        # Convert overdue cases (dict rows)
         overdue_cases = [
             OverdueCaseItem(
                 case_id=r["case_id"],
@@ -141,6 +143,8 @@ class DashboardService(BaseSecuredService):
                 active_users=chamber_stats["active_users"],
                 roles_count=chamber_stats["roles_count"],
                 pending_invites=chamber_stats["pending_invites"],
+                users_trend_pct=chamber_stats.get("users_trend_pct"),
+                active_users_trend_pct=chamber_stats.get("active_users_trend_pct"),
             ),
             overdue_cases=overdue_cases,
             todays_hearings=[self._to_hearing_item(r, desc_map, color_map) for r in today_rows],
@@ -148,7 +152,7 @@ class DashboardService(BaseSecuredService):
         )
 
     # ===================================================================
-    # ADMIN DASHBOARD — FIXED TREND LOGIC
+    # ADMIN DASHBOARD
     # ===================================================================
 
     async def get_admin_dashboard(self) -> AdminDashboardOut:
@@ -167,10 +171,20 @@ class DashboardService(BaseSecuredService):
             session=self.session, chamber_id=cid
         )
 
+        # Convert pending invitations (dict rows)
         pending_invitations = [
-            PendingInvitationItem(**r) for r in invitations_rows
+            PendingInvitationItem(
+                invitation_id=r["invitation_id"],
+                email=r["email"],
+                invited_date=r["invited_date"],
+                expires_date=r["expires_date"],
+                status_code=r["status_code"],
+                role_name=r.get("role_name"),
+            )
+            for r in invitations_rows
         ]
 
+        # Convert recent activity (dict rows)
         recent_activity = [
             RecentActivityItem(
                 activity_id=r["activity_id"],
@@ -188,8 +202,8 @@ class DashboardService(BaseSecuredService):
                 active_users=chamber_stats["active_users"],
                 roles_defined=chamber_stats["roles_count"],
                 pending_invites=chamber_stats["pending_invites"],
-                users_trend_pct=chamber_stats["users_trend_pct"],
-                active_users_trend_pct=chamber_stats["active_users_trend_pct"],
+                users_trend_pct=chamber_stats.get("users_trend_pct"),
+                active_users_trend_pct=chamber_stats.get("active_users_trend_pct"),
             ),
             pending_invitations=pending_invitations,
             recent_activity=recent_activity,

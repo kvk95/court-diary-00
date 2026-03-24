@@ -1,4 +1,3 @@
-
 USE courtdiary;
 
 -- =============================================================================
@@ -9,19 +8,19 @@ USE courtdiary;
 -- 15.1  Geographic
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_countries (code, description, phone_code, sort_order) VALUES
+INSERT IGNORE INTO refm_countries (code, description, phone_code, sort_order) VALUES
 ('IN', 'India', '+91', 1);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.2  Plans & Modules
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_plan_types (code, description, max_users, max_cases, price_monthly_amt, price_annual_amt, sort_order) VALUES
+INSERT IGNORE INTO refm_plan_types (code, description, max_users, max_cases, price_monthly_amt, price_annual_amt, sort_order) VALUES
 ('FREE', 'Free',       3,    75,    0.00,     0.00,    10),
 ('PRO',  'Pro',        10,   300,   999.00,   9999.00, 20),
 ('ENT',  'Enterprise', NULL, NULL,  2999.00, 29999.00, 30);
 
-INSERT INTO refm_modules (code, name, description, sort_order) VALUES
+INSERT IGNORE INTO refm_modules (code, name, description, sort_order) VALUES
 ('DASH',  'Dashboard',       'Overview & statistics',         10),
 ('CASES', 'Cases',           'Case register & details',       20),
 ('HEAR',  'Hearings',        'Hearing schedule & history',    30),
@@ -34,14 +33,14 @@ INSERT INTO refm_modules (code, name, description, sort_order) VALUES
 -- 15.3  Case & Hearing Statuses
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_case_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_case_status (code, description, color_code, sort_order) VALUES
 ('AC',  'Active',    '#3b82f6', 10),
 ('ADJ', 'Adjourned', '#f97316', 20),
 ('DIS', 'Disposed',  '#64748b', 30),
 ('CLO', 'Closed',    '#64748b', 40),
 ('OVD', 'Overdue',   '#ef4444', 50);
 
-INSERT INTO refm_hearing_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_hearing_status (code, description, color_code, sort_order) VALUES
 ('UP',  'Upcoming',       '#3b82f6', 10),
 ('SC',  'Scheduled',      '#3b82f6', 15),
 ('CMP', 'Completed',      '#22c55e', 20),
@@ -49,7 +48,7 @@ INSERT INTO refm_hearing_status (code, description, color_code, sort_order) VALU
 ('OR',  'Order Reserved', '#a855f7', 40),
 ('DIS', 'Disposed',       '#64748b', 50);
 
-INSERT INTO refm_case_types (code, description, sort_order) VALUES
+INSERT IGNORE INTO refm_case_types (code, description, sort_order) VALUES
 ('CRIM', 'Criminal',      10),
 ('CIVL', 'Civil Suit',    20),
 ('WRIT', 'Writ Petition', 30),
@@ -62,10 +61,10 @@ INSERT INTO refm_case_types (code, description, sort_order) VALUES
 -- 15.4  Email & Communication
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_email_encryption (code, description, sort_order) VALUES
+INSERT IGNORE INTO refm_email_encryption (code, description, sort_order) VALUES
 ('N', 'None', 10), ('T', 'TLS', 20), ('S', 'SSL', 30), ('B', 'Both', 40);
 
-INSERT INTO refm_email_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_email_status (code, description, color_code, sort_order) VALUES
 ('P', 'Pending',   '#f97316', 10),
 ('S', 'Sent',      '#3b82f6', 20),
 ('D', 'Delivered', '#22c55e', 30),
@@ -73,7 +72,7 @@ INSERT INTO refm_email_status (code, description, color_code, sort_order) VALUES
 ('F', 'Failed',    '#ef4444', 50),
 ('B', 'Bounced',   '#991b1b', 60);
 
-INSERT INTO refm_email_templates (code, subject, content, category, sort_order) VALUES
+INSERT IGNORE INTO refm_email_templates (code, subject, content, category, sort_order) VALUES
 ('hearing_tomorrow',
  'Hearing Tomorrow – {Case Number}',
  '<p>Dear {Advocate},</p><p>Hearing tomorrow: <strong>{Case Number}</strong><br>Court: {Court Name}<br>Purpose: {Purpose}</p>',
@@ -83,7 +82,7 @@ INSERT INTO refm_email_templates (code, subject, content, category, sort_order) 
  '<p>Hello {FirstName},</p><p>Your account is active.<br>Login: {Email}</p>',
  'WELCOME', 10);
 
-INSERT INTO refm_comm_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_comm_status (code, description, color_code, sort_order) VALUES
 ('PN', 'Pending',   '#f97316', 10),
 ('SN', 'Sent',      '#3b82f6', 20),
 ('DL', 'Delivered', '#22c55e', 30),
@@ -94,16 +93,16 @@ INSERT INTO refm_comm_status (code, description, color_code, sort_order) VALUES
 -- 15.5  User & Auth Statuses
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_login_status (code, description, sort_order) VALUES
+INSERT IGNORE INTO refm_login_status (code, description, sort_order) VALUES
 ('S', 'Success', 1),
 ('F', 'Failed',  2);
 
-INSERT INTO refm_user_deletion_status (code, description, sort_order) VALUES
+INSERT IGNORE INTO refm_user_deletion_status (code, description, sort_order) VALUES
 ('P', 'Pending',  1),
 ('D', 'Deleted',  2),
 ('R', 'Rejected', 3);
 
-INSERT INTO refm_invitation_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_invitation_status (code, description, color_code, sort_order) VALUES
 ('PN', 'Pending',  '#f97316', 10),
 ('AC', 'Accepted', '#22c55e', 20),
 ('RJ', 'Rejected', '#ef4444', 30),
@@ -113,14 +112,14 @@ INSERT INTO refm_invitation_status (code, description, color_code, sort_order) V
 -- 15.6  Billing, Party Roles, AOR, Collab Access
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_billing_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_billing_status (code, description, color_code, sort_order) VALUES
 ('PN', 'Pending',   '#f97316', 10),
 ('PD', 'Paid',      '#22c55e', 20),
 ('OV', 'Overdue',   '#ef4444', 30),
 ('CN', 'Cancelled', '#64748b', 40),
 ('AD', 'Adjusted',  '#a855f7', 50);
 
-INSERT INTO refm_party_roles (code, description, category, sort_order) VALUES
+INSERT IGNORE INTO refm_party_roles (code, description, category, sort_order) VALUES
 ('PET', 'Petitioner',         'PARTY', 10),
 ('RES', 'Respondent',         'PARTY', 20),
 ('APP', 'Appellant',          'PARTY', 30),
@@ -129,12 +128,12 @@ INSERT INTO refm_party_roles (code, description, category, sort_order) VALUES
 ('WIT', 'Witness',            'REP',   60),
 ('AOR', 'Advocate on Record', 'REP',   70);
 
-INSERT INTO refm_aor_status (code, description, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_aor_status (code, description, color_code, sort_order) VALUES
 ('AC', 'Active',      '#22c55e', 10),
 ('WD', 'Withdrawn',   '#64748b', 20),
 ('SU', 'Substituted', '#f97316', 30);
 
-INSERT INTO refm_collab_access (code, description, permissions, color_code, sort_order) VALUES
+INSERT IGNORE INTO refm_collab_access (code, description, permissions, color_code, sort_order) VALUES
 ('RO', 'Read Only',   'view',                    '#3b82f6', 10),
 ('RW', 'Read Write',  'view,edit,create',        '#a855f7', 20),
 ('FU', 'Full Access', 'view,edit,create,delete', '#22c55e', 30);
@@ -144,7 +143,7 @@ INSERT INTO refm_collab_access (code, description, permissions, color_code, sort
 -- 16. SEED DATA — TIER 1  (REFM with FK to other REFM)
 -- =============================================================================
 
-INSERT INTO refm_states (code, description, country_code, sort_order) VALUES
+INSERT IGNORE INTO refm_states (code, description, country_code, sort_order) VALUES
 ('TN', 'Tamil Nadu',  'IN', 1),
 ('KL', 'Kerala',      'IN', 2),
 ('KA', 'Karnataka',   'IN', 3),
@@ -211,11 +210,11 @@ SET @user_priya     = (SELECT user_id FROM users WHERE email = 'priya@vkchamber.
 SET @user_karthik   = (SELECT user_id FROM users WHERE email = 'karthik@vkchamber.in');
 SET @user_lokesh    = (SELECT user_id FROM users WHERE email = 'lokesh@sundarlaw.in');
 
-INSERT INTO user_chamber_link (user_id, chamber_id, is_primary, created_by) VALUES
-(@user_vijay,   @chamber_vk,     TRUE, @user_vijay),
-(@user_priya,   @chamber_vk,     TRUE, @user_vijay),
-(@user_karthik, @chamber_vk,     TRUE, @user_vijay),
-(@user_lokesh,  @chamber_sundar, TRUE, @user_lokesh);
+INSERT INTO user_chamber_link (user_id, chamber_id, is_primary, joined_date, created_by) VALUES
+(@user_vijay,   @chamber_vk,     TRUE, '2024-01-15', @user_vijay),
+(@user_priya,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
+(@user_karthik, @chamber_vk,     TRUE, '2024-03-10', @user_vijay),
+(@user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 18.3  Chamber Modules
@@ -266,11 +265,11 @@ SET @role_admin  = (SELECT role_id FROM security_roles WHERE role_code = 'ADM');
 SET @role_senior = (SELECT role_id FROM security_roles WHERE role_code = 'SEN');
 SET @role_clerk  = (SELECT role_id FROM security_roles WHERE role_code = 'CLK');
 
-INSERT INTO user_roles (link_id, role_id, created_by) VALUES
-(@link_vijay_vk,      @role_admin,  @user_vijay),
-(@link_priya_vk,      @role_senior, @user_vijay),
-(@link_karthik_vk,    @role_clerk,  @user_vijay),
-(@link_lokesh_sundar, @role_admin,  @user_lokesh);
+INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
+(@link_vijay_vk,      @role_admin,  '2024-01-15', @user_vijay),
+(@link_priya_vk,      @role_senior, '2024-02-01', @user_vijay),
+(@link_karthik_vk,    @role_clerk,  '2024-03-10', @user_vijay),
+(@link_lokesh_sundar, @role_admin,  '2024-01-20', @user_lokesh);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 19.3  Role Permissions  (VK chamber — Admin, Senior, Clerk)
@@ -294,7 +293,7 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 (@role_admin, @cm_rpt,   TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
 (@role_admin, @cm_set,   TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
 
--- Senior: manage cases & hearings, read-only elsewhere, no user management
+-- Senior: manage cases & hearings, read-only elsewhere
 INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
 (@role_senior, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
 (@role_senior, @cm_cases, FALSE, TRUE,  TRUE,  TRUE,  FALSE, @user_vijay),
@@ -304,7 +303,7 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 (@role_senior, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
 (@role_senior, @cm_set,   FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay);
 
--- Clerk: read-only across the board
+-- Clerk: read-only
 INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
 (@role_clerk, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
 (@role_clerk, @cm_cases, FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
@@ -316,45 +315,125 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 
 
 -- =============================================================================
--- 20. SEED DATA — TIER 6  (Cases)
+-- 20. SEED DATA — TIER 6  (Cases — Dashboard Ready)
 -- =============================================================================
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 20.1  Active Cases (Various Statuses for Dashboard Widgets)
+-- ─────────────────────────────────────────────────────────────────────────────
 
 INSERT INTO cases (chamber_id, case_number, court_id, case_type_code, filing_year,
                    petitioner, respondent, aor_user_id, case_summary, status_code,
-                   next_hearing_date, created_by) VALUES
+                   next_hearing_date, last_hearing_date, created_by) VALUES
+-- OVERDUE CASES (next_hearing_date < TODAY for Overdue widget)
 (@chamber_vk, 'Crl.O.P.No.234/2025',   1, 'CRIM', 2025,
  'State of Tamil Nadu', 'Arjun Prasad',      @user_priya,
- 'Quashing of FIR u/s 420 IPC – financial fraud',                      'AC',  '2026-03-15', @user_vijay),
+ 'Quashing of FIR u/s 420 IPC – financial fraud',                      'AC',  '2026-03-20', '2026-03-15', @user_vijay),
 
 (@chamber_vk, 'W.P.(MD)No.5678/2025',  1, 'WRIT', 2025,
  'Tmt. Saraswathi',     'The Tahsildar',     @user_priya,
- 'Challenge to patta cancellation order',                               'ADJ', '2026-02-28', @user_vijay),
+ 'Challenge to patta cancellation order',                               'AC',  '2026-03-22', '2026-03-18', @user_vijay),
 
+(@chamber_vk, 'Crl.M.C.No.89/2026',    6, 'CRIM', 2026,
+ 'Ramesh Kumar',        'Inspector of Police', @user_priya,
+ 'Anticipatory bail petition',                                         'AC',  '2026-03-18', '2026-03-10', @user_vijay),
+
+-- UPCOMING THIS WEEK (for This Week Hearings widget)
+(@chamber_vk, 'O.S.No.456/2025',       2, 'CIVL', 2025,
+ 'Meenkshi Textiles',   'Global Exports Ltd',  @user_priya,
+ 'Suit for specific performance of sale agreement',                     'AC',  '2026-03-26', '2026-03-19', @user_vijay),
+
+(@chamber_vk, 'F.C.No.123/2025',       5, 'FAM',  2025,
+ 'Lakshmi Devi',        'Suresh Babu',         @user_priya,
+ 'Divorce petition under Hindu Marriage Act',                           'AC',  '2026-03-27', '2026-03-12', @user_vijay),
+
+(@chamber_vk, 'L.C.No.78/2025',        3, 'LAB',  2025,
+ 'Workmen Union',       'ABC Manufacturing',   @user_priya,
+ 'Labour dispute – wrongful termination',                                'AC',  '2026-03-28', '2026-03-14', @user_vijay),
+
+-- FUTURE CASES (Active but not overdue)
+(@chamber_vk, 'Crl.O.P.No.567/2026',   1, 'CRIM', 2026,
+ 'State of Tamil Nadu', 'Murugan',             @user_priya,
+ 'Quashing of criminal proceedings',                                    'AC',  '2026-04-15', NULL,         @user_vijay),
+
+(@chamber_vk, 'W.P.No.9012/2026',      1, 'WRIT', 2026,
+ 'Chennai Developers',  'DTCP',                @user_priya,
+ 'Writ against planning permission denial',                             'AC',  '2026-04-20', NULL,         @user_vijay),
+
+-- ADJOURNED CASES
+(@chamber_vk, 'O.S.No.789/2024',       2, 'CIVL', 2024,
+ 'Subramanian',         'Venkatesh',           @user_priya,
+ 'Property partition suit',                                             'ADJ', '2026-04-05', '2026-03-21', @user_vijay),
+
+-- DISPOSED/CLOSED (for stats)
+(@chamber_vk, 'Crl.M.C.No.45/2024',    6, 'CRIM', 2024,
+ 'Anand',               'State of TN',         @user_priya,
+ 'Bail application – disposed',                                         'DIS', NULL,         '2026-02-15', @user_vijay),
+
+(@chamber_vk, 'F.C.No.56/2024',        5, 'FAM',  2024,
+ 'Priya',               'Rajesh',              @user_priya,
+ 'Custody matter – closed',                                             'CLO', NULL,         '2026-01-30', @user_vijay),
+
+-- Sundar Associates Cases
 (@chamber_sundar, 'O.S.No.145/2024',   4, 'CIVL', 2024,
  'M/s Blue Sky Builders', 'T.N. Housing Board', @user_lokesh,
- 'Specific performance of sale agreement – construction dispute',       'AC',  '2026-04-10', @user_lokesh);
+ 'Specific performance of sale agreement – construction dispute',       'AC',  '2026-04-10', '2026-03-01', @user_lokesh),
+
+(@chamber_sundar, 'Crl.O.P.No.88/2025', 1, 'CRIM', 2025,
+ 'State of Tamil Nadu', 'Ganesh',              @user_lokesh,
+ 'Criminal revision petition',                                          'AC',  '2026-03-25', '2026-03-10', @user_lokesh);
 
 
 -- =============================================================================
--- 21. SEED DATA — TIER 7  (Hearings, Notes, AORs)
+-- 21. SEED DATA — TIER 7  (Hearings — Dashboard Ready)
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 21.1  Hearings
+-- 21.1  Hearings (Various Dates for Dashboard Widgets)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-SET @case1 = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.234/2025');
-SET @case2 = (SELECT case_id FROM cases WHERE case_number = 'W.P.(MD)No.5678/2025');
-SET @case3 = (SELECT case_id FROM cases WHERE case_number = 'O.S.No.145/2024');
+SET @case1  = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.234/2025');
+SET @case2  = (SELECT case_id FROM cases WHERE case_number = 'W.P.(MD)No.5678/2025');
+SET @case3  = (SELECT case_id FROM cases WHERE case_number = 'O.S.No.145/2024');
+SET @case4  = (SELECT case_id FROM cases WHERE case_number = 'O.S.No.456/2025');
+SET @case5  = (SELECT case_id FROM cases WHERE case_number = 'F.C.No.123/2025');
+SET @case6  = (SELECT case_id FROM cases WHERE case_number = 'L.C.No.78/2025');
+SET @case7  = (SELECT case_id FROM cases WHERE case_number = 'Crl.M.C.No.89/2026');
+SET @case8  = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.567/2026');
+SET @case9  = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.88/2025');
 
+-- TODAY'S HEARINGS (for Today's Hearings widget) - Adjust date as needed
 INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
-(@chamber_vk,     @case1, '2026-01-20', 'CMP', 'Admission hearing',     'Notice issued to respondent',        '2026-03-15', @user_priya),
-(@chamber_vk,     @case1, '2026-03-15', 'UP',  'Final arguments',       'Awaiting final disposal',            NULL,         @user_priya),
-(@chamber_vk,     @case2, '2026-02-10', 'ADJ', 'Counter affidavit stage','Adjourned due to non-filing',       '2026-02-28', @user_karthik),
-(@chamber_sundar, @case3, '2026-03-01', 'CMP', 'Framing of issues',     'Issues framed',                      '2026-04-10', @user_lokesh);
+(@chamber_vk, @case1, '2026-03-24', 'UP',  'Final arguments',       'Awaiting final disposal',            NULL,         @user_priya),
+(@chamber_vk, @case2, '2026-03-24', 'UP',  'Evidence stage',        'Witness examination',                NULL,         @user_priya),
+(@chamber_vk, @case7, '2026-03-24', 'UP',  'Admission hearing',     'Notice issued',                      NULL,         @user_karthik);
+
+-- THIS WEEK HEARINGS (for This Week widget)
+INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
+(@chamber_vk, @case4, '2026-03-26', 'UP',  'First hearing',         'For admission',                      NULL,         @user_priya),
+(@chamber_vk, @case5, '2026-03-27', 'UP',  'Interim application',   'Maintenance pendente lite',          NULL,         @user_priya),
+(@chamber_vk, @case6, '2026-03-28', 'UP',  'Evidence',              'Document production',                NULL,         @user_karthik),
+(@chamber_sundar, @case9, '2026-03-25', 'UP',  'Arguments',           'Final submissions',                  NULL,         @user_lokesh);
+
+-- COMPLETED HEARINGS (Past - for history)
+INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
+(@chamber_vk, @case1, '2026-01-20', 'CMP', 'Admission hearing',     'Notice issued to respondent',        '2026-03-15', @user_priya),
+(@chamber_vk, @case1, '2026-03-15', 'CMP', 'Preliminary hearing',   'Issues framed',                      '2026-03-24', @user_priya),
+(@chamber_vk, @case2, '2026-02-10', 'ADJ', 'Counter affidavit',     'Adjourned due to non-filing',       '2026-03-18', @user_karthik),
+(@chamber_vk, @case2, '2026-03-18', 'CMP', 'Filing stage',          'Counter filed',                      '2026-03-24', @user_priya),
+(@chamber_sundar, @case3, '2026-03-01', 'CMP', 'Framing of issues',   'Issues framed',                      '2026-04-10', @user_lokesh);
+
+-- ADJOURNED HEARINGS
+INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
+(@chamber_vk, @case4, '2026-03-19', 'ADJ', 'First hearing',         'Counsel not available',              '2026-03-26', @user_priya);
+
+
+-- =============================================================================
+-- 22. SEED DATA — TIER 8  (Case Notes, AORs, Clients)
+-- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 21.2  Case Notes
+-- 22.1  Case Notes
 -- ─────────────────────────────────────────────────────────────────────────────
 
 INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, is_private, created_by) VALUES
@@ -366,17 +445,19 @@ INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, is_private, cre
 (@chamber_sundar, @case3, @user_lokesh, 'Builder agreed to mediation. Schedule for mid-March before framing of issues.',               FALSE, @user_lokesh);
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 21.3  Case AORs
+-- 22.2  Case AORs
 -- ─────────────────────────────────────────────────────────────────────────────
 
 INSERT INTO case_aors (case_id, user_id, chamber_id, is_primary, appointment_date, status_code, created_by) VALUES
 (@case1, @user_priya, @chamber_vk,     TRUE,  '2025-01-10', 'AC', @user_vijay),
 (@case2, @user_priya, @chamber_vk,     TRUE,  '2025-03-05', 'AC', @user_vijay),
-(@case3, @user_lokesh, @chamber_sundar, TRUE, '2024-08-12', 'AC', @user_lokesh);
+(@case3, @user_lokesh, @chamber_sundar, TRUE, '2024-08-12', 'AC', @user_lokesh),
+(@case4, @user_priya, @chamber_vk,     TRUE,  '2025-06-15', 'AC', @user_vijay),
+(@case5, @user_priya, @chamber_vk,     TRUE,  '2025-07-20', 'AC', @user_vijay);
 
 
 -- =============================================================================
--- 22. SEED DATA — TIER 9  (Config: Email Settings & Templates)
+-- 23. SEED DATA — TIER 9  (Config: Email Settings & Templates)
 -- =============================================================================
 
 INSERT INTO email_settings (chamber_id, from_email, smtp_host, smtp_port, smtp_user,
@@ -392,34 +473,107 @@ INSERT INTO email_templates (chamber_id, code, subject, content, is_customized, 
 
 
 -- =============================================================================
--- 23. SEED DATA — TIER 10  (Collaboration & Invitations)
+-- 24. SEED DATA — TIER 10  (Collaboration & Invitations)
 -- =============================================================================
 
-INSERT INTO case_collaborations (case_id, owner_chamber_id, collaborator_chamber_id,
-                                  access_level, invited_by, status_code, created_by)
-VALUES (@case1, @chamber_vk, @chamber_sundar, 'RW', @user_vijay, 'AC', @user_vijay);
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 24.1  Case Collaborations
+-- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO user_invitations (chamber_id, email, role_id, invited_by, expires_date,
+INSERT INTO case_collaborations (case_id, owner_chamber_id, collaborator_chamber_id,
+                                  access_level, invited_by, invited_date, accepted_date, status_code, created_by)
+VALUES (@case1, @chamber_vk, @chamber_sundar, 'RW', @user_vijay, '2026-02-15', '2026-02-16', 'AC', @user_vijay);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 24.2  User Invitations (for Pending Invites widget)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO user_invitations (chamber_id, email, role_id, invited_by, invited_date, expires_date,
                                status_code, message, created_by)
-VALUES (@chamber_vk, 'newlawyer@example.com', @role_senior,
-        @user_vijay, DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY),
+VALUES 
+(@chamber_vk, 'newlawyer@example.com', @role_senior, @user_vijay, '2026-03-20', '2026-04-19',
         'PN', 'Welcome to VijayKrishnan & Associates! Please accept this invitation.',
+        @user_vijay),
+(@chamber_vk, 'clerk@example.com', @role_clerk, @user_vijay, '2026-03-22', '2026-04-21',
+        'PN', 'Join our team as a clerk.',
         @user_vijay);
 
 
 -- =============================================================================
--- 24. SEED DATA — TIER 11  (Audit & Email Logs)
+-- 25. SEED DATA — TIER 11  (Audit & Activity Logs for Dashboard)
 -- =============================================================================
 
-INSERT INTO activity_log (chamber_id, user_id, action, target, ip_address, metadata_json, created_by) VALUES
-(@chamber_vk, @user_priya,   'CASE_UPDATE',    'case:1', '117.192.45.12', JSON_OBJECT('case_id', 1, 'changed', 'next_hearing_date'), @user_priya),
-(@chamber_vk, @user_karthik, 'HEARING_CREATE', 'case:2', '49.204.123.88', JSON_OBJECT('hearing_id', 3, 'case_id', 2),                @user_karthik);
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 25.1  Activity Log (Recent Activity widget)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO activity_log (chamber_id, user_id, action, target, ip_address, metadata_json, created_date, created_by) VALUES
+(@chamber_vk, @user_priya,   'CASE_UPDATE',    'case:1', '117.192.45.12', JSON_OBJECT('case_id', 1, 'changed', 'next_hearing_date'), '2026-03-24 09:15:00', @user_priya),
+(@chamber_vk, @user_karthik, 'HEARING_CREATE', 'case:2', '49.204.123.88', JSON_OBJECT('hearing_id', 3, 'case_id', 2),                '2026-03-24 10:30:00', @user_karthik),
+(@chamber_vk, @user_vijay,   'CASE_CREATE',    'case:7', '117.192.45.12', JSON_OBJECT('case_id', 7, 'case_number', 'Crl.O.P.No.567/2026'), '2026-03-23 14:20:00', @user_vijay),
+(@chamber_vk, @user_priya,   'NOTE_CREATE',    'case:1', '117.192.45.12', JSON_OBJECT('note_id', 1, 'case_id', 1),                    '2026-03-23 16:45:00', @user_priya),
+(@chamber_vk, @user_karthik, 'CASE_UPDATE',    'case:4', '49.204.123.88', JSON_OBJECT('case_id', 4, 'changed', 'status_code'),         '2026-03-23 11:00:00', @user_karthik),
+(@chamber_vk, @user_vijay,   'USER_INVITE',    'user',   '117.192.45.12', JSON_OBJECT('email', 'newlawyer@example.com'),               '2026-03-22 09:00:00', @user_vijay),
+(@chamber_vk, @user_priya,   'HEARING_UPDATE', 'case:2', '117.192.45.12', JSON_OBJECT('hearing_id', 2, 'case_id', 2),                  '2026-03-22 15:30:00', @user_priya),
+(@chamber_sundar, @user_lokesh, 'CASE_CREATE', 'case:3', '182.76.123.45', JSON_OBJECT('case_id', 3, 'case_number', 'O.S.No.145/2024'), '2026-03-21 10:00:00', @user_lokesh),
+(@chamber_vk, @user_karthik, 'DOCUMENT_UPLOAD','case:1', '49.204.123.88', JSON_OBJECT('case_id', 1, 'doc_type', 'affidavit'),           '2026-03-21 14:15:00', @user_karthik),
+(@chamber_vk, @user_vijay,   'SETTINGS_UPDATE','chamber','117.192.45.12', JSON_OBJECT('setting', 'email_config'),                      '2026-03-20 11:30:00', @user_vijay);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 25.2  Email Log
+-- ─────────────────────────────────────────────────────────────────────────────
 
 INSERT INTO email_log (chamber_id, user_id, template_code, recipient_email, subject,
                         status_code, sent_at, metadata_json, created_by) VALUES
 (@chamber_vk, @user_priya, 'hearing_tomorrow', 'priya@vkchamber.in',
  'Court Hearing Tomorrow – Urgent: Crl.O.P.No.234/2025',
- 'D', '2026-02-17 17:02:15',
- JSON_OBJECT('case_id', 1, 'hearing_date', '2026-02-18'), @user_karthik);
+ 'D', '2026-03-23 17:02:15',
+ JSON_OBJECT('case_id', 1, 'hearing_date', '2026-03-24'), @user_karthik);
 
-SELECT '✅ Full Court Diary schema with contextual membership loaded successfully!' AS status_message;
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 25.3  Login Audit
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO login_audit (user_id, chamber_id, email, ip_address, user_agent, status_code, login_time) VALUES
+(@user_vijay,   @chamber_vk, 'admin@vkchamber.in',   '117.192.45.12', 'Chrome / Windows', 'S', '2026-03-24 09:00:00'),
+(@user_priya,   @chamber_vk, 'priya@vkchamber.in',   '117.192.45.13', 'Chrome / Mac',     'S', '2026-03-24 09:30:00'),
+(@user_karthik, @chamber_vk, 'karthik@vkchamber.in', '49.204.123.88', 'Firefox / Linux',  'S', '2026-03-24 10:00:00'),
+(@user_lokesh,  @chamber_sundar, 'lokesh@sundarlaw.in', '182.76.123.45', 'Chrome / Android', 'S', '2026-03-24 08:45:00'),
+(@user_vijay,   @chamber_vk, 'admin@vkchamber.in',   '117.192.45.12', 'Chrome / Windows', 'F', '2026-03-23 18:30:00');
+
+
+-- =============================================================================
+-- 26. VERIFICATION QUERIES (Dashboard Data Check)
+-- =============================================================================
+
+-- Practice Overview Stats
+SELECT 
+    'Practice Overview' AS widget,
+    (SELECT COUNT(*) FROM cases WHERE chamber_id = @chamber_vk AND status_code = 'AC' AND is_deleted = FALSE) AS active_cases,
+    (SELECT COUNT(*) FROM hearings WHERE chamber_id = @chamber_vk AND hearing_date = '2026-03-24' AND is_deleted = FALSE) AS today_hearings,
+    (SELECT COUNT(*) FROM cases WHERE chamber_id = @chamber_vk AND status_code = 'AC' AND next_hearing_date < '2026-03-24' AND is_deleted = FALSE) AS overdue_cases;
+
+-- Chamber Management Stats
+SELECT 
+    'Chamber Management' AS widget,
+    (SELECT COUNT(*) FROM user_chamber_link WHERE chamber_id = @chamber_vk AND left_date IS NULL AND status_ind = TRUE) AS total_users,
+    (SELECT COUNT(*) FROM security_roles) AS total_roles,
+    (SELECT COUNT(*) FROM user_invitations WHERE chamber_id = @chamber_vk AND status_code = 'PN') AS pending_invites;
+
+-- Recent Activity
+SELECT 
+    al.action,
+    al.target,
+    CONCAT(u.first_name, ' ', u.last_name) AS user_name,
+    al.created_date
+FROM activity_log al
+LEFT JOIN users u ON al.user_id = u.user_id
+WHERE al.chamber_id = @chamber_vk
+ORDER BY al.created_date DESC
+LIMIT 10;
+
+-- =============================================================================
+-- END OF SEED DATA
+-- =============================================================================
+
+SELECT '✅ Dashboard-ready seed data loaded successfully!' AS status_message;

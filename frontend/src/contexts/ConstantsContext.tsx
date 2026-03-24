@@ -12,16 +12,22 @@ import { useAuth } from "@/contexts/AuthContext";
 // === AUTO-GENERATED SECTION START ===
 // Define the structure of your constants data
 interface ConstantData {
+  REFM_AOR_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
+  REFM_BILLING_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_CASE_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_CASE_TYPES: { code: string; description: string; status_ind: boolean }[];
+  REFM_COLLAB_ACCESS: { code: string; description: string; permissions: string; color_code: string; status_ind: boolean }[];
+  REFM_COMM_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_COUNTRIES: { code: string; description: string; phone_code: string; status_ind: boolean }[];
   REFM_COURTS: { court_id: string; court_name: string; state_code: string; court_type: string; address: string; status_ind: boolean }[];
   REFM_EMAIL_ENCRYPTION: { code: string; description: string; status_ind: boolean }[];
   REFM_EMAIL_STATUS: { code: string; description: string; color_code: string }[];
   REFM_EMAIL_TEMPLATES: { code: string; subject: string; content: string; category: string; description: string; status_ind: boolean }[];
   REFM_HEARING_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
+  REFM_INVITATION_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_LOGIN_STATUS: { code: string; description: string }[];
   REFM_MODULES: { code: string; name: string; description: string; status_ind: boolean }[];
+  REFM_PARTY_ROLES: { code: string; description: string; category: string; status_ind: boolean }[];
   REFM_PLAN_TYPES: { code: string; description: string; max_users: string; max_cases: string; price_monthly_amt: string; price_annual_amt: string; currency_code: string; status_ind: boolean }[];
   REFM_STATES: { code: string; description: string; country_code: string; status_ind: boolean }[];
   REFM_USER_DELETION_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
@@ -29,16 +35,22 @@ interface ConstantData {
 
 // Initial state (optional, for safety before data loads)
 const initialConstants: ConstantData = {
+  REFM_AOR_STATUS: [],
+  REFM_BILLING_STATUS: [],
   REFM_CASE_STATUS: [],
   REFM_CASE_TYPES: [],
+  REFM_COLLAB_ACCESS: [],
+  REFM_COMM_STATUS: [],
   REFM_COUNTRIES: [],
   REFM_COURTS: [],
   REFM_EMAIL_ENCRYPTION: [],
   REFM_EMAIL_STATUS: [],
   REFM_EMAIL_TEMPLATES: [],
   REFM_HEARING_STATUS: [],
+  REFM_INVITATION_STATUS: [],
   REFM_LOGIN_STATUS: [],
   REFM_MODULES: [],
+  REFM_PARTY_ROLES: [],
   REFM_PLAN_TYPES: [],
   REFM_STATES: [],
   REFM_USER_DELETION_STATUS: [],

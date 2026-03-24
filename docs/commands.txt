@@ -1,0 +1,30 @@
+apt update
+apt install -y mysql-server
+systemctl enable --now mysql
+mysql_secure_installation
+
+-- if DB should be created by the app:
+CREATE USER 'devuser'@'localhost' IDENTIFIED BY 'StrongPasswordHere';
+GRANT CREATE, ALTER, DROP, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE, CREATE TEMPORARY TABLES, LOCK TABLES
+ON *.* TO 'devuser'@'localhost';
+
+mysql -h 127.0.0.1 -u devuser -p
+
+~/working/court-diary-00/backend$ --> under this
+mysql -u devuser -p < data/1_cs_schema_create.sql
+mysql -u devuser -p < data/2_cs_data_inserts.sql
+
+mysql -u devuser -p courtdiary < courtdiary_full.sql
+
+sudo systemctl enable api.casdia.service
+sudo systemctl daemon-reload
+sudo systemctl start api.casdia.service
+sudo systemctl restart api.casdia.service
+journalctl -u api.casdia.service -n 50 --no-pager
+
+
+sudo ln -s /etc/nginx/sites-available/casdiaapi.nyainfo.com /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+
+certbot certonly --manual --preferred-challenge dns -d "nyainfo.com" -d "*.nyainfo.com"

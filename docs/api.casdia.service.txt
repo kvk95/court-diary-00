@@ -1,0 +1,27 @@
+# sudo nano /etc/systemd/system/api.casdia.service
+[Unit]
+Description=Gunicorn + Uvicorn worker for FastAPI backend (Casdia API)
+After=network.target
+
+[Service]
+User=myuser
+Group=myuser
+WorkingDirectory=/home/myuser/working/court-diary-00/backend
+
+ExecStart=/home/myuser/working/court-diary-00/backend/.venv/bin/gunicorn \
+    app.main:app \
+    --bind 127.0.0.1:9000 \
+    --workers 3 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --timeout 120 \
+    --log-level info \
+    --access-logfile - \
+    --error-logfile -
+
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/myuser/working/court-diary-00/backend/.venv/bin:$PATH
+
+[Install]
+WantedBy=multi-user.target
