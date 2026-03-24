@@ -130,6 +130,8 @@ class DashboardService(BaseSecuredService):
         return MainDashboardOut(
             greeting=_greeting(hour),
             user_first_name=user_first_name,
+            active_cases_count=overview["active_cases"],
+            today_hearings_count=overview["today_hearings"],
             today=today,
             practice_overview=PracticeOverviewStats(
                 active_cases=overview["active_cases"],
