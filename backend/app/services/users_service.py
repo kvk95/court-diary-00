@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 import uuid
 
 from sqlalchemy import and_, select
@@ -11,6 +11,7 @@ from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.repositories.delete_account_requests_repository import DeleteAccountRequestsRepository
+from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.user_roles_repository import UserRolesRepository
@@ -23,7 +24,10 @@ from app.dtos.users_dto import (
     UserEdit,
     UserOut,
     UserStatusToggle,
+    UserOut, UserProfileOut, UserFullThemeOut, UserCreate, UserEdit
 )
+from app.dtos.roles_dto import RoleOut
+from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.utils.security import hash_password
 from app.validators import (
     ErrorCodes,
@@ -44,6 +48,7 @@ class UsersService(BaseSecuredService):
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
         user_roles_repo: Optional[UserRolesRepository] = None,
         delete_account_repo: Optional[DeleteAccountRequestsRepository] = None,
+        role_permissions_repo: Optional[RolePermissionsRepository] = None,
     ):
         super().__init__(session)
         self.security_roles_repo = security_roles_repo or SecurityRolesRepository()
@@ -51,6 +56,7 @@ class UsersService(BaseSecuredService):
         self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
         self.user_roles_repo = user_roles_repo or UserRolesRepository()
         self.delete_account_repo = delete_account_repo or DeleteAccountRequestsRepository()
+        self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
 
     # ─────────────────────────────────────────────────────────────────────────
     # HELPERS
@@ -99,14 +105,116 @@ class UsersService(BaseSecuredService):
                 "created_by": self.user_id,
             },
         )
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # SINGLE METHOD: Get User Full Details (Called by ALL endpoints)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def get_user_full_details(
+        self,
+        user_id: Optional[int] = None,
+        email: Optional[str] = None,
+        chamber_id: Optional[int] = None,
+
+    ) -> UserOut:
+        """
+        Get complete user output with profile, permissions, and chamber info.
+        Single source of truth - called by login, /me, /{user_id}, /paged.
+        Uses self.chamber_id from BaseSecuredService context.
+        """
+        print(f"****** 1 chamber_id {chamber_id}")
+        chamber_id = chamber_id if(chamber_id) else self.chamber_id
+        print(f"****** 2 chamber_id {chamber_id}")
+        # Repository handles all complex joins
+        user_data = await self.users_repo.get_user_full_details(
+            session=self.session,
+            user_id=user_id,
+            email=email,
+            chamber_id=chamber_id,
+        )
+
+        if not user_data:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message=f"User not found in this chamber",
+            )
+
+        # Transform to DTO
+        return self._build_user_dto(user_data, chamber_id)
+
+    def _build_user_dto(self, 
+                        user_data: dict,                        
+                        chamber_id: int) -> UserOut:
+        """
+        Transform repository dict output to UserOut DTO.
+        Reused for single user and paginated list.
+        """
+        # Build RoleOut
+        role: Optional[RoleOut] = None
+        if user_data.get("role"):
+            role = RoleOut(
+                role_id=user_data["role"]["role_id"],
+                role_name=user_data["role"]["role_name"],
+                role_code=user_data["role"]["role_code"],
+                description=user_data["role"]["description"],
+                status_ind=user_data["role"]["status_ind"],
+            )
+
+        # Build ProfileOut
+        profile: Optional[UserProfileOut] = None
+        if user_data.get("profile"):
+            profile = UserProfileOut(
+                theme=UserFullThemeOut(
+                    header_color=user_data["profile"].get("header_color") or "0 0% 100%",
+                    sidebar_color=user_data["profile"].get("sidebar_color") or "0 0% 100%",
+                    primary_color=user_data["profile"].get("primary_color") or "32.4 99% 63%",
+                    font_family=user_data["profile"].get("font_family") or "Nunito, sans-serif",
+                )
+            )
+
+        # Build Permissions
+        permissions = [
+            RolePermissionModuleOut(
+                chamber_module_id=p["chamber_module_id"],
+                module_code=p["module_code"],
+                module_name=p["module_name"],
+                permission_id=p.get("permission_id"),
+                allow_all_ind=p["allow_all_ind"],
+                read_ind=p["read_ind"],
+                write_ind=p["write_ind"],
+                create_ind=p["create_ind"],
+                delete_ind=p["delete_ind"],
+            )
+            for p in user_data.get("permissions", [])
+        ]
+
+        return UserOut(
+            user_id=user_data["user_id"],
+            full_name=f"{user_data['first_name']} {user_data['last_name'] or ''}".strip(),
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
+            email=user_data["email"],
+            phone=user_data["phone"],
+            role=role,
+            is_active=user_data["status_ind"],
+            image="/assets/images/avatar/none.png",
+            created_date=user_data["created_date"],
+            chamber_name=user_data.get("chamber", {}).get("chamber_name"),
+            profile=profile,
+            permissions=permissions,
+            chamber_id=chamber_id,
+        )
 
     # ─────────────────────────────────────────────────────────────────────────
     # LIST
-    # ─────────────────────────────────────────────────────────────────────────
-
+    # ─────────────────────────────────────────────────────────────────────────    
+    
     async def users_get_paged(
         self, page: int, limit: int, search: Optional[str] = None
     ) -> PagingData[UserOut]:
+        """
+        Paginated users for a chamber with full nested structure.
+        """
         users, total_records = await self.users_repo.list_users_paginated(
             session=self.session,
             page=page,
@@ -114,54 +222,48 @@ class UsersService(BaseSecuredService):
             chamber_id=self.chamber_id,
             search=search,
         )
+        
+        # Transform each user using same DTO builder
+        full_users: List[UserOut] = []
+        for user_data in users:
+            # Get permissions for each user
+            if user_data.get("role"):
+                perm_rows = await self.role_permissions_repo.get_permissions_for_login(
+                    session=self.session,
+                    role_id=user_data["role"]["role_id"],
+                    chamber_id=self.chamber_id,
+                )
+                user_data["permissions"] = perm_rows
+            else:
+                user_data["permissions"] = []
+            
+            full_user = self._build_user_dto(user_data,self.chamber_id)
+            full_users.append(full_user)
+
         builder = PagingBuilder(total_records=total_records, page=page, limit=limit)
-        return builder.build(records=users)
+        return builder.build(records=full_users)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # GET SINGLE
+    # GET SINGLE (Calls get_user_full_details)
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_get_by_id(self, user_id: int) -> UserOut:
-        """Fetch a single user by ID, scoped to the current chamber."""
-        users, _ = await self.users_repo.list_users_paginated(
-            session=self.session,
-            page=1,
-            limit=1,
-            chamber_id=self.chamber_id,
-            search=None,
-        )
-        # Filter by user_id from the paginated result isn't ideal for a single fetch;
-        # use a direct query instead.
-        row = await self.users_repo.get_user_with_profile_and_role(
-            session=self.session,
-            user_id=user_id,
-            chamber_id=self.chamber_id,
-        )
-        if not row:
-            raise ValidationErrorDetail(
-                code=ErrorCodes.NOT_FOUND,
-                message=f"User {user_id} not found in this chamber",
-            )
-        user, _, role = row
-        return UserOut(
-            user_id=user.user_id,
-            full_name=f"{user.first_name} {user.last_name or ''}".strip(),
-            first_name=user.first_name,
-            last_name=user.last_name,
-            email=user.email,
-            phone=user.phone,
-            status_ind=user.status_ind,
-            role_id=role.role_id if role else None,
-            role_name=role.role_name if role else None,
-            created_date=user.created_date,
-            image="/assets/images/avatar/none.png",
-        )
+        """
+        Get full user output by ID.
+        """
+        return await self.get_user_full_details(user_id=user_id)
+
+    async def users_get_by_email(self, email: str) -> UserOut:
+        """
+        Get full user output by email.
+        """
+        return await self.get_user_full_details(email=email)
 
     # ─────────────────────────────────────────────────────────────────────────
     # ADD
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def users_add(self, payload: UserCreate) -> int:
+    async def users_add(self, payload: UserCreate) -> UserOut:
         errors = []
 
         if err := FieldValidator.validate_email(payload.email):
@@ -230,7 +332,7 @@ class UsersService(BaseSecuredService):
         if payload.role_id and link:
             await self._set_user_role(link.link_id, payload.role_id)
 
-        return user.user_id
+        return await self.get_user_full_details(user_id=user.user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # EDIT
@@ -275,7 +377,7 @@ class UsersService(BaseSecuredService):
                 )
             await self._set_user_role(link.link_id, payload.role_id)
 
-        return await self.users_get_by_id(user_id)
+        return await self.get_user_full_details(user_id=user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # STATUS TOGGLE
@@ -301,7 +403,7 @@ class UsersService(BaseSecuredService):
             id_values=payload.user_id,
             data={"status_ind": payload.status_ind},
         )
-        return await self.users_get_by_id(payload.user_id)
+        return await self.get_user_full_details(user_id=payload.user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # DELETE REQUEST

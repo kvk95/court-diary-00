@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+# app/services/auth_service.py
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from app.database.repositories.users_repository import UsersRepository
 from app.dtos.oauth_dtos import LoginRequest, RefreshRequest, TokenOut
 from app.utils.security import verify_password
 from app.database.models.refm_login_status import RefmLoginStatusConstants
+from app.services.users_service import UsersService  # ← Import UsersService
 from .base.base_service import BaseService
 
 
@@ -29,23 +30,22 @@ class AuthService(BaseService):
         audit_repo: LoginAuditRepository | None = None,
         user_profiles_repo: UserProfilesRepository | None = None,
         role_permissions_repo: RolePermissionsRepository | None = None,
+        users_service: UsersService | None = None,  # ← Inject UsersService
     ):
         super().__init__(session)
         self.users_repo = users_repo or UsersRepository()
         self.audit_repo = audit_repo or LoginAuditRepository()
         self.user_profiles_repo = user_profiles_repo or UserProfilesRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
+        self.users_service = users_service  # ← Use for get_user_full_details
 
     async def login(self, loginRequest: LoginRequest) -> TokenOut:
         """
         Authenticate user and return access/refresh tokens with user context.
-        - Validates credentials
-        - Logs audit entries for success/failure
-        - Issues tokens with authoritative claims from DB
         """
         print(f"LoginRequest: {loginRequest}")
 
-        # ✅ 1. Find user by email (chamber-agnostic at this point)
+        # 1. Find user by email
         user = await self.users_repo.get_first(
             self.session,
             filters={self.users_repo.model.email: loginRequest.email},
@@ -62,7 +62,7 @@ class AuthService(BaseService):
             )
             raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="User not found")
 
-        # ✅ 2. Verify password
+        # 2. Verify password
         if not verify_password(loginRequest.password, user.password_hash):
             await self.audit_repo.log_login(
                 self.session,
@@ -73,11 +73,9 @@ class AuthService(BaseService):
             )
             raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Invalid credentials")
 
-        # ✅ 3. Resolve user's PRIMARY chamber (or use loginRequest.chamber_id if provided)
-        chamber_id = loginRequest.chamber_id  # ✅ Optional: User can specify chamber at login
+        # 3. Resolve user's PRIMARY chamber
+        chamber_id = loginRequest.chamber_id
         if not chamber_id:
-            
-            
             stmt = select(UserChamberLink.chamber_id).where(
                 UserChamberLink.user_id == user.user_id,
                 UserChamberLink.is_primary == True,
@@ -90,31 +88,32 @@ class AuthService(BaseService):
                 raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="User has no active chamber membership")
             chamber_id = row.chamber_id
 
-        # ✅ 4. Success audit (include chamber_id)
+        # 4. Success audit
         await self.audit_repo.log_login(
             self.session,
             user_id=user.user_id,
             loginRequest=loginRequest,
             status_code=RefmLoginStatusConstants.SUCCESS,
             failure_reason=None,
-            chamber_id=chamber_id,  # ✅ Log which chamber was accessed
+            chamber_id=chamber_id,
         )
 
-        # ✅ 5. Authoritative claims from DB (include chamber_id)
+        # 5. Create tokens
         extra_claims = {
-            "chamber_id": chamber_id,  # ✅ Changed from company_id
+            "chamber_id": chamber_id,
             "user_id": user.user_id,
         }
 
         access_token = create_access_token(subject=str(user.user_id), extra_claims=extra_claims)
         refresh_token = create_refresh_token(subject=str(user.user_id), extra_claims=extra_claims)
 
-        # ✅ 6. Build user context (for THIS chamber)
-        user_details = await self.get_user_context(
-            self.session, 
-            user_id=user.user_id, 
-            chamber_id=chamber_id  # ✅ Pass chamber for contextual permissions
+        # 6. Get user details via UsersService (single source of truth)
+        # Create temporary UsersService with the resolved chamber_id
+        users_service = UsersService(
+            session=self.session
         )
+        user_details = await users_service.get_user_full_details(user_id=user.user_id,
+                                                                 chamber_id=chamber_id)
 
         return TokenOut(
             access_token=access_token,
@@ -126,20 +125,17 @@ class AuthService(BaseService):
     async def refresh(
         self, session: AsyncSession, refreshRequest: RefreshRequest
     ) -> TokenOut:
-        """
-        Refresh tokens using a valid refresh token.
-        """
+        """Refresh tokens using a valid refresh token."""
         payload = decode_token(refreshRequest.refresh_token)
         if not payload or payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid refresh token")
 
         subject = payload.get("sub")
-        chamber_id = payload.get("chamber_id")  # ✅ Preserve chamber from original token
+        chamber_id = payload.get("chamber_id")
         
         if not subject:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Fetch current user state (active check)
         user = await self.users_repo.get_first(
             session,
             filters={self.users_repo.model.user_id: int(subject)},
@@ -149,7 +145,7 @@ class AuthService(BaseService):
             raise HTTPException(status_code=401, detail="Session expired")
 
         extra_claims = {
-            "chamber_id": chamber_id,  # ✅ Keep same chamber
+            "chamber_id": chamber_id,
             "user_id": user.user_id,
         }
         
@@ -161,63 +157,3 @@ class AuthService(BaseService):
             refresh_token=refresh_token,
             token_type="bearer",
         )
-
-    async def get_user_context(
-        self,
-        session: AsyncSession,
-        *,
-        email: Optional[str] = None,
-        user_id: Optional[int] = None,
-        chamber_id: Optional[int] = None,  # ✅ NEW: For contextual permissions
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Assemble complete user context for a specific chamber.
-        """
-        # 1. Resolve user + profile + role via repository (with chamber context)
-        row = await self.users_repo.get_user_with_profile_and_role(
-            session, email=email, user_id=user_id, chamber_id=chamber_id
-        )
-        if not row:
-            return None
-
-        user, profile, role_obj = row
-
-        # 2. Role dictionary
-        role: Optional[Dict[str, Any]] = None
-        if role_obj:
-            role = {
-                "role_id": role_obj.role_id,
-                "role_name": role_obj.role_name,
-            }
-
-        # 3. Permissions via RolePermissionsRepository (chamber-specific)
-        permissions: list[dict] = []
-        if role_obj and chamber_id:
-            permissions = await self.role_permissions_repo.get_permissions_for_login(
-                session, 
-                role_id=role_obj.role_id, 
-                chamber_id=chamber_id
-            )
-
-        # 4. Final shape
-        return {
-            "user": {
-                "user_id": user.user_id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "phone": user.phone,
-                "role": role,
-                "image": "/assets/images/avatar/none.png",  # ✅ Default (no image column)
-            },
-            "profile": {
-                "theme": {
-                    "header_color": (profile.header_color if profile else None) or "0 0% 100%",
-                    "sidebar_color": (profile.sidebar_color if profile else None) or "0 0% 100%",
-                    "primary_color": (profile.primary_color if profile else None) or "32.4 99% 63%",
-                    "font_family": (profile.font_family if profile else None) or "Nunito, sans-serif",
-                }
-            },
-            "permissions": permissions,
-            "chamber_id": chamber_id,  # ✅ Include in context
-        }

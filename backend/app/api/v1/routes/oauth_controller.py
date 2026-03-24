@@ -5,18 +5,22 @@ from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
 
 from app.api.v1.routes.base.base_controller import BaseController
-from app.auth.schemas import Token as SwaggerToken
 from app.database.models.base.session import AsyncSession
 from app.dtos.oauth_dtos import LoginRequest, RefreshRequest, TokenOut
 from app.dependencies import get_auth_service, get_session
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.services.auth_service import AuthService
 
+from app.validators import (
+    ErrorCodes,
+    ValidationErrorDetail,
+)
+
 
 class OAuthController(BaseController):
     CONTROLLER_NAME = "oauth"
 
-    @BaseController.post("/token", include_in_schema=False, response_model=SwaggerToken)
+    @BaseController.post("/token", include_in_schema=False, response_model=TokenOut)
     async def login_for_swagger(
         self,
         request: Request,
@@ -34,18 +38,17 @@ class OAuthController(BaseController):
             user_agent=ua,
         )
 
-        token_out: TokenOut = await service.login(login_request)
+        try:
+            token_out: TokenOut = await service.login(login_request)
+        except ValidationErrorDetail as e:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.PERMISSION_DENIED,
+                message=e.message,
+            )
 
-        access_token = token_out.access_token
-        claims = jwt.get_unverified_claims(access_token)
-        expires_in = claims["exp"] - int(datetime.now(timezone.utc).timestamp())
+        self.set_token_expiry(token_out)
 
-        return SwaggerToken(
-            access_token=access_token,
-            refresh_token=token_out.refresh_token,
-            token_type=token_out.token_type.lower(),
-            expires_in=expires_in,
-        )
+        return token_out
 
     @BaseController.post(
         "/login",
@@ -64,8 +67,9 @@ class OAuthController(BaseController):
         loginRequest.ip_address = ip
         loginRequest.user_agent = ua
 
-        output: TokenOut = await service.login(loginRequest)
-        return self.success(result=output)
+        token_out: TokenOut = await service.login(loginRequest)
+        self.set_token_expiry(token_out)
+        return self.success(result=token_out)
 
     @BaseController.post(
         "/refresh",
@@ -78,5 +82,11 @@ class OAuthController(BaseController):
         session: AsyncSession = Depends(get_session),
         service: AuthService = Depends(get_auth_service),
     ) -> BaseOutDto[TokenOut]:
-        output: TokenOut = await service.refresh(session, payload)
-        return self.success(result=output)
+        token_out: TokenOut = await service.refresh(session, payload)
+        self.set_token_expiry(token_out)
+        return self.success(result=token_out)
+
+    def set_token_expiry(self, token_out):
+        access_token = token_out.access_token
+        claims = jwt.get_unverified_claims(access_token)
+        token_out.expires_in = claims["exp"] - int(datetime.now(timezone.utc).timestamp())

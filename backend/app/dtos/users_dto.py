@@ -1,28 +1,58 @@
+# app/dtos/users_dto.py
+
 from datetime import datetime
-from typing import Optional
-
+from typing import Optional, List
 from pydantic import EmailStr, field_validator
-
 from app.dtos.base.base_data import BaseInData, BaseRecordData
+from app.dtos.roles_dto import RoleOut
+from app.dtos.role_permissions_dto import RolePermissionModuleOut
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# USER DTOs
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
+# USER PROFILE & THEME DTOs
+# =============================================================================
+
+class UserFullThemeOut(BaseRecordData):
+    """User profile theme settings"""
+    header_color: str = "0 0% 100%"
+    sidebar_color: str = "0 0% 100%"
+    primary_color: str = "32.4 99% 63%"
+    font_family: str = "Nunito, sans-serif"
+
+
+class UserProfileOut(BaseRecordData):
+    """Profile section in user output"""
+    theme: UserFullThemeOut
+
+
+# =============================================================================
+# USER OUTPUT DTO (Unified for ALL endpoints)
+# =============================================================================
 
 class UserOut(BaseRecordData):
+    """
+    Full user output with profile, permissions, and chamber info.
+    Used for login, /me, /{user_id}, and /paged endpoints.
+    """
     user_id: int
     full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: EmailStr
     phone: Optional[str] = None
-    role_id: Optional[int] = None
-    role_name: Optional[str] = None
-    status_ind: bool = True
+    role: Optional[RoleOut] = None
+    is_active: bool = True
     image: Optional[str] = None
     created_date: Optional[datetime] = None
+    chamber_name: Optional[str] = None
+    profile: Optional[UserProfileOut] = None
+    permissions: List[RolePermissionModuleOut] = []
+    chamber_id: Optional[int] = None
 
+
+# =============================================================================
+# USER INPUT DTOs
+# =============================================================================
 
 class UserCreate(BaseInData):
     email: str
@@ -54,7 +84,6 @@ class UserEdit(BaseInData):
     phone: Optional[str] = None
     status_ind: Optional[bool] = None
     role_id: Optional[int] = None
-    # Email and password are separate dedicated endpoints for security
 
 
 class UserStatusToggle(BaseInData):
@@ -63,9 +92,9 @@ class UserStatusToggle(BaseInData):
     status_ind: bool
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # DELETION REQUEST DTOs
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 
 class DeletionRequestOut(BaseRecordData):
     request_id: int

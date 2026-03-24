@@ -1,5 +1,6 @@
-from typing import List, Optional, Tuple
+# app/database/repositories/users_repository.py
 
+from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,9 +9,12 @@ from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
+from app.database.models.chamber import Chamber
+from app.database.models.chamber_modules import ChamberModules
+from app.database.models.role_permissions import RolePermissions
+from app.database.models.refm_modules import RefmModules
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
-from app.dtos.users_dto import UserOut
 
 
 @apply_repo_context
@@ -23,6 +27,181 @@ class UsersRepository(BaseRepository[Users]):
     def __init__(self):
         super().__init__(Users)
 
+    async def get_user_full_details(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: Optional[int] = None,
+        email: Optional[str] = None,
+        chamber_id: int,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get complete user details with profile, role, permissions, and chamber.
+        All complex joins handled in repository layer.
+        Returns dict for service to transform into DTO.
+        """
+        if not user_id and not email:
+            raise ValueError("Either user_id or email must be provided")
+
+        # Build base query with all joins
+        stmt = (
+            select(
+                # User fields
+                Users.user_id,
+                Users.first_name,
+                Users.last_name,
+                Users.email,
+                Users.phone,
+                Users.status_ind,
+                Users.created_date,
+                # Profile fields
+                UserProfiles.profile_id,
+                UserProfiles.header_color,
+                UserProfiles.sidebar_color,
+                UserProfiles.primary_color,
+                UserProfiles.font_family,
+                # Role fields
+                SecurityRoles.role_id,
+                SecurityRoles.role_name,
+                SecurityRoles.role_code,
+                SecurityRoles.description.label("role_description"),
+                SecurityRoles.status_ind.label("role_status_ind"),
+                # Chamber fields
+                Chamber.chamber_id,
+                Chamber.chamber_name,
+            )
+            .join(
+                UserChamberLink,
+                and_(
+                    Users.user_id == UserChamberLink.user_id,
+                    UserChamberLink.chamber_id == chamber_id,
+                    UserChamberLink.left_date.is_(None),
+                    UserChamberLink.status_ind.is_(True),
+                )
+            )
+            .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
+            .outerjoin(
+                UserRoles,
+                and_(
+                    UserChamberLink.link_id == UserRoles.link_id,
+                    UserRoles.end_date.is_(None),
+                )
+            )
+            .outerjoin(SecurityRoles, UserRoles.role_id == SecurityRoles.role_id)
+            .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
+            .where(Users.is_deleted.is_(False))
+        )
+
+        if user_id:
+            stmt = stmt.where(Users.user_id == user_id)
+        else:
+            stmt = stmt.where(Users.email == email)
+
+        self._log_stmt(stmt, session)
+        result = await session.execute(stmt)
+        row = result.first()
+
+        if not row:
+            return None
+
+        # Get permissions for this role in this chamber
+        permissions = await self._get_role_permissions(
+            session=session,
+            role_id=row.role_id,
+            chamber_id=chamber_id,
+        )
+
+        return {
+            "user_id": row.user_id,
+            "first_name": row.first_name,
+            "last_name": row.last_name,
+            "email": row.email,
+            "phone": row.phone,
+            "status_ind": row.status_ind,
+            "created_date": row.created_date,
+            "profile": {
+                "header_color": row.header_color,
+                "sidebar_color": row.sidebar_color,
+                "primary_color": row.primary_color,
+                "font_family": row.font_family,
+            } if row.profile_id else None,
+            "role": {
+                "role_id": row.role_id,
+                "role_name": row.role_name,
+                "role_code": row.role_code,
+                "description": row.role_description,
+                "status_ind": row.role_status_ind,
+            } if row.role_id else None,
+            "chamber": {
+                "chamber_id": row.chamber_id,
+                "chamber_name": row.chamber_name,
+            },
+            "permissions": permissions,
+        }
+
+    async def _get_role_permissions(
+        self,
+        session: AsyncSession,
+        role_id: int,
+        chamber_id: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get permissions for a role in a specific chamber.
+        Helper method for get_user_full_details.
+        """
+        if not role_id:
+            return []
+
+        stmt = (
+            select(
+                ChamberModules.chamber_module_id,
+                RefmModules.code.label("module_code"),
+                RefmModules.name.label("module_name"),
+                RolePermissions.permission_id,
+                RolePermissions.allow_all_ind,
+                RolePermissions.read_ind,
+                RolePermissions.write_ind,
+                RolePermissions.create_ind,
+                RolePermissions.delete_ind,
+            )
+            .join(
+                RolePermissions,
+                ChamberModules.chamber_module_id == RolePermissions.chamber_module_id,
+            )
+            .join(
+                RefmModules,
+                ChamberModules.module_code == RefmModules.code,
+            )
+            .where(
+                RolePermissions.role_id == role_id,
+                ChamberModules.chamber_id == chamber_id,
+                ChamberModules.is_active.is_(True),
+            )
+        )
+
+        self._log_stmt(stmt, session)
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        return [
+            {
+                "chamber_module_id": row.chamber_module_id,
+                "module_code": row.module_code,
+                "module_name": row.module_name,
+                "permission_id": row.permission_id,
+                "allow_all_ind": row.allow_all_ind,
+                "read_ind": row.read_ind,
+                "write_ind": row.write_ind,
+                "create_ind": row.create_ind,
+                "delete_ind": row.delete_ind,
+            }
+            for row in rows
+        ]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Paginated List (Returns raw dicts, NOT DTOs)
+    # ─────────────────────────────────────────────────────────────────────────
+
     async def list_users_paginated(
         self,
         session: AsyncSession,
@@ -30,10 +209,10 @@ class UsersRepository(BaseRepository[Users]):
         limit: int,
         chamber_id: int,
         search: Optional[str] = None,
-    ) -> Tuple[List[UserOut], int]:
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
-        Paginated users for a chamber with role, filtered through user_chamber_link.
-        Joins UserRoles via link_id (the correct contextual path).
+        Paginated users for a chamber with role.
+        Returns list of dicts for service to transform into DTOs.
         """
         stmt = (
             select(
@@ -47,16 +226,26 @@ class UsersRepository(BaseRepository[Users]):
                 Users.created_date,
                 SecurityRoles.role_id,
                 SecurityRoles.role_name,
+                SecurityRoles.role_code,
+                SecurityRoles.description.label("role_description"),
+                SecurityRoles.status_ind.label("role_status_ind"),
+                UserProfiles.header_color,
+                UserProfiles.sidebar_color,
+                UserProfiles.primary_color,
+                UserProfiles.font_family,
+                Chamber.chamber_name,
             )
             .join(UserChamberLink, Users.user_id == UserChamberLink.user_id)
             .outerjoin(
                 UserRoles,
                 and_(
-                    UserChamberLink.link_id == UserRoles.link_id,   # ✅ via link_id, not user_id
+                    UserChamberLink.link_id == UserRoles.link_id,
                     UserRoles.end_date.is_(None),
                 ),
             )
             .outerjoin(SecurityRoles, UserRoles.role_id == SecurityRoles.role_id)
+            .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
+            .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .where(
                 Users.is_deleted.is_(False),
                 UserChamberLink.chamber_id == chamber_id,
@@ -87,27 +276,43 @@ class UsersRepository(BaseRepository[Users]):
         result = await session.execute(stmt)
         rows = result.all()
 
+        # Return raw dicts for service to transform
         users = [
-            UserOut(
-                user_id=row.user_id,
-                full_name=(row.full_name or "").strip(),
-                first_name=row.first_name or "",
-                last_name=row.last_name or "",
-                email=row.email,
-                phone=row.phone,
-                status_ind=row.status_ind,
-                role_id=row.role_id,
-                role_name=row.role_name,
-                created_date=row.created_date,
-                image="/assets/images/avatar/none.png",
-            )
+            {
+                "user_id": row.user_id,
+                "full_name": (row.full_name or "").strip(),
+                "first_name": row.first_name or "",
+                "last_name": row.last_name or "",
+                "email": row.email,
+                "phone": row.phone,
+                "status_ind": row.status_ind,
+                "created_date": row.created_date,
+                "role": {
+                    "role_id": row.role_id,
+                    "role_name": row.role_name,
+                    "role_code": row.role_code,
+                    "description": row.role_description,
+                    "status_ind": row.role_status_ind,
+                } if row.role_id else None,
+                "profile": {
+                    "header_color": row.header_color,
+                    "sidebar_color": row.sidebar_color,
+                    "primary_color": row.primary_color,
+                    "font_family": row.font_family,
+                } if row.header_color else None,
+                "chamber_name": row.chamber_name,
+            }
             for row in rows
         ]
 
         return users, total_records
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Helper Methods
+    # ─────────────────────────────────────────────────────────────────────────
+
     async def exists_by_email(self, session: AsyncSession, email: str) -> bool:
-        """Check if a user exists globally by email (email is unique across all chambers)."""
+        """Check if a user exists globally by email."""
         user = await self.get_first(session, filters={Users.email: email})
         return user is not None
 
@@ -121,8 +326,7 @@ class UsersRepository(BaseRepository[Users]):
     ) -> Optional[Tuple[Users, Optional[UserProfiles], Optional[SecurityRoles]]]:
         """
         Return (user, profile, role) tuple.
-        When chamber_id is provided, resolves role through the correct
-        user_chamber_link → user_roles path.
+        When chamber_id is provided, resolves role through user_chamber_link → user_roles.
         """
         if not email and not user_id:
             raise ValueError("Either email or user_id must be provided")
@@ -132,7 +336,7 @@ class UsersRepository(BaseRepository[Users]):
                 select(Users, UserProfiles, SecurityRoles)
                 .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
                 .join(UserChamberLink, Users.user_id == UserChamberLink.user_id)
-                .outerjoin(                                          # ✅ link_id path
+                .outerjoin(
                     UserRoles,
                     and_(
                         UserChamberLink.link_id == UserRoles.link_id,
@@ -149,7 +353,6 @@ class UsersRepository(BaseRepository[Users]):
                 )
             )
         else:
-            # Fallback: no chamber scoping (used internally, e.g. superadmin)
             stmt = (
                 select(Users, UserProfiles, SecurityRoles)
                 .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)

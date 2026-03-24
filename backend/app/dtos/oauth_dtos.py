@@ -1,5 +1,8 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, EmailStr
+from app.dtos.users_dto import (
+    UserOut
+)
 
 
 # =============================================================================
@@ -32,7 +35,7 @@ class TokenOut(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    user_details: Optional[Dict[str, Any]] = None
+    user_details: Optional[UserOut] = None
     expires_in: int = 3600  # seconds
 
 

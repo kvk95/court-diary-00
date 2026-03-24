@@ -1,30 +1,27 @@
 # app/api/v1/routes/users_controller.py
 
 from typing import Optional
-
 from fastapi import Body, Depends, Path, Query
-
-from app.api.v1.routes.base.base_controller import BaseController
-from app.dependencies import get_users_service,get_current_user
+from app.dtos.users_dto import (
+    UserOut, 
+    UserCreate, 
+    UserEdit, 
+    UserStatusToggle, 
+    DeletionRejectPayload,
+    DeletionRequestOut
+)
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
-from app.dtos.users_dto import (
-    DeletionRejectPayload,
-    DeletionRequestOut,
-    UserCreate,
-    UserEdit,
-    UserOut,
-    UserStatusToggle,
-)
 from app.services.users_service import UsersService
+from app.dependencies import get_current_user, get_users_service
+from app.api.v1.routes.base.base_controller import BaseController
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
 
 class UsersController(BaseController):
     CONTROLLER_NAME = "users"
 
-    # ── List ──────────────────────────────────────────────────────────────────
-
+    # ── List/Paged (FIRST - before parameterized routes) ─────────────────────
     @BaseController.get(
         "/paged",
         summary="Get users (paginated)",
@@ -39,34 +36,37 @@ class UsersController(BaseController):
     ) -> BaseOutDto[PagingData[UserOut]]:
         data = await service.users_get_paged(page=page, limit=limit, search=search)
         return self.success(result=data)
-    
-    # ── Single ────────────────────────────────────────────────────────────────
+
+    # ── Current User (SECOND - before parameterized routes) ──────────────────
     @BaseController.get(
         "/me",
-        summary="Get current user",
+        summary="Get current user with full profile and permissions",
         response_model=BaseOutDto[UserOut],
     )
     async def users_get_me(
         self,
         current_user: UserOut = Depends(get_current_user),
         service: UsersService = Depends(get_users_service),
-    ) -> BaseOutDto[UserOut]:
-        result = await service.users_get_by_id(user_id=current_user.user_id)
+    ) -> BaseOutDto[UserOut]: 
+        result = await service.users_get_by_id(
+            user_id=current_user.user_id,
+        )
         return self.success(result=result)
 
-    # ── Single ────────────────────────────────────────────────────────────────
-
+    # ── Single by ID (LAST - parameterized routes) ───────────────────────────
     @BaseController.get(
         "/{user_id}",
-        summary="Get user by ID",
-        response_model=BaseOutDto[UserOut],
+        summary="Get user by ID with full profile and permissions",
+        response_model=BaseOutDto[UserOut], 
     )
     async def users_get_by_id(
         self,
         user_id: int = Path(..., gt=0, description="User ID"),
         service: UsersService = Depends(get_users_service),
-    ) -> BaseOutDto[UserOut]:
-        result = await service.users_get_by_id(user_id=user_id)
+    ) -> BaseOutDto[UserOut]:  # ← CHANGED
+        result = await service.users_get_by_id(
+            user_id=user_id,
+        )
         return self.success(result=result)
 
     # ── Add ───────────────────────────────────────────────────────────────────
@@ -74,14 +74,14 @@ class UsersController(BaseController):
     @BaseController.post(
         "/add",
         summary="Add user to chamber",
-        response_model=BaseOutDto[int],
+        response_model=BaseOutDto[UserOut],
     )
     async def users_add(
         self,
         payload: UserCreate = Body(..., description="New user data"),
         service: UsersService = Depends(get_users_service),
-    ) -> BaseOutDto[int]:
-        result: int = await service.users_add(payload)
+    ) -> BaseOutDto[UserOut]:
+        result: UserOut = await service.users_add(payload)
         return self.success(result=result)
 
     # ── Edit ──────────────────────────────────────────────────────────────────
