@@ -99,6 +99,7 @@ class RolesService(BaseSecuredService):
                 code=ErrorCodes.VALIDATION_ERROR, message="Role name is required"
             )
 
+        # ✅ Check role name (non-deleted only - names can be reused)
         existing = await self.security_roles_repo.get_first(
             self.session,
             filters={SecurityRoles.role_name: payload.role_name.strip()},
@@ -110,17 +111,28 @@ class RolesService(BaseSecuredService):
                 message=f"Role name '{payload.role_name}' already exists",
             )
 
+        # ✅ FIXED: Check role code (ALL roles, including deleted)
         if payload.role_code:
-            existing_code = await self.security_roles_repo.get_first(
-                self.session,
-                filters={SecurityRoles.role_code: payload.role_code.upper()},
-                where=[SecurityRoles.is_deleted.is_(False)],
+            # ❌ DON'T USE: get_first() - applies soft-delete filter
+            # ✅ USE: Raw query to check ALL roles
+            stmt = select(SecurityRoles).where(
+                SecurityRoles.role_code == payload.role_code.upper()
             )
+            result = await self.session.execute(stmt)
+            existing_code = result.scalars().first()
+            
             if existing_code:
-                raise ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message=f"Role code '{payload.role_code}' already exists",
-                )
+                if existing_code.is_deleted:
+                    raise ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message=f"Role code '{payload.role_code}' was previously used by a deleted role. "
+                            f"Please use a different code.",
+                    )
+                else:
+                    raise ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message=f"Role code '{payload.role_code}' already exists",
+                    )
 
         role = await self.security_roles_repo.create(
             session=self.session,
@@ -142,6 +154,7 @@ class RolesService(BaseSecuredService):
                 code=ErrorCodes.NOT_FOUND, message=f"Role {role_id} not found"
             )
 
+        # ✅ Check role name (non-deleted only, excluding current role)
         if payload.role_name:
             duplicate = await self.security_roles_repo.get_first(
                 self.session,
@@ -157,20 +170,27 @@ class RolesService(BaseSecuredService):
                     message=f"Role name '{payload.role_name}' already exists",
                 )
 
+        # ✅ FIXED: Check role code (ALL roles, including deleted)
         if payload.role_code:
-            duplicate_code = await self.security_roles_repo.get_first(
-                self.session,
-                filters={SecurityRoles.role_code: payload.role_code.upper()},
-                where=[
-                    SecurityRoles.role_id != role_id,
-                    SecurityRoles.is_deleted.is_(False),
-                ],
+            stmt = select(SecurityRoles).where(
+                SecurityRoles.role_code == payload.role_code.upper(),
+                SecurityRoles.role_id != role_id,
             )
+            result = await self.session.execute(stmt)
+            duplicate_code = result.scalars().first()
+            
             if duplicate_code:
-                raise ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message=f"Role code '{payload.role_code}' already exists",
-                )
+                if duplicate_code.is_deleted:
+                    raise ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message=f"Role code '{payload.role_code}' was previously used by a deleted role. "
+                            f"Please use a different code.",
+                    )
+                else:
+                    raise ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message=f"Role code '{payload.role_code}' already exists",
+                    )
 
         update_data: dict = {}
         if payload.role_name is not None:

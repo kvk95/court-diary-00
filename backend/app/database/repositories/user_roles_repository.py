@@ -1,11 +1,14 @@
 # app/database/repositories/user_roles_repository.py
 
-from typing import Optional
+from typing import Optional, Tuple,List,Any, Dict
+
 from datetime import date
-from sqlalchemy import and_, update
+from sqlalchemy import and_, update, select,func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.user_roles import UserRoles
+from app.database.models.user_roles import UserRoles
+from app.database.models.security_roles import SecurityRoles
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
@@ -132,3 +135,64 @@ class UserRolesRepository(BaseRepository[UserRoles]):
             start_date=date.today(),
             created_by=current_user_id,
         )
+    
+    async def get_roles_paged(
+        self,
+        session: AsyncSession,
+        page: int,
+        limit: int,
+        search: Optional[str] = None,
+        status: Optional[bool] = None,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Paginated roles with active user count."""
+        stmt = (
+            select(
+                SecurityRoles.role_id,
+                SecurityRoles.role_name,
+                SecurityRoles.role_code,
+                SecurityRoles.description,
+                SecurityRoles.status_ind,
+                func.count(UserRoles.user_role_id).label("user_count"),
+            )
+            .outerjoin(
+                UserRoles,
+                and_(
+                    SecurityRoles.role_id == UserRoles.role_id,
+                    UserRoles.end_date.is_(None),
+                ),
+            )
+            .where(SecurityRoles.is_deleted.is_(False))
+            .group_by(SecurityRoles.role_id)
+        )
+
+        if search and search.strip():
+            stmt = stmt.where(SecurityRoles.role_name.ilike(f"%{search.strip()}%"))
+
+        if status is not None:
+            stmt = stmt.where(SecurityRoles.status_ind == status)
+
+        # Count
+        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+        count_result = await session.execute(count_stmt)
+        total = count_result.scalar_one() or 0
+
+        # Pagination
+        stmt = stmt.order_by(SecurityRoles.role_name.asc())
+        stmt = stmt.offset((page - 1) * limit).limit(limit)
+
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        roles = [
+            {
+                "role_id": row.role_id,
+                "role_name": row.role_name,
+                "role_code": row.role_code,
+                "description": row.description,
+                "status_ind": row.status_ind,
+                "user_count": row.user_count or 0,
+            }
+            for row in rows
+        ]
+
+        return roles, total

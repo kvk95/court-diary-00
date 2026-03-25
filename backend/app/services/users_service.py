@@ -214,6 +214,8 @@ class UsersService(BaseSecuredService):
                 write_ind=p["write_ind"],
                 create_ind=p["create_ind"],
                 delete_ind=p["delete_ind"],
+                import_ind=p["import_ind"],
+                export_ind=p["export_ind"],
             )
             for p in user_data.get("permissions", [])
         ]

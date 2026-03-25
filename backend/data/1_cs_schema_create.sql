@@ -485,6 +485,8 @@ CREATE TABLE role_permissions (
     write_ind         BOOLEAN   NOT NULL DEFAULT FALSE,
     create_ind        BOOLEAN   NOT NULL DEFAULT FALSE,
     delete_ind        BOOLEAN   NOT NULL DEFAULT FALSE,
+    import_ind        BOOLEAN   NOT NULL DEFAULT FALSE,  -- ✅ NEW
+    export_ind        BOOLEAN   NOT NULL DEFAULT FALSE,  -- ✅ NEW
     created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by        BIGINT    NULL,
     updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -499,7 +501,7 @@ CREATE TABLE role_permissions (
         FOREIGN KEY (created_by)        REFERENCES users(user_id)                         ON DELETE SET NULL,
     CONSTRAINT fk_role_permissions_updated_by
         FOREIGN KEY (updated_by)        REFERENCES users(user_id)                         ON DELETE SET NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Role-module CRUD permissions';
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Role-module CRUD + Import/Export permissions';
 
 
 -- =============================================================================

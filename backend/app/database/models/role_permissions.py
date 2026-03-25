@@ -36,6 +36,12 @@ class RolePermissions(BaseModel, TimestampMixin):
     # delete_ind : TINYINT
     delete_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # import_ind : TINYINT
+    import_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # export_ind : TINYINT
+    export_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # created_by : BIGINT
     created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
 

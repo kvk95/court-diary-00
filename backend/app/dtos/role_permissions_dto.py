@@ -1,21 +1,23 @@
-from typing import Optional
+# app/dtos/role_permissions_dto.py
 
+from typing import Optional
 from pydantic import BaseModel
 
 
 class RolePermissionBase(BaseModel):
+    """Base permission fields."""
     chamber_module_id: int
     allow_all_ind: bool = False
     read_ind: bool = False
     write_ind: bool = False
     create_ind: bool = False
     delete_ind: bool = False
-    # Add these if you have them in schema
-    # import_ind: bool = False
-    # export_ind: bool = False
+    import_ind: bool = False
+    export_ind: bool = False
 
 
 class RolePermissionEdit(RolePermissionBase):
+    """Permission edit payload."""
     pass
 
 
@@ -32,13 +34,23 @@ class RolePermissionModuleOut(BaseModel):
     write_ind: bool
     create_ind: bool
     delete_ind: bool
-    # Add these if you have them in schema
-    # import_ind: bool
-    # export_ind: bool
+    import_ind: bool
+    export_ind: bool
 
 
 class RolePermissionMatrixOut(BaseModel):
+    """Full permission matrix for a role."""
     role_id: int
     role_name: str
     role_code: Optional[str]
     permissions: list[RolePermissionModuleOut]
+
+class RolePermissionsSummaryOut(BaseModel):
+    """Summary of permissions for all roles (for admin view)."""
+    role_id: int
+    role_name: str
+    role_code: Optional[str]
+    description: Optional[str]
+    status_ind: bool
+    total_modules: int = 0
+    modules_with_access: int = 0

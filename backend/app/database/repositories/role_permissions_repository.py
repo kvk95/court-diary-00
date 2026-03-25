@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
+from sqlalchemy.types import Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.role_permissions import RolePermissions
@@ -8,6 +9,7 @@ from app.database.models.chamber_modules import ChamberModules
 from app.database.models.user_roles import UserRoles
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.chamber import Chamber
+from app.database.models.security_roles import SecurityRoles
 from app.database.models.refm_modules import RefmModules
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -46,6 +48,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 RolePermissions.write_ind,
                 RolePermissions.create_ind,
                 RolePermissions.delete_ind,
+                RolePermissions.import_ind,
+                RolePermissions.export_ind,
             )
             .join(
                 Chamber,
@@ -102,6 +106,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 "write_ind": row.write_ind,
                 "create_ind": row.create_ind,
                 "delete_ind": row.delete_ind,
+                "import_ind": row.import_ind,
+                "export_ind": row.export_ind,
             }
             for row in rows
         ]
@@ -131,6 +137,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 RolePermissions.write_ind,
                 RolePermissions.create_ind,
                 RolePermissions.delete_ind,
+                RolePermissions.import_ind,
+                RolePermissions.export_ind,
             )
             .join(RefmModules, ChamberModules.module_code == RefmModules.code)
             .join(
@@ -202,6 +210,10 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             return perm.allow_all_ind or perm.create_ind
         elif action == "delete":
             return perm.allow_all_ind or perm.delete_ind
+        elif action == "import":
+            return perm.allow_all_ind or perm.import_ind
+        elif action == "export":
+            return perm.allow_all_ind or perm.export_ind
 
         return False
 
@@ -232,3 +244,143 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         self._log_stmt(stmt, session)
         result = await session.execute(stmt)
         return list(result.scalars().all())
+    
+    async def get_all_roles_permissions_summary(
+        self,
+        session: AsyncSession,
+        chamber_id: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get summary of all roles with their permission counts.
+        Useful for admin overview of all roles in the chamber.
+        """
+        # Get all active roles for this chamber
+        stmt = (
+            select(
+                SecurityRoles.role_id,
+                SecurityRoles.role_name,
+                SecurityRoles.role_code,
+                SecurityRoles.description,
+                SecurityRoles.status_ind,
+                func.count(RolePermissions.chamber_module_id).label("total_modules"),
+                func.sum(
+                    (RolePermissions.read_ind.is_(True)).cast(
+                        Integer
+                    )
+                ).label("modules_with_access"),
+            )
+            .outerjoin(
+                RolePermissions,
+                and_(
+                    SecurityRoles.role_id == RolePermissions.role_id,
+                    RolePermissions.chamber_module_id.in_(
+                        select(ChamberModules.chamber_module_id).where(
+                            ChamberModules.chamber_id == chamber_id,
+                            ChamberModules.is_active.is_(True),
+                        )
+                    ),
+                ),
+            )
+            .where(
+                SecurityRoles.is_deleted.is_(False),
+            )
+            .group_by(
+                SecurityRoles.role_id,
+                SecurityRoles.role_name,
+                SecurityRoles.role_code,
+                SecurityRoles.description,
+                SecurityRoles.status_ind,
+            )
+            .order_by(SecurityRoles.role_name)
+        )
+
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        return [
+            {
+                "role_id": row.role_id,
+                "role_name": row.role_name,
+                "role_code": row.role_code,
+                "description": row.description,
+                "status_ind": row.status_ind,
+                "total_modules": row.total_modules or 0,
+                "modules_with_access": row.modules_with_access or 0,
+            }
+            for row in rows
+        ]
+
+    # ✅ NEW: Get all roles with full permission matrix
+    async def get_all_roles_full_matrix(
+        self,
+        session: AsyncSession,
+        chamber_id: int,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get complete permission matrix for ALL roles in the chamber.
+        Returns flattened structure for easy UI rendering.
+        """
+        stmt = (
+            select(
+                SecurityRoles.role_id,
+                SecurityRoles.role_name,
+                SecurityRoles.role_code,
+                RolePermissions.permission_id,
+                RolePermissions.chamber_module_id,
+                RolePermissions.allow_all_ind,
+                RolePermissions.read_ind,
+                RolePermissions.write_ind,
+                RolePermissions.create_ind,
+                RolePermissions.delete_ind,
+                RolePermissions.import_ind,  # ✅ NEW
+                RolePermissions.export_ind,  # ✅ NEW
+                RefmModules.code.label("module_code"),
+                RefmModules.name.label("module_name"),
+                RefmModules.sort_order,
+            )
+            .join(
+                RolePermissions,
+                SecurityRoles.role_id == RolePermissions.role_id,
+            )
+            .join(
+                ChamberModules,
+                RolePermissions.chamber_module_id == ChamberModules.chamber_module_id,
+            )
+            .join(
+                RefmModules,
+                ChamberModules.module_code == RefmModules.code,
+            )
+            .where(
+                SecurityRoles.is_deleted.is_(False),
+                ChamberModules.chamber_id == chamber_id,
+                ChamberModules.is_active.is_(True),
+            )
+            .order_by(
+                SecurityRoles.role_name,
+                RefmModules.sort_order,
+            )
+        )
+
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        return [
+            {
+                "role_id": row.role_id,
+                "role_name": row.role_name,
+                "role_code": row.role_code,
+                "permission_id": row.permission_id,
+                "chamber_module_id": row.chamber_module_id,
+                "allow_all_ind": row.allow_all_ind,
+                "read_ind": row.read_ind,
+                "write_ind": row.write_ind,
+                "create_ind": row.create_ind,
+                "delete_ind": row.delete_ind,
+                "import_ind": row.import_ind,  # ✅ NEW
+                "export_ind": row.export_ind,  # ✅ NEW
+                "module_code": row.module_code,
+                "module_name": row.module_name,
+                "sort_order": row.sort_order,
+            }
+            for row in rows
+        ]

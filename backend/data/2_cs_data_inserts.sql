@@ -271,9 +271,9 @@ INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_karthik_vk,    @role_clerk,  '2024-03-10', @user_vijay),
 (@link_lokesh_sundar, @role_admin,  '2024-01-20', @user_lokesh);
 
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================================================
 -- 19.3  Role Permissions  (VK chamber — Admin, Senior, Clerk)
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================================================
 
 SET @cm_dash  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'DASH');
 SET @cm_cases = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'CASES');
@@ -283,35 +283,45 @@ SET @cm_users = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id 
 SET @cm_rpt   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'RPT');
 SET @cm_set   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'SET');
 
--- Admin: full access to all
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
-(@role_admin, @cm_dash,  TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_cases, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_hear,  TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_cal,   TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_users, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_rpt,   TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_set,   TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Admin: Full access to ALL permissions (including Import/Export)
+-- ─────────────────────────────────────────────────────────────────────────────
 
--- Senior: manage cases & hearings, read-only elsewhere
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
-(@role_senior, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_cases, FALSE, TRUE,  TRUE,  TRUE,  FALSE, @user_vijay),
-(@role_senior, @cm_hear,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, @user_vijay),
-(@role_senior, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_set,   FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay);
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
+(@role_admin, @cm_dash,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin, @cm_cases, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin, @cm_hear,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin, @cm_cal,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin, @cm_users, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin, @cm_rpt,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin, @cm_set,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
 
--- Clerk: read-only
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, created_by) VALUES
-(@role_clerk, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_cases, FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_hear,  FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_rpt,   FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_set,   FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Senior: Manage cases & hearings, read-only elsewhere
+-- Import/Export only for Cases, Hearings, Reports
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
+(@role_senior, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_senior, @cm_cases, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),  -- ✅ Import/Export for cases
+(@role_senior, @cm_hear,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),  -- ✅ Import/Export for hearings
+(@role_senior, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_senior, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_senior, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_vijay),  -- ✅ Export for reports
+(@role_senior, @cm_set,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Clerk: Read-only, NO Import/Export
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
+(@role_clerk, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk, @cm_cases, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk, @cm_hear,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk, @cm_set,   FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
 
 
 -- =============================================================================

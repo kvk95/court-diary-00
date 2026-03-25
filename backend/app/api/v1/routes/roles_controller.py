@@ -1,3 +1,5 @@
+# app/api/v1/routes/roles_controller.py
+
 from typing import List, Optional
 
 from fastapi import Body, Depends, Path, Query
@@ -20,6 +22,10 @@ from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAG
 class RolesController(BaseController):
     CONTROLLER_NAME = "roles"
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 1. List Roles (Paginated with Stats)
+    # ─────────────────────────────────────────────────────────────────────────
+
     @BaseController.get(
         "/paged",
         summary="Get roles (paginated with stats)",
@@ -36,6 +42,10 @@ class RolesController(BaseController):
         data = await service.roles_get_paged(page, limit, search, status)
         return self.success(result=data)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 2. Get All Active Roles (For Dropdowns)
+    # ─────────────────────────────────────────────────────────────────────────
+
     @BaseController.get(
         "/all",
         summary="Get all active roles (for dropdowns)",
@@ -47,6 +57,10 @@ class RolesController(BaseController):
     ) -> BaseOutDto[List[RoleOut]]:
         result = await service.get_all_roles()
         return self.success(result=result)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 3. Get Role by ID
+    # ─────────────────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/{role_id}",
@@ -61,6 +75,10 @@ class RolesController(BaseController):
         result = await service.get_role_by_id(role_id)
         return self.success(result=result)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 4. Add New Role
+    # ─────────────────────────────────────────────────────────────────────────
+
     @BaseController.post(
         "/add",
         summary="Add new role",
@@ -73,6 +91,10 @@ class RolesController(BaseController):
     ) -> BaseOutDto[RoleOut]:
         result = await service.roles_add(payload)
         return self.success(result=result)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 5. Update Role
+    # ─────────────────────────────────────────────────────────────────────────
 
     @BaseController.put(
         "/{role_id}/edit",
@@ -88,6 +110,10 @@ class RolesController(BaseController):
         result = await service.roles_update(role_id, payload)
         return self.success(result=result)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 6. Delete Role
+    # ─────────────────────────────────────────────────────────────────────────
+
     @BaseController.delete(
         "/{role_id}/delete",
         summary="Delete role (soft delete, blocked if users assigned)",
@@ -100,6 +126,10 @@ class RolesController(BaseController):
     ) -> BaseOutDto[bool]:
         result = await service.roles_delete(role_id)
         return self.success(result=result)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 7. Get Role Statistics
+    # ─────────────────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/{role_id}/stats",

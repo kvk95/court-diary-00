@@ -1,5 +1,6 @@
-from typing import List, Optional
+# app/services/role_permissions_service.py
 
+from typing import List, Optional
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,7 @@ from app.dtos.role_permissions_dto import (
     RolePermissionEdit,
     RolePermissionMatrixOut,
     RolePermissionModuleOut,
+    RolePermissionsSummaryOut,
 )
 from app.validators import ErrorCodes, ValidationErrorDetail
 
@@ -31,6 +33,7 @@ class RolePermissionsService(BaseSecuredService):
         role_id: int,
         module_name: Optional[str] = None,
     ) -> List[RolePermissionModuleOut]:
+        """Get permission matrix for a specific role."""
         rows = await self.role_permissions_repo.get_role_permission_matrix(
             session=self.session,
             role_id=role_id,
@@ -52,19 +55,98 @@ class RolePermissionsService(BaseSecuredService):
                 write_ind=bool(row.get("write_ind")) if row.get("write_ind") is not None else False,
                 create_ind=bool(row.get("create_ind")) if row.get("create_ind") is not None else False,
                 delete_ind=bool(row.get("delete_ind")) if row.get("delete_ind") is not None else False,
+                import_ind=bool(row.get("import_ind")) if row.get("import_ind") is not None else False,
+                export_ind=bool(row.get("export_ind")) if row.get("export_ind") is not None else False,
             )
             for row in rows
         ]
+
+    # ✅ NEW: Get all roles with permission summary
+    async def get_all_roles_permissions_summary(
+        self,
+    ) -> List[RolePermissionsSummaryOut]:
+        """Get summary of all roles with their permission counts."""
+        rows = await self.role_permissions_repo.get_all_roles_permissions_summary(
+            session=self.session,
+            chamber_id=self.chamber_id,
+        )
+
+        return [
+            RolePermissionsSummaryOut(
+                role_id=row["role_id"],
+                role_name=row["role_name"],
+                role_code=row["role_code"],
+                description=row["description"],
+                status_ind=row["status_ind"],
+                total_modules=row["total_modules"],
+                modules_with_access=row["modules_with_access"],
+            )
+            for row in rows
+        ]
+
+    # ✅ NEW: Get all roles with full permission matrix
+    async def get_all_roles_full_matrix(
+        self,
+    ) -> dict:
+        """
+        Get complete permission matrix for ALL roles.
+        Returns grouped structure: {roles: [...], modules: [...], permissions: [...]}
+        """
+        rows = await self.role_permissions_repo.get_all_roles_full_matrix(
+            session=self.session,
+            chamber_id=self.chamber_id,
+        )
+
+        # Group by role
+        roles_dict = {}
+        modules_dict = {}
+
+        for row in rows:
+            # Build roles list
+            if row["role_id"] not in roles_dict:
+                roles_dict[row["role_id"]] = {
+                    "role_id": row["role_id"],
+                    "role_name": row["role_name"],
+                    "role_code": row["role_code"],
+                }
+
+            # Build modules list
+            if row["chamber_module_id"] not in modules_dict:
+                modules_dict[row["chamber_module_id"]] = {
+                    "chamber_module_id": row["chamber_module_id"],
+                    "module_code": row["module_code"],
+                    "module_name": row["module_name"],
+                    "sort_order": row["sort_order"],
+                }
+
+        # Build permissions matrix (role_id × module_id)
+        permissions = []
+        for row in rows:
+            permissions.append({
+                "role_id": row["role_id"],
+                "chamber_module_id": row["chamber_module_id"],
+                "permission_id": row.get("permission_id"),
+                "allow_all_ind": bool(row.get("allow_all_ind")) if row.get("allow_all_ind") is not None else False,
+                "read_ind": bool(row.get("read_ind")) if row.get("read_ind") is not None else False,
+                "write_ind": bool(row.get("write_ind")) if row.get("write_ind") is not None else False,
+                "create_ind": bool(row.get("create_ind")) if row.get("create_ind") is not None else False,
+                "delete_ind": bool(row.get("delete_ind")) if row.get("delete_ind") is not None else False,
+                "import_ind": bool(row.get("import_ind")) if row.get("import_ind") is not None else False,  # ✅ NEW
+                "export_ind": bool(row.get("export_ind")) if row.get("export_ind") is not None else False,  # ✅ NEW
+            })
+
+        return {
+            "roles": list(roles_dict.values()),
+            "modules": sorted(modules_dict.values(), key=lambda x: x["sort_order"]),
+            "permissions": permissions,
+        }
 
     async def role_permissions_edit(
         self,
         role_id: int,
         payload: List[RolePermissionEdit],
     ) -> bool:
-        """
-        Bulk upsert permissions for a role from the toggle matrix.
-        Validates role existence and that each module belongs to this chamber.
-        """
+        """Bulk upsert permissions for a role from the toggle matrix."""
         # Verify role exists and is not deleted
         role_result = await self.session.execute(
             select(SecurityRoles).where(
@@ -104,6 +186,8 @@ class RolePermissionsService(BaseSecuredService):
                 "write_ind": dto.write_ind,
                 "create_ind": dto.create_ind,
                 "delete_ind": dto.delete_ind,
+                "import_ind": dto.import_ind,  # ✅ NEW
+                "export_ind": dto.export_ind,  # ✅ NEW
             }
 
             await self.role_permissions_repo.upsert(
