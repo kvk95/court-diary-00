@@ -35,3 +35,30 @@ React:
 sudo ln -s /etc/nginx/sites-available/court-diary.nyainfo.com /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
+
+ssh root@srv1219119.hstgr.cloud
+
+Frontend
+su - myuser
+cd working/courtease-ui-e1fa5329/
+git pull
+npm install
+npm run build
+sudo systemctl restart nginx
+
+Backend
+su - myuser
+cd working/court-diary-00/
+git pull
+cd backend
+poetry install
+exit
+sudo systemctl restart api.casdia.service
+# To check logs
+journalctl -u api.casdia.service -n 50 --no-pager
+
+# run DB
+su - myuser
+cd working/court-diary-00/backend/
+mysql -u devuser -p < data/1_cs_schema_create.sql
+mysql -u devuser -p < data/2_cs_data_inserts.sql

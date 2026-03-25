@@ -1,6 +1,7 @@
 # app/database/repositories/users_repository.py
 
 from typing import List, Optional, Tuple, Dict, Any
+from datetime import datetime
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.models.chamber import Chamber
+from app.database.models.user_invitations import UserInvitations
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -322,3 +324,111 @@ class UsersRepository(BaseRepository[Users]):
         if not row:
             return None
         return row.tuple()
+    
+    async def update_deleted_user(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        data: Dict[str, Any],
+    ) -> None:
+        """
+        Update a soft-deleted user (bypasses soft-delete filtering).
+        Used for reactivation scenarios.
+        """
+        from sqlalchemy import update
+        
+        stmt = (
+            update(Users)
+            .where(Users.user_id == user_id)
+            .values(**data)
+        )
+        
+        await session.execute(stmt)
+        await session.flush()
+
+    async def reactivate_deleted_user(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        current_user_id: int,
+    ) -> None:
+        """
+        Undelete a user (bypasses soft-delete filtering in BaseRepository.update()).
+        Used for reactivating deleted users who are being re-added to a chamber.
+        """
+        from sqlalchemy import update
+        
+        stmt = (
+            update(Users)
+            .where(Users.user_id == user_id)
+            .values(
+                is_deleted=False,
+                deleted_date=None,
+                deleted_by=None,
+                status_ind=True,
+                updated_by=current_user_id,
+                updated_date=datetime.now(),
+            )
+        )
+        
+        await session.execute(stmt)
+        await session.flush()
+
+    async def get_user_stats(
+        self,
+        session: AsyncSession,
+        chamber_id: int,
+    ) -> Dict[str, int]:
+        """
+        Get user management statistics for a chamber.
+        Returns dict with total_users, active_users, total_roles, pending_invites.
+        """
+        # 1. Total users in chamber (all time, including left)
+        total_users_stmt = select(func.count(func.distinct(UserChamberLink.user_id))).where(
+            UserChamberLink.chamber_id == chamber_id
+        )
+        total_users_result = await session.execute(total_users_stmt)
+        total_users = total_users_result.scalar_one() or 0
+
+        # 2. Active users in chamber (not left, status_ind=True)
+        active_users_stmt = select(func.count(func.distinct(UserChamberLink.user_id))).where(
+            and_(
+                UserChamberLink.chamber_id == chamber_id,
+                UserChamberLink.left_date.is_(None),
+                UserChamberLink.status_ind.is_(True),
+            )
+        )
+        active_users_result = await session.execute(active_users_stmt)
+        active_users = active_users_result.scalar_one() or 0
+
+        # 3. Total roles defined for chamber (via user_roles)
+        total_roles_stmt = select(func.count(func.distinct(UserRoles.role_id))).join(
+            UserChamberLink,
+            UserChamberLink.link_id == UserRoles.link_id
+        ).where(
+            and_(
+                UserChamberLink.chamber_id == chamber_id,
+                UserChamberLink.left_date.is_(None),
+                UserChamberLink.status_ind.is_(True),
+                UserRoles.end_date.is_(None),
+            )
+        )
+        total_roles_result = await session.execute(total_roles_stmt)
+        total_roles = total_roles_result.scalar_one() or 0
+
+        # 4. Pending invitations
+        pending_invites_stmt = select(func.count(UserInvitations.invitation_id)).where(
+            and_(
+                UserInvitations.chamber_id == chamber_id,
+                UserInvitations.status_code == 'PN',
+            )
+        )
+        pending_invites_result = await session.execute(pending_invites_stmt)
+        pending_invites = pending_invites_result.scalar_one() or 0
+
+        return {
+            "total_users": total_users,
+            "active_users": active_users,
+            "total_roles": total_roles,
+            "pending_invites": pending_invites,
+        }

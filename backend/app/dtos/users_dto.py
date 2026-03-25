@@ -110,3 +110,10 @@ class DeletionRequestOut(BaseRecordData):
 
 class DeletionRejectPayload(BaseInData):
     notes: Optional[str] = None
+
+class UserStatsOut(BaseInData):
+    """User management statistics for dashboard."""
+    total_users: int = 0
+    active_users: int = 0
+    total_roles: int = 0
+    pending_invites: int = 0

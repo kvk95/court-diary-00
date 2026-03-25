@@ -8,7 +8,8 @@ from app.dtos.users_dto import (
     UserEdit, 
     UserStatusToggle, 
     DeletionRejectPayload,
-    DeletionRequestOut
+    DeletionRequestOut,
+    UserStatsOut
 )
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
@@ -22,6 +23,20 @@ class UsersController(BaseController):
     CONTROLLER_NAME = "users"
 
     # ── List/Paged (FIRST - before parameterized routes) ─────────────────────
+
+    @BaseController.get(
+        "/stats",
+        summary="Get user management statistics",
+        response_model=BaseOutDto[UserStatsOut],
+    )
+    async def users_get_stats(
+        self,
+        service: UsersService = Depends(get_users_service),
+    ) -> BaseOutDto[UserStatsOut]:
+        """Get statistics for user management dashboard."""
+        result = await service.get_user_stats()
+        return self.success(result=result)
+
     @BaseController.get(
         "/paged",
         summary="Get users (paginated)",
@@ -168,7 +183,7 @@ class UsersController(BaseController):
     async def reject_deletion_request(
         self,
         request_id: int = Path(..., gt=0, description="Deletion request ID"),
-        payload: DeletionRejectPayload = Body(default=DeletionRejectPayload()),
+        payload: DeletionRejectPayload = Body(..., description="Fields to reject deletion"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[dict]:
         result = await service.reject_deletion_request(

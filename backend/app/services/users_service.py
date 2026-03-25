@@ -1,15 +1,15 @@
-# app\services\users_service.py
+# app/services/users_service.py
+
 from datetime import date, datetime
 from typing import Optional, List
 import uuid
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.delete_account_requests import DeleteAccountRequests
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
-from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.repositories.delete_account_requests_repository import DeleteAccountRequestsRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
@@ -25,7 +25,9 @@ from app.dtos.users_dto import (
     UserEdit,
     UserOut,
     UserStatusToggle,
-    UserOut, UserProfileOut, UserFullThemeOut, UserCreate, UserEdit
+    UserProfileOut,
+    UserFullThemeOut,
+    UserStatsOut,
 )
 from app.dtos.roles_dto import RoleOut
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
@@ -59,56 +61,96 @@ class UsersService(BaseSecuredService):
         self.delete_account_repo = delete_account_repo or DeleteAccountRequestsRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
 
+    async def get_user_stats(self) -> UserStatsOut:
+        """
+        Get user management statistics for current chamber.
+        """
+        stats = await self.users_repo.get_user_stats(
+            session=self.session,
+            chamber_id=self.chamber_id,
+        )
+        
+        return UserStatsOut(
+            total_users=stats["total_users"],
+            active_users=stats["active_users"],
+            total_roles=stats["total_roles"],
+            pending_invites=stats["pending_invites"],
+        )
+
     # ─────────────────────────────────────────────────────────────────────────
-    # HELPERS
+    # HELPERS (Now Just Call Repository Methods - No Query Logic)
     # ─────────────────────────────────────────────────────────────────────────
 
     async def _get_active_link(self, user_id: int) -> Optional[UserChamberLink]:
-        """Get the active user_chamber_link row for this user in the current chamber."""
-        result = await self.session.execute(
-            select(UserChamberLink).where(
-                and_(
-                    UserChamberLink.user_id == user_id,
-                    UserChamberLink.chamber_id == self.chamber_id,
-                    UserChamberLink.left_date.is_(None),
-                    UserChamberLink.status_ind.is_(True),
-                )
-            )
+        """Get the active user_chamber_link for this user in the current chamber."""
+        return await self.user_chamber_link_repo.get_active_link(
+            session=self.session,
+            user_id=user_id,
+            chamber_id=self.chamber_id,
         )
-        return result.scalars().first()
 
     async def _set_user_role(self, link_id: int, role_id: int) -> None:
         """
         Replace the current active role for a link with a new one.
-        Closes any existing open role assignment then creates a new one.
-        Uses hard delete on the old row since user_roles has no soft-delete column.
+        ✅ FIXED: Now delegates to repository method (no query logic in service).
         """
-        # End current active role(s) by setting end_date = today
-        existing = await self.session.execute(
-            select(UserRoles).where(
-                and_(
-                    UserRoles.link_id == link_id,
-                    UserRoles.end_date.is_(None),
-                )
-            )
-        )
-        for old_role in existing.scalars().all():
-            old_role.end_date = date.today()
-        await self.session.flush()
-
-        # Create new assignment
-        await self.user_roles_repo.create(
+        await self.user_roles_repo.set_user_role(
             session=self.session,
-            data={
-                "link_id": link_id,
-                "role_id": role_id,
-                "start_date": date.today(),
-                "created_by": self.user_id,
-            },
+            link_id=link_id,
+            role_id=role_id,
+            current_user_id=self.user_id,
         )
-    
+
+    async def _unlink_user_from_all_chambers(self, user_id: int) -> None:
+        """
+        Unlink user from all chambers.
+        ✅ FIXED: Now delegates to repository method (no query logic in service).
+        """
+        await self.user_chamber_link_repo.unlink_user_from_all_chambers(
+            session=self.session,
+            user_id=user_id,
+            current_user_id=self.user_id,
+        )
+
+    async def _check_user_chamber_membership(self, email: str) -> dict:
+        """
+        Check user's chamber membership status.
+        ✅ FIXED: Uses raw SELECT to include deleted users.
+        """
+        # Get user INCLUDING deleted (use raw query, not get_first)
+        stmt = select(Users).where(Users.email == email.lower())
+        result = await self.session.execute(stmt)
+        user = result.scalars().first()
+        
+        if not user:
+            return {"exists": False}
+        
+        # Check all chamber links
+        all_links = await self.user_chamber_link_repo.get_all_active_links_for_user(
+            session=self.session,
+            user_id=user.user_id,
+        )
+        
+        return {
+            "exists": True,
+            "user": user,
+            "user_id": user.user_id,
+            "is_deleted": user.is_deleted,
+            "active_links": all_links,
+            "active_chambers_count": len(all_links),
+            "active_chamber_ids": [link.chamber_id for link in all_links],
+        }
+
+    async def _reactivate_user(self, user_id: int) -> None:
+        """Undelete a user - delegates to repository."""
+        await self.users_repo.reactivate_deleted_user(
+            session=self.session,
+            user_id=user_id,
+            current_user_id=self.user_id,
+        )
+
     # ─────────────────────────────────────────────────────────────────────────
-    # SINGLE METHOD: Get User Full Details (Called by ALL endpoints)
+    # GET USER FULL DETAILS
     # ─────────────────────────────────────────────────────────────────────────
 
     async def get_user_full_details(
@@ -116,17 +158,10 @@ class UsersService(BaseSecuredService):
         user_id: Optional[int] = None,
         email: Optional[str] = None,
         chamber_id: Optional[int] = None,
-
     ) -> UserOut:
-        """
-        Get complete user output with profile, permissions, and chamber info.
-        Single source of truth - called by login, /me, /{user_id}, /paged.
-        Uses self.chamber_id from BaseSecuredService context.
-        """
-        print(f"****** 1 chamber_id {chamber_id}")
-        chamber_id = chamber_id if(chamber_id) else self.chamber_id
-        print(f"****** 2 chamber_id {chamber_id}")
-        # Repository handles all complex joins
+        """Get complete user output with profile, permissions, and chamber info."""
+        chamber_id = chamber_id if chamber_id else self.chamber_id
+        
         user_data = await self.users_repo.get_user_full_details(
             session=self.session,
             user_id=user_id,
@@ -140,17 +175,10 @@ class UsersService(BaseSecuredService):
                 message=f"User not found in this chamber",
             )
 
-        # Transform to DTO
         return self._build_user_dto(user_data, chamber_id)
 
-    def _build_user_dto(self, 
-                        user_data: dict,                        
-                        chamber_id: int) -> UserOut:
-        """
-        Transform repository dict output to UserOut DTO.
-        Reused for single user and paginated list.
-        """
-        # Build RoleOut
+    def _build_user_dto(self, user_data: dict, chamber_id: int) -> UserOut:
+        """Transform repository dict output to UserOut DTO."""
         role: Optional[RoleOut] = None
         if user_data.get("role"):
             role = RoleOut(
@@ -161,7 +189,6 @@ class UsersService(BaseSecuredService):
                 status_ind=user_data["role"]["status_ind"],
             )
 
-        # Build ProfileOut
         profile: Optional[UserProfileOut] = None
         if user_data.get("profile"):
             profile = UserProfileOut(
@@ -173,7 +200,6 @@ class UsersService(BaseSecuredService):
                 )
             )
 
-        # Build Permissions
         permissions = [
             RolePermissionModuleOut(
                 chamber_module_id=p["chamber_module_id"],
@@ -210,15 +236,13 @@ class UsersService(BaseSecuredService):
         )
 
     # ─────────────────────────────────────────────────────────────────────────
-    # LIST
-    # ─────────────────────────────────────────────────────────────────────────    
-    
+    # LIST / PAGED
+    # ─────────────────────────────────────────────────────────────────────────
+
     async def users_get_paged(
         self, page: int, limit: int, search: Optional[str] = None
     ) -> PagingData[UserOut]:
-        """
-        Paginated users for a chamber with full nested structure.
-        """
+        """Paginated users for a chamber with full nested structure."""
         users, total_records = await self.users_repo.list_users_paginated(
             session=self.session,
             page=page,
@@ -227,10 +251,8 @@ class UsersService(BaseSecuredService):
             search=search,
         )
         
-        # Transform each user using same DTO builder
         full_users: List[UserOut] = []
         for user_data in users:
-            # Get permissions for each user
             if user_data.get("role"):
                 perm_rows = await self.role_permissions_repo.get_role_permissions(
                     session=self.session,
@@ -241,26 +263,22 @@ class UsersService(BaseSecuredService):
             else:
                 user_data["permissions"] = []
             
-            full_user = self._build_user_dto(user_data,self.chamber_id)
+            full_user = self._build_user_dto(user_data, self.chamber_id)
             full_users.append(full_user)
 
         builder = PagingBuilder(total_records=total_records, page=page, limit=limit)
         return builder.build(records=full_users)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # GET SINGLE (Calls get_user_full_details)
+    # GET SINGLE
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_get_by_id(self, user_id: int) -> UserOut:
-        """
-        Get full user output by ID.
-        """
+        """Get full user output by ID."""
         return await self.get_user_full_details(user_id=user_id)
 
     async def users_get_by_email(self, email: str) -> UserOut:
-        """
-        Get full user output by email.
-        """
+        """Get full user output by email."""
         return await self.get_user_full_details(email=email)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -268,7 +286,15 @@ class UsersService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_add(self, payload: UserCreate) -> UserOut:
+        """
+        Create new user or reactivate existing deleted user.
+        ✅ FIXED: Reactivate existing link instead of creating duplicate.
+        """
         errors = []
+
+        # ─────────────────────────────────────────────────────────────────────
+        # 1. VALIDATION
+        # ─────────────────────────────────────────────────────────────────────
 
         if err := FieldValidator.validate_email(payload.email):
             errors.append(err)
@@ -292,49 +318,115 @@ class UsersService(BaseSecuredService):
                     )
                 )
 
-        # Email is globally unique across all chambers
-        if payload.email and await self.users_repo.exists_by_email(
-            self.session, payload.email.strip().lower()
-        ):
-            errors.append(
-                ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message=f"Email '{payload.email}' is already registered",
-                )
-            )
-
         if errors:
             aggregate_errors(errors=errors)
 
-        # Create user
-        user = await self.users_repo.create(
-            session=self.session,
-            data={
-                "email": payload.email.strip().lower(),
-                "first_name": payload.first_name.strip(),
-                "last_name": (payload.last_name or "").strip() or None,
-                "phone": payload.phone,
-                "password_hash": hash_password(payload.password),
-                "status_ind": payload.status_ind,
-            },
-        )
+        # ─────────────────────────────────────────────────────────────────────
+        # 2. CHECK USER MEMBERSHIP STATUS
+        # ─────────────────────────────────────────────────────────────────────
 
-        # Create user_chamber_link
-        link = await self.user_chamber_link_repo.create(
-            session=self.session,
-            data={
-                "user_id": user.user_id,
-                "chamber_id": self.chamber_id,
-                "is_primary": True,
-                "joined_date": date.today(),
-                "status_ind": True,
-                "created_by": self.user_id,
-            },
-        )
+        membership = await self._check_user_chamber_membership(payload.email)
 
-        # Assign role
-        if payload.role_id and link:
-            await self._set_user_role(link.link_id, payload.role_id)
+        # ─────────────────────────────────────────────────────────────────────
+        # 3. HANDLE SCENARIOS
+        # ─────────────────────────────────────────────────────────────────────
+
+        if not membership["exists"]:
+            # ─────────────────────────────────────────────────────────────────
+            # SCENARIO 1: New User - Create and Link
+            # ─────────────────────────────────────────────────────────────────
+            
+            user = await self.users_repo.create(
+                session=self.session,
+                data={
+                    "email": payload.email.strip().lower(),
+                    "first_name": payload.first_name.strip(),
+                    "last_name": (payload.last_name or "").strip() or None,
+                    "phone": payload.phone,
+                    "password_hash": hash_password(payload.password),
+                    "status_ind": payload.status_ind,
+                },
+            )
+
+            link = await self.user_chamber_link_repo.create_chamber_link(
+                session=self.session,
+                user_id=user.user_id,
+                chamber_id=self.chamber_id,
+                is_primary=True,
+                created_by=self.user_id,
+            )
+
+            if payload.role_id and link:
+                await self._set_user_role(link.link_id, payload.role_id)
+
+        elif membership["is_deleted"]:
+            # ─────────────────────────────────────────────────────────────────
+            # SCENARIO 2 & 3: Deleted User - Reactivate and Link
+            # ─────────────────────────────────────────────────────────────────
+            
+            user = membership["user"]
+            
+            # ✅ If user has active links to OTHER chambers, check first
+            if membership["active_chambers_count"] > 0:
+                other_chamber_links = [
+                    link for link in membership["active_links"]
+                    if link.chamber_id != self.chamber_id
+                ]
+                if other_chamber_links:
+                    raise ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message=f"User already belongs to another chamber. "
+                            f"Please remove them from their current chamber first.",
+                    )
+            
+            # ✅ Undelete user
+            await self._reactivate_user(user.user_id)
+            
+            # ✅ FIXED: Check for EXISTING link (including ones with left_date set)
+            existing_link = await self.user_chamber_link_repo.get_link_for_user_chamber(
+                session=self.session,
+                user_id=user.user_id,
+                chamber_id=self.chamber_id,
+            )
+            
+            if existing_link:
+                # ✅ REACTIVATE existing link (don't create new one)
+                await self.user_chamber_link_repo.reactivate_chamber_link(
+                    session=self.session,
+                    link_id=existing_link.link_id,
+                    current_user_id=self.user_id,
+                )
+                
+                # Assign role if provided
+                if payload.role_id:
+                    await self._set_user_role(existing_link.link_id, payload.role_id)
+            else:
+                # ✅ No existing link - create new one
+                link = await self.user_chamber_link_repo.create_chamber_link(
+                    session=self.session,
+                    user_id=user.user_id,
+                    chamber_id=self.chamber_id,
+                    is_primary=True,
+                    created_by=self.user_id,
+                )
+
+                if payload.role_id and link:
+                    await self._set_user_role(link.link_id, payload.role_id)
+
+        else:
+            # ─────────────────────────────────────────────────────────────────
+            # SCENARIO 4: Active User in Another Chamber - Raise Error
+            # ─────────────────────────────────────────────────────────────────
+            
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message=f"User already belongs to another chamber. "
+                    f"Please remove them from their current chamber first.",
+            )
+
+        # ─────────────────────────────────────────────────────────────────────
+        # 4. RETURN FULL USER DETAILS
+        # ─────────────────────────────────────────────────────────────────────
 
         return await self.get_user_full_details(user_id=user.user_id)
 
@@ -343,8 +435,13 @@ class UsersService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_edit(self, user_id: int, payload: UserEdit) -> UserOut:
-        # Verify user belongs to this chamber
-        link = await self._get_active_link(user_id)
+        """Edit user details."""
+        link = await self.user_chamber_link_repo.get_active_link(
+            session=self.session,
+            user_id=user_id,
+            chamber_id=self.chamber_id,
+        )
+        
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
@@ -370,7 +467,6 @@ class UsersService(BaseSecuredService):
                 data=update_data,
             )
 
-        # Handle role change
         if payload.role_id is not None:
             role = await self.security_roles_repo.get_by_id(
                 session=self.session, id_values=payload.role_id
@@ -395,7 +491,12 @@ class UsersService(BaseSecuredService):
                 message="You cannot change your own status.",
             )
 
-        link = await self._get_active_link(payload.user_id)
+        link = await self.user_chamber_link_repo.get_active_link(
+            session=self.session,
+            user_id=payload.user_id,
+            chamber_id=self.chamber_id,
+        )
+        
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
@@ -421,8 +522,12 @@ class UsersService(BaseSecuredService):
                 message="You cannot request deletion of your own account. Contact another administrator.",
             )
 
-        # Verify user is in this chamber
-        link = await self._get_active_link(user_id)
+        link = await self.user_chamber_link_repo.get_active_link(
+            session=self.session,
+            user_id=user_id,
+            chamber_id=self.chamber_id,
+        )
+        
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
@@ -435,7 +540,6 @@ class UsersService(BaseSecuredService):
                 code=ErrorCodes.NOT_FOUND, message=f"User {user_id} not found"
             )
 
-        # Prevent duplicate pending requests
         existing = await self.delete_account_repo.get_first(
             session=self.session,
             filters={
@@ -474,11 +578,11 @@ class UsersService(BaseSecuredService):
         }
 
     # ─────────────────────────────────────────────────────────────────────────
-    # APPROVE / REJECT DELETION
+    # APPROVE DELETION
     # ─────────────────────────────────────────────────────────────────────────
 
     async def approve_deletion_request(self, request_id: int) -> dict:
-        """Approve a pending deletion request and soft-delete the user."""
+        """Approve a pending deletion request."""
         request = await self.delete_account_repo.get_by_id(
             session=self.session, id_values=request_id
         )
@@ -503,19 +607,22 @@ class UsersService(BaseSecuredService):
                 message=f"User {request.user_id} not found",
             )
 
-        # Soft-delete user
-        await self.users_repo.update(
+        # ✅ 1. Soft-delete user (use repository method)
+        await self.users_repo.reactivate_deleted_user(
             session=self.session,
-            id_values=user.user_id,
-            data={
-                "is_deleted": True,
-                "deleted_date": datetime.now(),
-                "deleted_by": self.user_id,
-                "status_ind": False,
-            },
+            user_id=user.user_id,
+            current_user_id=self.user_id,
         )
 
-        # Mark deletion request as done
+        # ✅ 2. Unlink user from this chamber (use repository method)
+        await self.user_chamber_link_repo.unlink_user_from_chamber(
+            session=self.session,
+            user_id=user.user_id,
+            chamber_id=self.chamber_id,
+            current_user_id=self.user_id,
+        )
+
+        # ✅ 3. Mark deletion request as done
         await self.delete_account_repo.update(
             session=self.session,
             id_values=request_id,
@@ -531,8 +638,12 @@ class UsersService(BaseSecuredService):
             "user_id": user.user_id,
             "user_email": user.email,
             "status": "Deleted",
-            "message": "User has been successfully deleted.",
+            "message": "User has been successfully deleted and removed from chamber.",
         }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # REJECT DELETION
+    # ─────────────────────────────────────────────────────────────────────────
 
     async def reject_deletion_request(self, request_id: int, payload: DeletionRejectPayload) -> dict:
         """Reject a pending deletion request."""
@@ -568,6 +679,10 @@ class UsersService(BaseSecuredService):
             "message": "Deletion request has been rejected.",
         }
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # GET DELETION REQUESTS
+    # ─────────────────────────────────────────────────────────────────────────
+
     async def get_deletion_requests(
         self,
         page: int = 1,
@@ -575,67 +690,50 @@ class UsersService(BaseSecuredService):
         status: Optional[str] = None,
     ) -> PagingData[DeletionRequestOut]:
         """Get all deletion requests for this chamber (admin view)."""
-        from sqlalchemy import func
-
-        stmt = (
-            select(
-                DeleteAccountRequests,
-                Users.email,
-                Users.first_name,
-                Users.last_name,
-            )
-            .join(Users, DeleteAccountRequests.user_id == Users.user_id)
-            .where(DeleteAccountRequests.chamber_id == self.chamber_id)
+        requests, total = await self.delete_account_repo.get_deletion_requests_paginated(
+            session=self.session,
+            chamber_id=self.chamber_id,
+            page=page,
+            limit=limit,
+            status=status,
         )
-
-        if status:
-            stmt = stmt.where(DeleteAccountRequests.status_code == status)
-
-        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
-        count_result = await self.session.execute(count_stmt)
-        total = count_result.scalar_one() or 0
-
-        stmt = stmt.order_by(DeleteAccountRequests.request_date.desc())
-        stmt = stmt.offset((page - 1) * limit).limit(limit)
-
-        result = await self.session.execute(stmt)
-        rows = result.all()
 
         records = [
             DeletionRequestOut(
-                request_id=req.request_id,
-                request_no=req.request_no,
-                user_id=req.user_id,
-                user_email=email,
-                user_name=f"{first_name} {last_name or ''}".strip(),
-                request_date=req.request_date,
-                status_code=req.status_code,
-                notes=req.notes,
-                created_by=req.created_by,
+                request_id=req["request_id"],
+                request_no=req["request_no"],
+                user_id=req["user_id"],
+                user_email=req["user_email"],
+                user_name=req["user_name"],
+                request_date=req["request_date"],
+                status_code=req["status_code"],
+                notes=req["notes"],
+                created_by=req["created_by"],
             )
-            for req, email, first_name, last_name in rows
+            for req in requests
         ]
 
         builder = PagingBuilder(total_records=total, page=page, limit=limit)
         return builder.build(records=records)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # REMOVE FROM CHAMBER (soft-delete the link, not the user)
+    # REMOVE FROM CHAMBER
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_remove_from_chamber(self, user_id: int) -> dict:
-        """
-        Soft-removes a user from this chamber by setting left_date on the
-        user_chamber_link and marking status_ind=False.
-        The user record itself is NOT deleted — they can still belong to other chambers.
-        """
+        """Soft-removes a user from this chamber."""
         if user_id == self.user_id:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
                 message="You cannot remove yourself from the chamber.",
             )
 
-        link = await self._get_active_link(user_id)
+        link = await self.user_chamber_link_repo.get_active_link(
+            session=self.session,
+            user_id=user_id,
+            chamber_id=self.chamber_id,
+        )
+        
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
@@ -644,7 +742,6 @@ class UsersService(BaseSecuredService):
 
         user = await self.users_repo.get_by_id(session=self.session, id_values=user_id)
 
-        # Close the link
         await self.user_chamber_link_repo.update(
             session=self.session,
             id_values=link.link_id,
