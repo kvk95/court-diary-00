@@ -44,6 +44,7 @@ cd working/courtease-ui-e1fa5329/
 git pull
 npm install
 npm run build
+exit
 sudo systemctl restart nginx
 
 Backend
