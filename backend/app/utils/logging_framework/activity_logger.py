@@ -7,7 +7,7 @@ from .logging_util import add_to_queue
 
 async def log_activity(
     action: str,
-    actor_user_id: int | None = None,
+    actor_user_id: str | None = None,
     actor_company_id: int | None = None,
     target: str | None = None,
     metadata: dict | None = None,

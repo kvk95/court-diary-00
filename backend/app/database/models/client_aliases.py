@@ -1,6 +1,6 @@
 """client_aliases"""
 
-from sqlalchemy import ForeignKey, BigInteger, DateTime, String
+from sqlalchemy import ForeignKey, CHAR, DateTime, String
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -12,11 +12,11 @@ from app.database.models.base.base_model import BaseModel
 class ClientAliases(BaseModel):
     __tablename__ = 'client_aliases'
 
-    # alias_id : BIGINT
-    alias_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # alias_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    alias_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # client_id : BIGINT
-    client_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
+    # client_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    client_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
 
     # alias_name : VARCHAR(200) COLLATE "utf8mb4_unicode_ci"
     alias_name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -27,8 +27,8 @@ class ClientAliases(BaseModel):
     # created_date : TIMESTAMP
     created_date: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

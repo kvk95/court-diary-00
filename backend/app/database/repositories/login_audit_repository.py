@@ -25,11 +25,11 @@ class LoginAuditRepository(BaseRepository[LoginAudit]):
         self,
         session: AsyncSession,
         *,
-        user_id: Optional[int] = None,
+        user_id: Optional[str] = None,
         loginRequest: LoginRequest,
         status_code: str,  # 'S' = Success, 'F' = Failed
         failure_reason: Optional[str] = None,
-        chamber_id: Optional[int] = None,  # ✅ NEW: Track which chamber was accessed
+        chamber_id: Optional[str] = None,  # ✅ NEW: Track which chamber was accessed
     ) -> None:
         """
         Log a login attempt to the audit table.
@@ -71,7 +71,7 @@ class LoginAuditRepository(BaseRepository[LoginAudit]):
     async def get_recent_logins(
         self,
         session: AsyncSession,
-        user_id: int,
+        user_id: str,
         limit: int = 10,
     ) -> list:
         """

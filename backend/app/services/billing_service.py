@@ -56,7 +56,7 @@ class BillingService(BaseSecuredService):
     # PRIVATE HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _get_bill_or_404(self, bill_id: int) -> ClientBills:
+    async def _get_bill_or_404(self, bill_id: str) -> ClientBills:
         bill = await self.bills_repo.get_by_id(
             session=self.session,
             filters={ClientBills.bill_id: bill_id, ClientBills.chamber_id: self.chamber_id},
@@ -65,7 +65,7 @@ class BillingService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Bill not found")
         return bill
 
-    async def _verify_client(self, client_id: int) -> Clients:
+    async def _verify_client(self, client_id: str) -> Clients:
         client = await self.clients_repo.get_by_id(
             session=self.session,
             filters={Clients.client_id: client_id, Clients.chamber_id: self.chamber_id},
@@ -74,7 +74,7 @@ class BillingService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client not found")
         return client
 
-    async def _recalculate_bill(self, bill_id: int) -> None:
+    async def _recalculate_bill(self, bill_id: str) -> None:
         """After any payment change, ask repo to recompute paid_amount + status."""
         bill = await self.bills_repo.get_by_id(session=self.session, id_values=bill_id)
         if not bill:
@@ -171,7 +171,7 @@ class BillingService(BaseSecuredService):
     # BILLS — Detail
     # ─────────────────────────────────────────────────────────────────────
 
-    async def bills_get_by_id(self, bill_id: int) -> BillDetailOut:
+    async def bills_get_by_id(self, bill_id: str) -> BillDetailOut:
         b = await self._get_bill_or_404(bill_id)
 
         # Get status description via session.get (single PK lookup — acceptable in service)
@@ -280,7 +280,7 @@ class BillingService(BaseSecuredService):
     # PAYMENTS — Get for bill
     # ─────────────────────────────────────────────────────────────────────
 
-    async def payments_get_by_bill(self, bill_id: int) -> List[PaymentOut]:
+    async def payments_get_by_bill(self, bill_id: str) -> List[PaymentOut]:
         await self._get_bill_or_404(bill_id)
         payments_raw = await self.payments_repo.list_all(
             session=self.session,
@@ -458,7 +458,7 @@ class BillingService(BaseSecuredService):
             notes=doc.notes, created_date=doc.created_date,
         )
 
-    async def documents_delete(self, document_id: int) -> dict:
+    async def documents_delete(self, document_id: str) -> dict:
         doc = await self.documents_repo.get_by_id(
             session=self.session,
             filters={ClientDocuments.document_id: document_id, ClientDocuments.chamber_id: self.chamber_id},

@@ -1,3 +1,4 @@
+# app\database\models\base\base_model.py
 import json
 from typing import Any, Dict
 from sqlalchemy.orm import declarative_base

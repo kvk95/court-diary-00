@@ -1,6 +1,4 @@
-from typing import Optional
 
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.security_roles import SecurityRoles
 from app.database.models.security_roles import SecurityRoles
@@ -16,11 +14,4 @@ class SecurityRolesRepository(BaseRepository[SecurityRoles]):
     """
 
     def __init__(self):
-        super().__init__(SecurityRoles)    
-
-    async def get_by_code(self, session: AsyncSession, role_code: str) -> Optional[SecurityRoles]:
-        """Get role by role_code."""
-        return await self.get_first(
-            session,
-            filters={self.model.role_code: role_code},
-        )
+        super().__init__(SecurityRoles) 

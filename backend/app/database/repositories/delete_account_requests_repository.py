@@ -34,7 +34,7 @@ class DeleteAccountRequestsRepository(BaseRepository[DeleteAccountRequests]):
     async def get_deletion_requests_paginated(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         page: int = 1,
         limit: int = 50,
         status: Optional[str] = None,

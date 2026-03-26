@@ -1,6 +1,7 @@
-"""security_roles"""
+"""chamber_roles"""
 
-from sqlalchemy import Boolean, CHAR, DateTime, Integer, String, Text
+from sqlalchemy import ForeignKey, Boolean, CHAR, DateTime, Integer, String, Text
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from datetime import datetime
@@ -9,11 +10,14 @@ from typing import Any, Optional
 from app.database.models.base.base_model import BaseModel
 from app.database.models.base.timestampmixin import TimestampMixin
 
-class SecurityRoles(BaseModel, TimestampMixin):
-    __tablename__ = 'security_roles'
+class ChamberRoles(BaseModel, TimestampMixin):
+    __tablename__ = 'chamber_roles'
 
     # role_id : INTEGER
     role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+
+    # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # role_name : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
     role_name: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -37,15 +41,34 @@ class SecurityRoles(BaseModel, TimestampMixin):
     deleted_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
     # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
-    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
-    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    #    -- No relationships defined. --
+    # chamber_roles.chamber_id -> chamber.chamber_id
+    chamber_roles_chamber_id_chamber = relationship(
+        "Chamber",
+        foreign_keys=[chamber_id], 
+        backref=backref("chamber_roles_chamber_id_chambers", cascade="all, delete-orphan")
+    )
+
+    # chamber_roles.created_by -> users.user_id
+    chamber_roles_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], 
+        backref=backref("chamber_roles_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # chamber_roles.updated_by -> users.user_id
+    chamber_roles_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], 
+        backref=backref("chamber_roles_updated_by_userss", cascade="all, delete-orphan")
+    )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 

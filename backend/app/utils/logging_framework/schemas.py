@@ -18,7 +18,7 @@ class DBCallLogPayload(BaseModel):
     params: Optional[DBCallLogParams] = None
     final_query: Optional[str] = None
     repo: Optional[str] = None
-    user_id: Optional[int] = None
+    user_id: Optional[str] = None
     company_id: Optional[int] = None
     error: Optional[str] = None
     metadataz: Optional[DBCallLogMeta] = None
@@ -46,7 +46,7 @@ class ExceptionLogPayload(BaseModel):
     query_params: Optional[ExceptionQueryParams] = None
     request_body: Optional[str] = None
     headers: Optional[ExceptionHeaders] = None
-    user_id: Optional[int] = None
+    user_id: Optional[str] = None
     company_id: Optional[int] = None
     error_code: Optional[str] = None
     metadataz: Optional[ExceptionLogMeta] = None
@@ -59,7 +59,7 @@ class ActivityMetadata(BaseModel):
 class ActivityLogPayload(BaseModel):
     timestamp: str
     action: str
-    actor_user_id: Optional[int] = None
+    actor_user_id: Optional[str] = None
     actor_company_id: Optional[int] = None
     target: Optional[str] = None
     metadataz: Optional[ActivityMetadata] = None

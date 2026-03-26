@@ -1,7 +1,7 @@
 """client_bills_repository.py — All DB operations for ClientBills + billing reports"""
 
 from datetime import date
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
     async def get_billing_stats(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         today: date,
         paid_code: str,
         cancelled_code: str,
@@ -77,7 +77,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
     async def list_bills_enriched(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         page: int,
         limit: int,
         client_id: Optional[int] = None,
@@ -148,7 +148,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
     async def recalculate_paid_amount(
         self,
         session: AsyncSession,
-        bill_id: int,
+        bill_id: str,
         total_paid: float,
         bill: ClientBills,
         today: date,
@@ -173,7 +173,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
             data={"paid_amount": round(total_paid, 2), "status_code": new_status},
         )
 
-    async def count_payments(self, session: AsyncSession, bill_id: int) -> int:
+    async def count_payments(self, session: AsyncSession, bill_id: str) -> int:
         """Count payments on a bill — used by delete-bill guard."""
         from app.database.models.client_payments import ClientPayments
         return await session.scalar(
@@ -184,7 +184,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
     async def get_billing_by_month(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         month_start: date,
         month_end: date,
     ) -> dict:
@@ -207,7 +207,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
     async def get_top_clients_billing(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         limit: int = 10,
     ) -> list:
         """Top clients by total billed amount."""

@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.user_roles import UserRoles
 from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
@@ -38,31 +38,31 @@ class RolesService(BaseSecuredService):
         """Paginated roles with active user count."""
         stmt = (
             select(
-                SecurityRoles,
+                ChamberRoles,
                 func.count(UserRoles.user_role_id).label("user_count"),
             )
             .outerjoin(
                 UserRoles,
                 and_(
-                    SecurityRoles.role_id == UserRoles.role_id,
+                    ChamberRoles.role_id == UserRoles.chamber_role_id,
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .where(SecurityRoles.is_deleted.is_(False))
-            .group_by(SecurityRoles.role_id)
+            .where(ChamberRoles.is_deleted.is_(False))
+            .group_by(ChamberRoles.role_id)
         )
 
         if search and search.strip():
-            stmt = stmt.where(SecurityRoles.role_name.ilike(f"%{search.strip()}%"))
+            stmt = stmt.where(ChamberRoles.role_name.ilike(f"%{search.strip()}%"))
 
         if status is not None:
-            stmt = stmt.where(SecurityRoles.status_ind == status)
+            stmt = stmt.where(ChamberRoles.status_ind == status)
 
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
         count_result = await self.session.execute(count_stmt)
         total = count_result.scalar_one() or 0
 
-        stmt = stmt.order_by(SecurityRoles.role_name.asc())
+        stmt = stmt.order_by(ChamberRoles.role_name.asc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
 
         result = await self.session.execute(stmt)
@@ -70,9 +70,7 @@ class RolesService(BaseSecuredService):
 
         roles = [
             RoleWithStatsOut(
-                role_id=role_row.role_id,
-                role_name=role_row.role_name,
-                role_code=role_row.role_code,
+                role_id=role_row.chamber_role_id,
                 description=role_row.description,
                 status_ind=role_row.status_ind,
                 user_count=user_count or 0,
@@ -102,8 +100,8 @@ class RolesService(BaseSecuredService):
         # ✅ Check role name (non-deleted only - names can be reused)
         existing = await self.security_roles_repo.get_first(
             self.session,
-            filters={SecurityRoles.role_name: payload.role_name.strip()},
-            where=[SecurityRoles.is_deleted.is_(False)],
+            filters={ChamberRoles.role_name: payload.role_name.strip()},
+            where=[ChamberRoles.is_deleted.is_(False)],
         )
         if existing:
             raise ValidationErrorDetail(
@@ -115,8 +113,8 @@ class RolesService(BaseSecuredService):
         if payload.role_code:
             # ❌ DON'T USE: get_first() - applies soft-delete filter
             # ✅ USE: Raw query to check ALL roles
-            stmt = select(SecurityRoles).where(
-                SecurityRoles.role_code == payload.role_code.upper()
+            stmt = select(ChamberRoles).where(
+                ChamberRoles.role_code == payload.role_code.upper()
             )
             result = await self.session.execute(stmt)
             existing_code = result.scalars().first()
@@ -158,10 +156,10 @@ class RolesService(BaseSecuredService):
         if payload.role_name:
             duplicate = await self.security_roles_repo.get_first(
                 self.session,
-                filters={SecurityRoles.role_name: payload.role_name.strip()},
+                filters={ChamberRoles.role_name: payload.role_name.strip()},
                 where=[
-                    SecurityRoles.role_id != role_id,
-                    SecurityRoles.is_deleted.is_(False),
+                    ChamberRoles.role_id != role_id,
+                    ChamberRoles.is_deleted.is_(False),
                 ],
             )
             if duplicate:
@@ -172,9 +170,9 @@ class RolesService(BaseSecuredService):
 
         # ✅ FIXED: Check role code (ALL roles, including deleted)
         if payload.role_code:
-            stmt = select(SecurityRoles).where(
-                SecurityRoles.role_code == payload.role_code.upper(),
-                SecurityRoles.role_id != role_id,
+            stmt = select(ChamberRoles).where(
+                ChamberRoles.role_code == payload.role_code.upper(),
+                ChamberRoles.role_id != role_id,
             )
             result = await self.session.execute(stmt)
             duplicate_code = result.scalars().first()
@@ -221,7 +219,7 @@ class RolesService(BaseSecuredService):
 
         # Block deletion if role has active assignments
         stmt = select(func.count(UserRoles.user_role_id)).where(
-            and_(UserRoles.role_id == role_id, UserRoles.end_date.is_(None))
+            and_(UserRoles.chamber_role_id == role_id, UserRoles.end_date.is_(None))
         )
         result = await self.session.execute(stmt)
         user_count = result.scalar_one() or 0
@@ -239,7 +237,7 @@ class RolesService(BaseSecuredService):
 
     async def get_role_stats(self, role_id: int) -> RoleUserCountOut:
         stmt = select(func.count(UserRoles.user_role_id)).where(
-            and_(UserRoles.role_id == role_id, UserRoles.end_date.is_(None))
+            and_(UserRoles.chamber_role_id == role_id, UserRoles.end_date.is_(None))
         )
         result = await self.session.execute(stmt)
         user_count = result.scalar_one() or 0
@@ -249,7 +247,7 @@ class RolesService(BaseSecuredService):
         """Lightweight list for dropdowns (no pagination needed)."""
         roles = await self.security_roles_repo.list_all(
             session=self.session,
-            where=[SecurityRoles.is_deleted.is_(False), SecurityRoles.status_ind.is_(True)],
-            order_by=[SecurityRoles.role_name.asc()],
+            where=[ChamberRoles.is_deleted.is_(False), ChamberRoles.status_ind.is_(True)],
+            order_by=[ChamberRoles.role_name.asc()],
         )
         return [RoleOut.model_validate(r) for r in roles]

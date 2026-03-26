@@ -3,7 +3,6 @@
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_collaborations import CaseCollaborations
@@ -44,7 +43,7 @@ class CollaborationsService(BaseSecuredService):
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _get_collab_or_404(self, collaboration_id: int) -> CaseCollaborations:
+    async def _get_collab_or_404(self, collaboration_id: str) -> CaseCollaborations:
         c = await self.collabs_repo.get_by_id(
             session=self.session, id_values=collaboration_id
         )
@@ -52,7 +51,7 @@ class CollaborationsService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Collaboration not found")
         return c
 
-    async def _chamber_name(self, chamber_id: int) -> Optional[str]:
+    async def _chamber_name(self, chamber_id: str) -> Optional[str]:
         ch = await self.session.get(Chamber, chamber_id)
         return ch.chamber_name if ch else None
 
@@ -147,7 +146,7 @@ class CollaborationsService(BaseSecuredService):
     # GET FOR A CASE (both directions)
     # ─────────────────────────────────────────────────────────────────────
 
-    async def collabs_get_by_case(self, case_id: int) -> List[CollaborationOut]:
+    async def collabs_get_by_case(self, case_id: str) -> List[CollaborationOut]:
         """All active collaborations where this chamber is the owner for this case."""
         collabs = await self.collabs_repo.list_all(
             session=self.session,

@@ -25,11 +25,13 @@ class ChamberManagementStats(BaseRecordData):
     active_users: int = 0
     roles_count: int = 0
     pending_invites: int = 0
+    users_trend_pct: int = 0
+    active_users_trend_pct: int = 0
 
 
 class OverdueCaseItem(BaseRecordData):
     """One row in the Overdue Updates accordion."""
-    case_id: int
+    case_id: str
     case_number: str
     court_name: Optional[str] = None
     petitioner: str
@@ -41,8 +43,8 @@ class OverdueCaseItem(BaseRecordData):
 
 class DashboardHearingItem(BaseRecordData):
     """One row in Today's / Tomorrow's Hearings sections."""
-    hearing_id: int
-    case_id: int
+    hearing_id: str
+    case_id: str
     case_number: str
     court_name: Optional[str] = None
     petitioner: str
@@ -88,7 +90,7 @@ class AdminStatCards(BaseRecordData):
 
 class PendingInvitationItem(BaseRecordData):
     """One row in the Pending Invitations widget."""
-    invitation_id: int
+    invitation_id: str
     email: str
     role_name: Optional[str] = None
     invited_date: Optional[datetime] = None

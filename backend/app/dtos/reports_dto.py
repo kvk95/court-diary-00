@@ -1,6 +1,5 @@
 """reports_dto.py — DTOs for Reports module"""
 
-from datetime import date
 from typing import List, Optional
 
 from app.dtos.base.base_data import BaseRecordData
@@ -94,7 +93,7 @@ class BillingByMonthRow(BaseRecordData):
 
 
 class TopClientBillingRow(BaseRecordData):
-    client_id: int
+    client_id: str
     client_name: str
     total_billed: float = 0.0
     total_paid: float = 0.0

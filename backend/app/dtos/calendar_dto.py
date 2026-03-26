@@ -1,6 +1,6 @@
 """calendar_dto.py — DTOs for Calendar module"""
 
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional
 
 from app.dtos.base.base_data import BaseRecordData
@@ -11,9 +11,9 @@ class CalendarEventOut(BaseRecordData):
     event_id: str                        # "hearing:{id}"
     event_type: str = "hearing"
     title: str                           # e.g. "WP.No.1234/2024 — Arguments"
-    case_id: int
+    case_id: str
     case_number: str
-    hearing_id: int
+    hearing_id: str
     event_date: date
     court_name: Optional[str] = None
     petitioner: Optional[str] = None
@@ -37,8 +37,8 @@ class CalendarMonthOut(BaseRecordData):
 
 class CalendarUpcomingOut(BaseRecordData):
     """Slim row for the upcoming-hearings widget / dashboard sidebar."""
-    hearing_id: int
-    case_id: int
+    hearing_id: str
+    case_id: str
     case_number: str
     petitioner: str
     respondent: str

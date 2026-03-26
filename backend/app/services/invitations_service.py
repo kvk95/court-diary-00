@@ -3,16 +3,15 @@
 from datetime import date, timedelta
 from typing import Optional
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.user_invitations import UserInvitations
 from app.database.models.users import Users
 from app.database.repositories.user_invitations_repository import UserInvitationsRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.invitations_dto import InvitationCreate, InvitationOut, InvitationRevoke
-from app.database.models.refm_invitation_status import RefmInvitationStatusConstants
 from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import ErrorCodes, ValidationErrorDetail
 
@@ -29,7 +28,7 @@ class InvitationsService(BaseSecuredService):
     async def _to_out(self, inv: UserInvitations) -> InvitationOut:
         role_name = None
         if inv.role_id:
-            role = await self.session.get(SecurityRoles, inv.role_id)
+            role = await self.session.get(ChamberRoles, inv.role_id)
             role_name = role.role_name if role else None
         invited_by_name = None
         if inv.invited_by:

@@ -1,6 +1,6 @@
 """case_collaborations"""
 
-from sqlalchemy import ForeignKey, BigInteger, CHAR, DateTime, Text
+from sqlalchemy import ForeignKey, CHAR, DateTime, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -13,23 +13,23 @@ from app.database.models.base.timestampmixin import TimestampMixin
 class CaseCollaborations(BaseModel, TimestampMixin):
     __tablename__ = 'case_collaborations'
 
-    # collaboration_id : BIGINT
-    collaboration_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # collaboration_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    collaboration_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # case_id : BIGINT
-    case_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=False)
+    # case_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    case_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("cases.case_id", ondelete="CASCADE"), nullable=False)
 
-    # owner_chamber_id : BIGINT
-    owner_chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # owner_chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    owner_chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
-    # collaborator_chamber_id : BIGINT
-    collaborator_chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # collaborator_chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    collaborator_chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # access_level : CHAR(2) COLLATE "utf8mb4_unicode_ci"
     access_level: Mapped[Optional[str]] = mapped_column(CHAR(2), default='RO')
 
-    # invited_by : BIGINT
-    invited_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # invited_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    invited_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # invited_date : TIMESTAMP
     invited_date: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
@@ -43,11 +43,11 @@ class CaseCollaborations(BaseModel, TimestampMixin):
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
-    # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

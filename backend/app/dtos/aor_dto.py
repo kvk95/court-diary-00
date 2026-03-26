@@ -13,9 +13,9 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AorOut(BaseRecordData):
-    case_aor_id: int
-    case_id: int
-    user_id: int
+    case_aor_id: str
+    case_id: str
+    user_id: str
     advocate_name: str           # first_name + last_name of the user
     is_primary: bool = False
     status_code: str = "AC"
@@ -27,15 +27,15 @@ class AorOut(BaseRecordData):
 
 
 class AorCreate(BaseInData):
-    case_id: int
-    user_id: int                 # must be a chamber member
+    case_id: str
+    user_id: str                 # must be a chamber member
     is_primary: bool = False
     appointment_date: Optional[date] = None
     notes: Optional[str] = None
 
 
 class AorEdit(BaseInData):
-    case_aor_id: int
+    case_aor_id: str
     is_primary: Optional[bool] = None
     status_code: Optional[str] = None      # AC | WD | SU
     appointment_date: Optional[date] = None
@@ -51,6 +51,6 @@ class AorEdit(BaseInData):
 
 
 class AorWithdraw(BaseInData):
-    case_aor_id: int
+    case_aor_id: str
     withdrawal_date: Optional[date] = None
     notes: Optional[str] = None

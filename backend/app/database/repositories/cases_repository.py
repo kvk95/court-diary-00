@@ -1,13 +1,12 @@
 """cases_repository.py — All DB operations for Cases"""
 
 from datetime import date
-from typing import List, Optional, Tuple
+from typing import List
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.cases import Cases
-from app.database.models.hearings import Hearings
 from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_courts import RefmCourts
@@ -23,7 +22,7 @@ class CasesRepository(BaseRepository[Cases]):
     async def get_case_summary_stats(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         active_code: str,
         adjourned_code: str,
         disposed_code: str,
@@ -55,7 +54,7 @@ class CasesRepository(BaseRepository[Cases]):
         }
 
     async def get_cases_by_status(
-        self, session: AsyncSession, chamber_id: int
+        self, session: AsyncSession, chamber_id: str
     ) -> List[dict]:
         """Cases grouped by status with descriptions and colors."""
         rows = await session.execute(
@@ -85,7 +84,7 @@ class CasesRepository(BaseRepository[Cases]):
         ]
 
     async def get_cases_by_court(
-        self, session: AsyncSession, chamber_id: int, limit: int = 10
+        self, session: AsyncSession, chamber_id: str, limit: int = 10
     ) -> List[dict]:
         rows = await session.execute(
             select(
@@ -102,7 +101,7 @@ class CasesRepository(BaseRepository[Cases]):
         return [{"court_id": r.court_id, "court_name": r.court_name, "count": r.cnt} for r in rows]
 
     async def get_cases_by_type(
-        self, session: AsyncSession, chamber_id: int
+        self, session: AsyncSession, chamber_id: str
     ) -> List[dict]:
         rows = await session.execute(
             select(
@@ -124,7 +123,7 @@ class CasesRepository(BaseRepository[Cases]):
     async def count_cases_in_month(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         month_start: date,
         month_end: date,
     ) -> int:
@@ -140,7 +139,7 @@ class CasesRepository(BaseRepository[Cases]):
     async def count_cases_since(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         since: date,
     ) -> int:
         return await session.scalar(

@@ -9,7 +9,7 @@ from app.database.models.chamber_modules import ChamberModules
 from app.database.models.user_roles import UserRoles
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.chamber import Chamber
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.refm_modules import RefmModules
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -28,8 +28,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
     async def get_role_permissions(
         self,
         session: AsyncSession,
-        chamber_id: int,
-        user_id: int,
+        chamber_id: str,
+        user_id: str,
     ) -> List[Dict[str, Any]]:
         """
         Get one permission row per module for the user.
@@ -42,7 +42,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 RefmModules.code.label("module_code"),
                 RefmModules.name.label("module_name"),
                 RolePermissions.permission_id,
-                UserRoles.role_id,
+                UserRoles.chamber_role_id,
                 RolePermissions.allow_all_ind,
                 RolePermissions.read_ind,
                 RolePermissions.write_ind,
@@ -75,7 +75,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             .join(
                 RolePermissions,
                 and_(
-                    RolePermissions.role_id == UserRoles.role_id,
+                    RolePermissions.chamber_role_id == UserRoles.chamber_role_id,
                     RolePermissions.chamber_module_id == ChamberModules.chamber_module_id   # ← Key condition
                 )
             )
@@ -100,7 +100,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 "module_code": row.module_code,
                 "module_name": row.module_name,
                 "permission_id": row.permission_id,
-                "role_id": row.role_id,
+                "chamber_role_id": row.chamber_role_id,
                 "allow_all_ind": row.allow_all_ind,
                 "read_ind": row.read_ind,
                 "write_ind": row.write_ind,
@@ -116,7 +116,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         self,
         session: AsyncSession,
         role_id: int,
-        chamber_id: int,
+        chamber_id: str,
         module_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
@@ -149,7 +149,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 RolePermissions,
                 and_(
                     RolePermissions.chamber_module_id == ChamberModules.chamber_module_id,
-                    RolePermissions.role_id == role_id,
+                    RolePermissions.chamber_role_id == role_id,
                 )
             )
             .where(
@@ -170,7 +170,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         session: AsyncSession,
         *,
         role_id: int,
-        chamber_id: int, 
+        chamber_id: str, 
         module_code: str,
         action: str = "read",  # read, write, create, delete
     ) -> bool:
@@ -185,7 +185,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .where(
                 and_(
-                    RolePermissions.role_id == role_id,
+                    RolePermissions.chamber_role_id == role_id,
                     ChamberModules.chamber_id == chamber_id,
                     ChamberModules.module_code == module_code,
                     ChamberModules.is_active == True,
@@ -221,7 +221,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         self,
         session: AsyncSession,
         role_id: int,
-        chamber_id: int,
+        chamber_id: str,
     ) -> List[RolePermissions]:
         """
         Get raw RolePermissions objects for a role in a chamber.
@@ -234,7 +234,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .where(
                 and_(
-                    RolePermissions.role_id == role_id,
+                    RolePermissions.chamber_role_id == role_id,
                     ChamberModules.chamber_id == chamber_id,
                     ChamberModules.is_active == True,
                 )
@@ -248,7 +248,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
     async def get_all_roles_permissions_summary(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
     ) -> List[Dict[str, Any]]:
         """
         Get summary of all roles with their permission counts.
@@ -257,11 +257,10 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         # Get all active roles for this chamber
         stmt = (
             select(
-                SecurityRoles.role_id,
-                SecurityRoles.role_name,
-                SecurityRoles.role_code,
-                SecurityRoles.description,
-                SecurityRoles.status_ind,
+                ChamberRoles.role_id,
+                ChamberRoles.role_name,
+                ChamberRoles.description,
+                ChamberRoles.status_ind,
                 func.count(RolePermissions.chamber_module_id).label("total_modules"),
                 func.sum(
                     (RolePermissions.read_ind.is_(True)).cast(
@@ -272,7 +271,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             .outerjoin(
                 RolePermissions,
                 and_(
-                    SecurityRoles.role_id == RolePermissions.role_id,
+                    ChamberRoles.role_id == RolePermissions.chamber_role_id,
                     RolePermissions.chamber_module_id.in_(
                         select(ChamberModules.chamber_module_id).where(
                             ChamberModules.chamber_id == chamber_id,
@@ -282,16 +281,15 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 ),
             )
             .where(
-                SecurityRoles.is_deleted.is_(False),
+                ChamberRoles.is_deleted.is_(False),
             )
             .group_by(
-                SecurityRoles.role_id,
-                SecurityRoles.role_name,
-                SecurityRoles.role_code,
-                SecurityRoles.description,
-                SecurityRoles.status_ind,
+                ChamberRoles.role_id,
+                ChamberRoles.role_name,
+                ChamberRoles.description,
+                ChamberRoles.status_ind,
             )
-            .order_by(SecurityRoles.role_name)
+            .order_by(ChamberRoles.role_name)
         )
 
         result = await session.execute(stmt)
@@ -299,9 +297,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
 
         return [
             {
-                "role_id": row.role_id,
+                "role_id": row.chamber_role_id,
                 "role_name": row.role_name,
-                "role_code": row.role_code,
                 "description": row.description,
                 "status_ind": row.status_ind,
                 "total_modules": row.total_modules or 0,
@@ -314,7 +311,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
     async def get_all_roles_full_matrix(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
     ) -> List[Dict[str, Any]]:
         """
         Get complete permission matrix for ALL roles in the chamber.
@@ -322,9 +319,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         """
         stmt = (
             select(
-                SecurityRoles.role_id,
-                SecurityRoles.role_name,
-                SecurityRoles.role_code,
+                ChamberRoles.role_id,
+                ChamberRoles.role_name,
                 RolePermissions.permission_id,
                 RolePermissions.chamber_module_id,
                 RolePermissions.allow_all_ind,
@@ -340,7 +336,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .join(
                 RolePermissions,
-                SecurityRoles.role_id == RolePermissions.role_id,
+                ChamberRoles.role_id == RolePermissions.chamber_role_id,
             )
             .join(
                 ChamberModules,
@@ -351,12 +347,12 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 ChamberModules.module_code == RefmModules.code,
             )
             .where(
-                SecurityRoles.is_deleted.is_(False),
+                ChamberRoles.is_deleted.is_(False),
                 ChamberModules.chamber_id == chamber_id,
                 ChamberModules.is_active.is_(True),
             )
             .order_by(
-                SecurityRoles.role_name,
+                ChamberRoles.role_name,
                 RefmModules.sort_order,
             )
         )
@@ -368,7 +364,6 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             {
                 "role_id": row.role_id,
                 "role_name": row.role_name,
-                "role_code": row.role_code,
                 "permission_id": row.permission_id,
                 "chamber_module_id": row.chamber_module_id,
                 "allow_all_ind": row.allow_all_ind,

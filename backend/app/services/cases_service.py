@@ -1,6 +1,6 @@
 """cases_service.py — Business logic for Cases, Hearings, Case Notes, Case Clients"""
 
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import List, Optional
 
 from sqlalchemy import func, select, or_
@@ -71,7 +71,7 @@ class CasesService(BaseSecuredService):
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _get_case_or_404(self, case_id: int) -> Cases:
+    async def _get_case_or_404(self, case_id: str) -> Cases:
         case = await self.cases_repo.get_by_id(
             session=self.session,
             filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
@@ -268,7 +268,7 @@ class CasesService(BaseSecuredService):
     # CASES — Detail / Add / Edit / Delete
     # ─────────────────────────────────────────────────────────────────────
 
-    async def cases_get_by_id(self, case_id: int) -> CaseDetailOut:
+    async def cases_get_by_id(self, case_id: str) -> CaseDetailOut:
         return await self._enrich_case_detail(await self._get_case_or_404(case_id))
 
     async def cases_add(self, payload: CaseCreate) -> CaseDetailOut:
@@ -318,7 +318,7 @@ class CasesService(BaseSecuredService):
     # HEARINGS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def hearings_get_by_case(self, case_id: int) -> List[HearingOut]:
+    async def hearings_get_by_case(self, case_id: str) -> List[HearingOut]:
         await self._get_case_or_404(case_id)
         hearings = await self.hearings_repo.list_all(
             session=self.session,
@@ -437,7 +437,7 @@ class CasesService(BaseSecuredService):
     # CASE NOTES
     # ─────────────────────────────────────────────────────────────────────
 
-    async def case_notes_get_by_case(self, case_id: int) -> List[CaseNoteOut]:
+    async def case_notes_get_by_case(self, case_id: str) -> List[CaseNoteOut]:
         await self._get_case_or_404(case_id)
         notes = await self.case_notes_repo.list_all(
             session=self.session,
@@ -512,7 +512,7 @@ class CasesService(BaseSecuredService):
     # CASE CLIENTS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def case_clients_get(self, case_id: int) -> List[CaseClientOut]:
+    async def case_clients_get(self, case_id: str) -> List[CaseClientOut]:
         await self._get_case_or_404(case_id)
         rows = await self.session.execute(
             select(
@@ -555,7 +555,7 @@ class CasesService(BaseSecuredService):
             for r in rows.all()
         ]
 
-    async def case_clients_link(self, case_id: int, payload: CaseClientLinkPayload) -> CaseClientOut:
+    async def case_clients_link(self, case_id: str, payload: CaseClientLinkPayload) -> CaseClientOut:
         await self._get_case_or_404(case_id)
         # Check if already linked with same role
         existing = await self.case_clients_repo.get_first(
@@ -602,7 +602,7 @@ class CasesService(BaseSecuredService):
             phone=client.phone if client else None,
         )
 
-    async def case_clients_unlink(self, case_id: int, case_client_id: int) -> dict:
+    async def case_clients_unlink(self, case_id: str, case_client_id: str) -> dict:
         await self._get_case_or_404(case_id)
         link = await self.case_clients_repo.get_by_id(
             session=self.session,
@@ -619,7 +619,7 @@ class CasesService(BaseSecuredService):
     # RECENT ACTIVITY
     # ─────────────────────────────────────────────────────────────────────
 
-    async def cases_get_recent_activity(self, case_id: int, limit: int = 10) -> List[RecentActivityItem]:
+    async def cases_get_recent_activity(self, case_id: str, limit: int = 10) -> List[RecentActivityItem]:
         try:
             rows = await self.session.execute(
                 select(ActivityLog.action, ActivityLog.user_id, ActivityLog.created_date)

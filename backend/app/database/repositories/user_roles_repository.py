@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.user_roles import UserRoles
 from app.database.models.user_roles import UserRoles
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
@@ -23,7 +23,7 @@ class UserRolesRepository(BaseRepository[UserRoles]):
     async def get_active_role_for_link(
         self,
         session: AsyncSession,
-        link_id: int,
+        link_id: str,
         role_id: int,
     ) -> Optional[UserRoles]:
         """
@@ -34,7 +34,7 @@ class UserRolesRepository(BaseRepository[UserRoles]):
             session=session,
             filters={
                 UserRoles.link_id: link_id,
-                UserRoles.role_id: role_id,
+                UserRoles.chamber_role_id: role_id,
             },
             where=[UserRoles.end_date.is_(None)]
         )
@@ -42,9 +42,9 @@ class UserRolesRepository(BaseRepository[UserRoles]):
     async def end_all_active_roles_for_link(
         self,
         session: AsyncSession,
-        link_id: int,
+        link_id: str,
         end_date: date,
-        updated_by: int,
+        updated_by: str,
     ) -> None:
         """
         End all active role assignments for a link (set end_date).
@@ -71,10 +71,10 @@ class UserRolesRepository(BaseRepository[UserRoles]):
     async def assign_role_to_link(
         self,
         session: AsyncSession,
-        link_id: int,
+        link_id: str,
         role_id: int,
         start_date: date,
-        created_by: int,
+        created_by: str,
     ) -> UserRoles:
         """
         Create a new role assignment for a link.
@@ -92,9 +92,9 @@ class UserRolesRepository(BaseRepository[UserRoles]):
     async def set_user_role(
         self,
         session: AsyncSession,
-        link_id: int,
+        link_id: str,
         role_id: int,
-        current_user_id: int,
+        current_user_id: str,
     ) -> None:
         """
         Complete workflow: End existing roles + assign new role.
@@ -147,29 +147,28 @@ class UserRolesRepository(BaseRepository[UserRoles]):
         """Paginated roles with active user count."""
         stmt = (
             select(
-                SecurityRoles.role_id,
-                SecurityRoles.role_name,
-                SecurityRoles.role_code,
-                SecurityRoles.description,
-                SecurityRoles.status_ind,
+                ChamberRoles.role_id,
+                ChamberRoles.role_name,
+                ChamberRoles.description,
+                ChamberRoles.status_ind,
                 func.count(UserRoles.user_role_id).label("user_count"),
             )
             .outerjoin(
                 UserRoles,
                 and_(
-                    SecurityRoles.role_id == UserRoles.role_id,
+                    ChamberRoles.role_id == UserRoles.chamber_role_id,
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .where(SecurityRoles.is_deleted.is_(False))
-            .group_by(SecurityRoles.role_id)
+            .where(ChamberRoles.is_deleted.is_(False))
+            .group_by(ChamberRoles.role_id)
         )
 
         if search and search.strip():
-            stmt = stmt.where(SecurityRoles.role_name.ilike(f"%{search.strip()}%"))
+            stmt = stmt.where(ChamberRoles.role_name.ilike(f"%{search.strip()}%"))
 
         if status is not None:
-            stmt = stmt.where(SecurityRoles.status_ind == status)
+            stmt = stmt.where(ChamberRoles.status_ind == status)
 
         # Count
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
@@ -177,7 +176,7 @@ class UserRolesRepository(BaseRepository[UserRoles]):
         total = count_result.scalar_one() or 0
 
         # Pagination
-        stmt = stmt.order_by(SecurityRoles.role_name.asc())
+        stmt = stmt.order_by(ChamberRoles.role_name.asc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
 
         result = await session.execute(stmt)
@@ -185,9 +184,8 @@ class UserRolesRepository(BaseRepository[UserRoles]):
 
         roles = [
             {
-                "role_id": row.role_id,
+                "role_id": row.chamber_role_id,
                 "role_name": row.role_name,
-                "role_code": row.role_code,
                 "description": row.description,
                 "status_ind": row.status_ind,
                 "user_count": row.user_count or 0,

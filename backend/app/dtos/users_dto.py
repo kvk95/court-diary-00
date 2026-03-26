@@ -34,7 +34,7 @@ class UserOut(BaseRecordData):
     Full user output with profile, permissions, and chamber info.
     Used for login, /me, /{user_id}, and /paged endpoints.
     """
-    user_id: int
+    user_id: str
     full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -47,7 +47,7 @@ class UserOut(BaseRecordData):
     chamber_name: Optional[str] = None
     profile: Optional[UserProfileOut] = None
     permissions: List[RolePermissionModuleOut] = []
-    chamber_id: Optional[int] = None
+    chamber_id: Optional[str] = None
 
 
 # =============================================================================
@@ -88,7 +88,7 @@ class UserEdit(BaseInData):
 
 class UserStatusToggle(BaseInData):
     """Toggle a user's active/inactive status."""
-    user_id: int
+    user_id: str
     status_ind: bool
 
 
@@ -99,7 +99,7 @@ class UserStatusToggle(BaseInData):
 class DeletionRequestOut(BaseRecordData):
     request_id: int
     request_no: str
-    user_id: int
+    user_id: str
     user_email: Optional[str] = None
     user_name: Optional[str] = None
     request_date: Optional[datetime] = None

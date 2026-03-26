@@ -1,7 +1,7 @@
 """hearings_repository.py — All DB operations for Hearings"""
 
 from datetime import date, timedelta
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ class HearingsRepository(BaseRepository[Hearings]):
     async def get_hearing_summary_stats(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         today: date,
     ) -> dict:
         """All hearing stat-card counts in minimal queries."""
@@ -66,7 +66,7 @@ class HearingsRepository(BaseRepository[Hearings]):
     async def count_hearings_in_month(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         month_start: date,
         month_end: date,
         status_code: Optional[str] = None,
@@ -86,7 +86,7 @@ class HearingsRepository(BaseRepository[Hearings]):
     async def get_calendar_events(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         date_from: date,
         date_to: date,
     ) -> list:
@@ -122,7 +122,7 @@ class HearingsRepository(BaseRepository[Hearings]):
     async def get_upcoming_hearings(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         date_to: date,
         limit: int = 20,
     ) -> list:

@@ -1,6 +1,6 @@
 """activity_log"""
 
-from sqlalchemy import ForeignKey, BigInteger, Date, DateTime, JSON, String
+from sqlalchemy import ForeignKey, CHAR, Date, DateTime, JSON, String
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -12,14 +12,14 @@ from app.database.models.base.base_model import BaseModel
 class ActivityLog(BaseModel):
     __tablename__ = 'activity_log'
 
-    # id : BIGINT
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
-    # user_id : BIGINT
-    user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # timestamp : DATETIME
     timestamp: Mapped[date] = mapped_column(Date, nullable=False)
@@ -39,8 +39,8 @@ class ActivityLog(BaseModel):
     # created_date : TIMESTAMP
     created_date: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

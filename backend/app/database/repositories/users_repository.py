@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
@@ -31,9 +31,9 @@ class UsersRepository(BaseRepository[Users]):
         self,
         session: AsyncSession,
         *,
-        user_id: Optional[int] = None,
+        user_id: Optional[str] = None,
         email: Optional[str] = None,
-        chamber_id: int,
+        chamber_id: str,
     ) -> Optional[Dict[str, Any]]:
         """
         Get complete user details with profile, role, permissions, and chamber.
@@ -61,11 +61,10 @@ class UsersRepository(BaseRepository[Users]):
                 UserProfiles.primary_color,
                 UserProfiles.font_family,
                 # Role fields
-                SecurityRoles.role_id,
-                SecurityRoles.role_name,
-                SecurityRoles.role_code,
-                SecurityRoles.description.label("role_description"),
-                SecurityRoles.status_ind.label("role_status_ind"),
+                ChamberRoles.role_id,
+                ChamberRoles.role_name,
+                ChamberRoles.description.label("role_description"),
+                ChamberRoles.status_ind.label("role_status_ind"),
                 # Chamber fields
                 Chamber.chamber_id,
                 Chamber.chamber_name,
@@ -87,7 +86,7 @@ class UsersRepository(BaseRepository[Users]):
                     UserRoles.end_date.is_(None),
                 )
             )
-            .outerjoin(SecurityRoles, UserRoles.role_id == SecurityRoles.role_id)
+            .outerjoin(ChamberRoles, UserRoles.chamber_role_id == ChamberRoles.role_id)
             .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .where(Users.is_deleted.is_(False))
         )
@@ -129,7 +128,6 @@ class UsersRepository(BaseRepository[Users]):
             "role": {
                 "role_id": row.role_id,
                 "role_name": row.role_name,
-                "role_code": row.role_code,
                 "description": row.role_description,
                 "status_ind": row.role_status_ind,
             } if row.role_id else None,
@@ -149,7 +147,7 @@ class UsersRepository(BaseRepository[Users]):
         session: AsyncSession,
         page: int,
         limit: int,
-        chamber_id: int,
+        chamber_id: str,
         search: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
@@ -166,11 +164,10 @@ class UsersRepository(BaseRepository[Users]):
                 Users.phone,
                 Users.status_ind,
                 Users.created_date,
-                SecurityRoles.role_id,
-                SecurityRoles.role_name,
-                SecurityRoles.role_code,
-                SecurityRoles.description.label("role_description"),
-                SecurityRoles.status_ind.label("role_status_ind"),
+                ChamberRoles.role_id,
+                ChamberRoles.role_name,
+                ChamberRoles.description.label("role_description"),
+                ChamberRoles.status_ind.label("role_status_ind"),
                 UserProfiles.header_color,
                 UserProfiles.sidebar_color,
                 UserProfiles.primary_color,
@@ -185,7 +182,7 @@ class UsersRepository(BaseRepository[Users]):
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .outerjoin(SecurityRoles, UserRoles.role_id == SecurityRoles.role_id)
+            .outerjoin(ChamberRoles, UserRoles.chamber_role_id == ChamberRoles.role_id)
             .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
             .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .where(
@@ -204,7 +201,7 @@ class UsersRepository(BaseRepository[Users]):
                     Users.last_name.ilike(kw),
                     Users.email.ilike(kw),
                     Users.phone.ilike(kw),
-                    SecurityRoles.role_name.ilike(kw),
+                    ChamberRoles.role_name.ilike(kw),
                 )
             )
 
@@ -230,12 +227,11 @@ class UsersRepository(BaseRepository[Users]):
                 "status_ind": row.status_ind,
                 "created_date": row.created_date,
                 "role": {
-                    "role_id": row.role_id,
+                    "role_id": row.chamber_role_id,
                     "role_name": row.role_name,
-                    "role_code": row.role_code,
                     "description": row.role_description,
                     "status_ind": row.role_status_ind,
-                } if row.role_id else None,
+                } if row.chamber_role_id else None,
                 "profile": {
                     "header_color": row.header_color,
                     "sidebar_color": row.sidebar_color,
@@ -263,9 +259,9 @@ class UsersRepository(BaseRepository[Users]):
         session: AsyncSession,
         *,
         email: Optional[str] = None,
-        user_id: Optional[int] = None,
-        chamber_id: Optional[int] = None,
-    ) -> Optional[Tuple[Users, Optional[UserProfiles], Optional[SecurityRoles]]]:
+        user_id: Optional[str] = None,
+        chamber_id: Optional[str] = None,
+    ) -> Optional[Tuple[Users, Optional[UserProfiles], Optional[ChamberRoles]]]:
         """
         Return (user, profile, role) tuple.
         When chamber_id is provided, resolves role through user_chamber_link → user_roles.
@@ -275,7 +271,7 @@ class UsersRepository(BaseRepository[Users]):
 
         if chamber_id:
             stmt = (
-                select(Users, UserProfiles, SecurityRoles)
+                select(Users, UserProfiles, ChamberRoles)
                 .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
                 .join(UserChamberLink, Users.user_id == UserChamberLink.user_id)
                 .outerjoin(
@@ -285,7 +281,7 @@ class UsersRepository(BaseRepository[Users]):
                         UserRoles.end_date.is_(None),
                     ),
                 )
-                .outerjoin(SecurityRoles, SecurityRoles.role_id == UserRoles.role_id)
+                .outerjoin(ChamberRoles, ChamberRoles.role_id == UserRoles.chamber_role_id)
                 .where(
                     Users.is_deleted.is_(False),
                     Users.status_ind.is_(True),
@@ -296,7 +292,7 @@ class UsersRepository(BaseRepository[Users]):
             )
         else:
             stmt = (
-                select(Users, UserProfiles, SecurityRoles)
+                select(Users, UserProfiles, ChamberRoles)
                 .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
                 .outerjoin(UserChamberLink, Users.user_id == UserChamberLink.user_id)
                 .outerjoin(
@@ -306,7 +302,7 @@ class UsersRepository(BaseRepository[Users]):
                         UserRoles.end_date.is_(None),
                     ),
                 )
-                .outerjoin(SecurityRoles, SecurityRoles.role_id == UserRoles.role_id)
+                .outerjoin(ChamberRoles, ChamberRoles.role_id == UserRoles.chamber_role_id)
                 .where(
                     Users.is_deleted.is_(False),
                     Users.status_ind.is_(True),
@@ -328,7 +324,7 @@ class UsersRepository(BaseRepository[Users]):
     async def update_deleted_user(
         self,
         session: AsyncSession,
-        user_id: int,
+        user_id: str,
         data: Dict[str, Any],
     ) -> None:
         """
@@ -349,8 +345,8 @@ class UsersRepository(BaseRepository[Users]):
     async def reactivate_deleted_user(
         self,
         session: AsyncSession,
-        user_id: int,
-        current_user_id: int,
+        user_id: str,
+        current_user_id: str,
     ) -> None:
         """
         Undelete a user (bypasses soft-delete filtering in BaseRepository.update()).
@@ -377,7 +373,7 @@ class UsersRepository(BaseRepository[Users]):
     async def get_user_stats(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
     ) -> Dict[str, int]:
         """
         Get user management statistics for a chamber.
@@ -402,7 +398,7 @@ class UsersRepository(BaseRepository[Users]):
         active_users = active_users_result.scalar_one() or 0
 
         # 3. Total roles defined for chamber (via user_roles)
-        total_roles_stmt = select(func.count(func.distinct(UserRoles.role_id))).join(
+        total_roles_stmt = select(func.count(func.distinct(UserRoles.chamber_role_id))).join(
             UserChamberLink,
             UserChamberLink.link_id == UserRoles.link_id
         ).where(

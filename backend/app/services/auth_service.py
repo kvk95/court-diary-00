@@ -138,7 +138,7 @@ class AuthService(BaseService):
 
         user = await self.users_repo.get_first(
             session,
-            filters={self.users_repo.model.user_id: int(subject)},
+            filters={self.users_repo.model.user_id: str(subject)},
             where=[self.users_repo.model.status_ind == True],
         )
         if not user:

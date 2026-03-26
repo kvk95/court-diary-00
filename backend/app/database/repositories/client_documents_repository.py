@@ -1,6 +1,5 @@
 """client_documents_repository.py — All DB operations for ClientDocuments"""
 
-from datetime import date
 from typing import Optional, Tuple
 
 from sqlalchemy import select
@@ -21,7 +20,7 @@ class ClientDocumentsRepository(BaseRepository[ClientDocuments]):
     async def list_documents_enriched(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         page: int,
         limit: int,
         client_id: Optional[int] = None,

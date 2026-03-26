@@ -1,6 +1,6 @@
 """delete_account_requests"""
 
-from sqlalchemy import ForeignKey, BigInteger, CHAR, Date, Integer, String, Text
+from sqlalchemy import ForeignKey, CHAR, Date, Integer, String, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -16,14 +16,14 @@ class DeleteAccountRequests(BaseModel, TimestampMixin):
     # request_id : INTEGER
     request_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
 
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # request_no : VARCHAR(30) COLLATE "utf8mb4_unicode_ci"
     request_no: Mapped[str] = mapped_column(String(30), nullable=False)
 
-    # user_id : BIGINT
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    # user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    user_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
     # request_date : DATE
     request_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -34,11 +34,11 @@ class DeleteAccountRequests(BaseModel, TimestampMixin):
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
-    # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

@@ -1,6 +1,6 @@
 """client_relationships"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, DateTime, String, Text
+from sqlalchemy import ForeignKey, Boolean, CHAR, DateTime, String, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -12,14 +12,14 @@ from app.database.models.base.base_model import BaseModel
 class ClientRelationships(BaseModel):
     __tablename__ = 'client_relationships'
 
-    # relationship_id : BIGINT
-    relationship_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # relationship_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    relationship_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # client_id_from : BIGINT
-    client_id_from: Mapped[int] = mapped_column(BigInteger, ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
+    # client_id_from : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    client_id_from: Mapped[str] = mapped_column(CHAR(36), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
 
-    # client_id_to : BIGINT
-    client_id_to: Mapped[int] = mapped_column(BigInteger, ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
+    # client_id_to : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    client_id_to: Mapped[str] = mapped_column(CHAR(36), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
 
     # relationship_type : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     relationship_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -33,8 +33,8 @@ class ClientRelationships(BaseModel):
     # created_date : TIMESTAMP
     created_date: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

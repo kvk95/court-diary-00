@@ -76,7 +76,7 @@ class UsersController(BaseController):
     )
     async def users_get_by_id(
         self,
-        user_id: int = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., gt=0, description="User ID"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[UserOut]:  # ← CHANGED
         result = await service.users_get_by_id(
@@ -108,7 +108,7 @@ class UsersController(BaseController):
     )
     async def users_edit(
         self,
-        user_id: int = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., gt=0, description="User ID"),
         payload: UserEdit = Body(..., description="Fields to update"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[UserOut]:
@@ -139,7 +139,7 @@ class UsersController(BaseController):
     )
     async def users_delete(
         self,
-        user_id: int = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., gt=0, description="User ID"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[dict]:
         result = await service.users_delete(user_id=user_id)
@@ -200,7 +200,7 @@ class UsersController(BaseController):
     )
     async def users_remove_from_chamber(
         self,
-        user_id: int = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., gt=0, description="User ID"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[dict]:
         result = await service.users_remove_from_chamber(user_id=user_id)

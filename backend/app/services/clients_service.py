@@ -1,6 +1,5 @@
 """clients_service.py — Business logic for the Clients module"""
 
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import func, select
@@ -34,7 +33,7 @@ class ClientsService(BaseSecuredService):
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _get_client_or_404(self, client_id: int) -> Clients:
+    async def _get_client_or_404(self, client_id: str) -> Clients:
         client = await self.clients_repo.get_by_id(
             session=self.session,
             filters={Clients.client_id: client_id, Clients.chamber_id: self.chamber_id},
@@ -43,7 +42,7 @@ class ClientsService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client not found")
         return client
 
-    async def _linked_cases_count(self, client_id: int) -> int:
+    async def _linked_cases_count(self, client_id: str) -> int:
         return await self.session.scalar(
             select(func.count(CaseClients.case_client_id)).where(CaseClients.client_id == client_id)
         ) or 0
@@ -172,7 +171,7 @@ class ClientsService(BaseSecuredService):
     # GET BY ID
     # ─────────────────────────────────────────────────────────────────────
 
-    async def clients_get_by_id(self, client_id: int) -> ClientDetailOut:
+    async def clients_get_by_id(self, client_id: str) -> ClientDetailOut:
         return await self._to_detail_out(await self._get_client_or_404(client_id))
 
     # ─────────────────────────────────────────────────────────────────────
@@ -192,7 +191,7 @@ class ClientsService(BaseSecuredService):
     # EDIT
     # ─────────────────────────────────────────────────────────────────────
 
-    async def clients_edit(self, client_id: int, payload: ClientEdit) -> ClientDetailOut:
+    async def clients_edit(self, client_id: str, payload: ClientEdit) -> ClientDetailOut:
         await self._get_client_or_404(client_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         if data:
@@ -207,7 +206,7 @@ class ClientsService(BaseSecuredService):
     # DELETE (soft)
     # ─────────────────────────────────────────────────────────────────────
 
-    async def clients_delete(self, client_id: int) -> dict:
+    async def clients_delete(self, client_id: str) -> dict:
         client = await self._get_client_or_404(client_id)
         # Block if linked to active cases
         linked = await self._linked_cases_count(client_id)

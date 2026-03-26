@@ -26,11 +26,11 @@ class BillSummaryStats(BaseRecordData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BillListOut(BaseRecordData):
-    bill_id: int
+    bill_id: str
     bill_number: Optional[str] = None
-    client_id: int
+    client_id: str
     client_name: str
-    case_id: Optional[int] = None
+    case_id: Optional[str] = ""
     case_number: Optional[str] = None
     bill_date: date
     due_date: Optional[date] = None
@@ -56,8 +56,8 @@ class BillDetailOut(BillListOut):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BillCreate(BaseInData):
-    client_id: int
-    case_id: Optional[int] = None
+    client_id: str
+    case_id: Optional[str] = None
     bill_number: Optional[str] = None
     bill_date: date
     due_date: Optional[date] = None
@@ -77,7 +77,7 @@ class BillCreate(BaseInData):
 
 
 class BillEdit(BaseInData):
-    bill_id: int
+    bill_id: str
     bill_number: Optional[str] = None
     bill_date: Optional[date] = None
     due_date: Optional[date] = None
@@ -90,7 +90,7 @@ class BillEdit(BaseInData):
 
 
 class BillDelete(BaseInData):
-    bill_id: int
+    bill_id: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,9 +98,9 @@ class BillDelete(BaseInData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PaymentOut(BaseRecordData):
-    payment_id: int
-    bill_id: int
-    client_id: int
+    payment_id: str
+    bill_id: str
+    client_id: str
     client_name: Optional[str] = None
     payment_date: date
     amount: float
@@ -118,7 +118,7 @@ class PaymentOut(BaseRecordData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PaymentCreate(BaseInData):
-    bill_id: int
+    bill_id: str
     payment_date: date
     amount: float
     payment_mode: Optional[str] = None   # CASH | UPI | NEFT | CHQ | CARD
@@ -137,7 +137,7 @@ class PaymentCreate(BaseInData):
 
 
 class PaymentDelete(BaseInData):
-    payment_id: int
+    payment_id: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -145,10 +145,10 @@ class PaymentDelete(BaseInData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DocumentOut(BaseRecordData):
-    document_id: int
-    client_id: int
+    document_id: str
+    client_id: str
     client_name: Optional[str] = None
-    case_id: Optional[int] = None
+    case_id: Optional[str] = None
     case_number: Optional[str] = None
     document_name: str
     document_type: Optional[str] = None
@@ -169,8 +169,8 @@ class DocumentOut(BaseRecordData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DocumentCreate(BaseInData):
-    client_id: int
-    case_id: Optional[int] = None
+    client_id: str
+    case_id: Optional[str] = None
     document_name: str
     document_type: Optional[str] = None
     document_category: Optional[str] = None
@@ -190,7 +190,7 @@ class DocumentCreate(BaseInData):
 
 
 class DocumentEdit(BaseInData):
-    document_id: int
+    document_id: str
     document_name: Optional[str] = None
     document_type: Optional[str] = None
     document_category: Optional[str] = None

@@ -14,17 +14,17 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CollaborationOut(BaseRecordData):
-    collaboration_id: int
-    case_id: int
+    collaboration_id: str
+    case_id: str
     case_number: Optional[str] = None
     case_title: Optional[str] = None       # petitioner vs respondent
-    owner_chamber_id: int
+    owner_chamber_id: str
     owner_chamber_name: Optional[str] = None
-    collaborator_chamber_id: int
+    collaborator_chamber_id: str
     collaborator_chamber_name: Optional[str] = None
     access_level: Optional[str] = None
     access_level_description: Optional[str] = None
-    invited_by: Optional[int] = None
+    invited_by: Optional[str] = ""
     invited_by_name: Optional[str] = None
     invited_date: Optional[datetime] = None
     accepted_date: Optional[datetime] = None
@@ -36,8 +36,8 @@ class CollaborationOut(BaseRecordData):
 
 class CollaborationInvite(BaseInData):
     """Owner chamber invites a collaborator chamber to access a case."""
-    case_id: int
-    collaborator_chamber_id: int
+    case_id: str
+    collaborator_chamber_id: str
     access_level: str = "RO"               # RO | RW | FU
     notes: Optional[str] = None
 
@@ -51,7 +51,7 @@ class CollaborationInvite(BaseInData):
 
 class CollaborationRespond(BaseInData):
     """Collaborator chamber accepts or rejects a pending invitation."""
-    collaboration_id: int
+    collaboration_id: str
     action: str                            # accept | reject
     notes: Optional[str] = None
 
@@ -65,5 +65,5 @@ class CollaborationRespond(BaseInData):
 
 class CollaborationRevoke(BaseInData):
     """Owner chamber revokes an accepted collaboration."""
-    collaboration_id: int
+    collaboration_id: str
     notes: Optional[str] = None

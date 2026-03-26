@@ -159,122 +159,110 @@ INSERT INTO refm_courts (court_name, state_code, court_type, sort_order) VALUES
 ('JM Court, Saidapet',                   'TN', 'Magistrate',     60);
 
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 17. SEED DATA — TIER 2 (Core Entities: chamber + users)
 -- =============================================================================
--- 17. SEED DATA — TIER 2  (Core Entities: chamber + users)
--- =============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 17.1  Chambers
--- ─────────────────────────────────────────────────────────────────────────────
+-- 17.1 Chambers
+INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, created_by) 
+VALUES 
+('VijayKrishnan & Associates', 'office@vkchamber.in', '9876543210', 'Chennai', 'TN', 'PRO', NULL);
 
-INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, created_by) VALUES
-('VijayKrishnan & Associates', 'office@vkchamber.in',  '9876543210', 'Chennai',    'TN', 'PRO',  NULL),
-('Sundar Associates',          'office@sundarlaw.in',  '9445123456', 'Coimbatore', 'TN', 'FREE', NULL);
+SET @chamber_vk = (SELECT chamber_id FROM chamber WHERE chamber_name = 'VijayKrishnan & Associates');
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 17.2  Users (chamber-agnostic)
--- ─────────────────────────────────────────────────────────────────────────────
+INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, created_by) 
+VALUES 
+('Sundar Associates', 'office@sundarlaw.in', '9445123456', 'Coimbatore', 'TN', 'FREE', NULL);
 
+SET @chamber_sundar = (SELECT chamber_id FROM chamber WHERE chamber_name = 'Sundar Associates');
+
+-- 17.2 Users
 SET @pwd_hash = '$argon2id$v=19$m=65536,t=3,p=4$hfCeE0IoZay1lhLifA+BkA$3rA1GrCAkdhLzYyGi2S7lc422/W2eEPIqW3MD4u1B48';
 
-INSERT INTO users (email, password_hash, first_name, last_name, phone, role_code, created_by) VALUES
-('admin@vkchamber.in',   @pwd_hash, 'Vijay',   'Krishnan', '9876543210', 'ADM',  NULL),
-('priya@vkchamber.in',   @pwd_hash, 'Priya',   'Natarajan','8123456789', 'SEN',  1),
-('karthik@vkchamber.in', @pwd_hash, 'Karthik', 'Raja',     '9001234567', 'CLK',  1),
-('lokesh@sundarlaw.in',  @pwd_hash, 'Lokesh',  'Mani',     '9445123456', 'ADM',  1);
+INSERT INTO users (user_id, email, password_hash, first_name, last_name, phone, created_by) VALUES
+(UUID(), 'admin@vkchamber.in',  @pwd_hash, 'Vijay', 'Krishnan', '9876543210', NULL),
+(UUID(), 'priya@vkchamber.in',  @pwd_hash, 'Priya', 'Natarajan', '8123456789', NULL),
+(UUID(), 'karthik@vkchamber.in',@pwd_hash, 'Karthik', 'Raja', '9001234567', NULL),
+(UUID(), 'lokesh@sundarlaw.in', @pwd_hash, 'Lokesh', 'Mani', '9445123456', NULL);
 
+SET @user_vijay   = (SELECT user_id FROM users WHERE email = 'admin@vkchamber.in');
+SET @user_priya   = (SELECT user_id FROM users WHERE email = 'priya@vkchamber.in');
+SET @user_karthik = (SELECT user_id FROM users WHERE email = 'karthik@vkchamber.in');
+SET @user_lokesh  = (SELECT user_id FROM users WHERE email = 'lokesh@sundarlaw.in');
 
--- =============================================================================
--- 18. SEED DATA — TIER 3  (Bridge Tables: profiles, links, modules)
--- =============================================================================
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 18.1  User Profiles
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO user_profiles (user_id, address, country, state, city, postal_code,
-                           header_color, sidebar_color, primary_color, font_family, updated_by) VALUES
-(1, 'No. 45, Anna Salai, Teynampet',         'IN', 'TN', 'Chennai',    '600018', '222 33% 10%', '222 40% 12%', '32.4 99% 63%',  'Nunito, sans-serif', 1),
-(2, 'Flat 3B, Greenwoods Apartment, Adyar',  'IN', 'TN', 'Chennai',    '600020', '230 20% 15%', '230 25% 18%', '215 100% 55%',  'Inter, sans-serif',  1),
-(3, '12/5, Gandhi Nagar, Chengalpattu',      'IN', 'TN', 'Chengalpattu','603001','0 0% 12%',    '0 0% 15%',    '262 83% 58%',   'Nunito, sans-serif', 1),
-(4, 'Plot 78, RS Puram',                     'IN', 'TN', 'Coimbatore', '641002', '225 30% 11%', '225 35% 14%', '142 76% 36%',   'Roboto, sans-serif', 4);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 18.2  User ↔ Chamber Links
--- ─────────────────────────────────────────────────────────────────────────────
-
-SET @chamber_vk     = (SELECT chamber_id FROM chamber WHERE chamber_name = 'VijayKrishnan & Associates');
-SET @chamber_sundar = (SELECT chamber_id FROM chamber WHERE chamber_name = 'Sundar Associates');
-SET @user_vijay     = (SELECT user_id FROM users WHERE email = 'admin@vkchamber.in');
-SET @user_priya     = (SELECT user_id FROM users WHERE email = 'priya@vkchamber.in');
-SET @user_karthik   = (SELECT user_id FROM users WHERE email = 'karthik@vkchamber.in');
-SET @user_lokesh    = (SELECT user_id FROM users WHERE email = 'lokesh@sundarlaw.in');
-
-INSERT INTO user_chamber_link (user_id, chamber_id, is_primary, joined_date, created_by) VALUES
-(@user_vijay,   @chamber_vk,     TRUE, '2024-01-15', @user_vijay),
-(@user_priya,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
-(@user_karthik, @chamber_vk,     TRUE, '2024-03-10', @user_vijay),
-(@user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 18.3  Chamber Modules
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO chamber_modules (chamber_id, module_code, is_active, created_by) VALUES
-(@chamber_vk, 'DASH',  TRUE,  @user_vijay),
-(@chamber_vk, 'CASES', TRUE,  @user_vijay),
-(@chamber_vk, 'HEAR',  TRUE,  @user_vijay),
-(@chamber_vk, 'CAL',   TRUE,  @user_vijay),
-(@chamber_vk, 'USERS', TRUE,  @user_vijay),
-(@chamber_vk, 'RPT',   TRUE,  @user_vijay),
-(@chamber_vk, 'SET',   TRUE,  @user_vijay);
-
-INSERT INTO chamber_modules (chamber_id, module_code, is_active, created_by) VALUES
-(@chamber_sundar, 'DASH',  TRUE,  @user_lokesh),
-(@chamber_sundar, 'CASES', TRUE,  @user_lokesh),
-(@chamber_sundar, 'HEAR',  TRUE,  @user_lokesh),
-(@chamber_sundar, 'CAL',   TRUE,  @user_lokesh),
-(@chamber_sundar, 'USERS', FALSE, @user_lokesh),
-(@chamber_sundar, 'RPT',   FALSE, @user_lokesh),
-(@chamber_sundar, 'SET',   TRUE,  @user_lokesh);
-
-
--- =============================================================================
--- 19. SEED DATA — TIER 4 & 5  (Roles & Permissions)
+-- 18. SEED DATA — TIER 3 (Bridge Tables)
 -- =============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 19.1  Security Roles
--- ─────────────────────────────────────────────────────────────────────────────
+-- 18.1 User Profiles
+INSERT INTO user_profiles (profile_id, user_id, address, country, state, city, postal_code, 
+                           header_color, sidebar_color, primary_color, font_family, updated_by) 
+VALUES
+(UUID(), @user_vijay,   'No. 45, Anna Salai, Teynampet', 'IN', 'TN', 'Chennai', '600018', '222 33% 10%', '222 40% 12%', '32.4 99% 63%', 'Nunito, sans-serif', @user_vijay),
+(UUID(), @user_priya,   'Flat 3B, Greenwoods Apartment, Adyar', 'IN', 'TN', 'Chennai', '600020', '230 20% 15%', '230 25% 18%', '215 100% 55%', 'Inter, sans-serif', @user_vijay),
+(UUID(), @user_karthik, '12/5, Gandhi Nagar, Chengalpattu', 'IN', 'TN', 'Chengalpattu', '603001', '0 0% 12%', '0 0% 15%', '262 83% 58%', 'Nunito, sans-serif', @user_vijay),
+(UUID(), @user_lokesh,  'Plot 78, RS Puram', 'IN', 'TN', 'Coimbatore', '641002', '225 30% 11%', '225 35% 14%', '142 76% 36%', 'Roboto, sans-serif', @user_lokesh);
 
-INSERT INTO security_roles (role_name, role_code, description, created_by) VALUES
-('Administrator',   'ADM', 'Full access to all modules',         @user_vijay),
-('Senior Advocate', 'SEN', 'Manage cases & hearings',            @user_vijay),
-('Clerk',           'CLK', 'View & basic data entry only',       @user_vijay);
+-- 18.2 User ↔ Chamber Links
+INSERT INTO user_chamber_link (link_id, user_id, chamber_id, is_primary, joined_date, created_by) VALUES
+(UUID(), @user_vijay,   @chamber_vk,     TRUE, '2024-01-15', @user_vijay),
+(UUID(), @user_priya,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
+(UUID(), @user_karthik, @chamber_vk,     TRUE, '2024-03-10', @user_vijay),
+(UUID(), @user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh);
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 19.2  User Roles  (via link_id — contextual)
--- ─────────────────────────────────────────────────────────────────────────────
+-- 18.3 Chamber Modules
+INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, is_active, created_by) VALUES
+(UUID(), @chamber_vk, 'DASH', TRUE, @user_vijay),
+(UUID(), @chamber_vk, 'CASES', TRUE, @user_vijay),
+(UUID(), @chamber_vk, 'HEAR', TRUE, @user_vijay),
+(UUID(), @chamber_vk, 'CAL', TRUE, @user_vijay),
+(UUID(), @chamber_vk, 'USERS', TRUE, @user_vijay),
+(UUID(), @chamber_vk, 'RPT', TRUE, @user_vijay),
+(UUID(), @chamber_vk, 'SET', TRUE, @user_vijay);
 
-SET @link_vijay_vk      = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_vijay   AND chamber_id = @chamber_vk);
-SET @link_priya_vk      = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_priya   AND chamber_id = @chamber_vk);
-SET @link_karthik_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_karthik AND chamber_id = @chamber_vk);
-SET @link_lokesh_sundar = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_lokesh  AND chamber_id = @chamber_sundar);
-
-SET @role_admin  = (SELECT role_id FROM security_roles WHERE role_code = 'ADM');
-SET @role_senior = (SELECT role_id FROM security_roles WHERE role_code = 'SEN');
-SET @role_clerk  = (SELECT role_id FROM security_roles WHERE role_code = 'CLK');
-
-INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
-(@link_vijay_vk,      @role_admin,  '2024-01-15', @user_vijay),
-(@link_priya_vk,      @role_senior, '2024-02-01', @user_vijay),
-(@link_karthik_vk,    @role_clerk,  '2024-03-10', @user_vijay),
-(@link_lokesh_sundar, @role_admin,  '2024-01-20', @user_lokesh);
+INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, is_active, created_by) VALUES
+(UUID(), @chamber_sundar, 'DASH', TRUE, @user_lokesh),
+(UUID(), @chamber_sundar, 'CASES', TRUE, @user_lokesh),
+(UUID(), @chamber_sundar, 'HEAR', TRUE, @user_lokesh),
+(UUID(), @chamber_sundar, 'CAL', TRUE, @user_lokesh),
+(UUID(), @chamber_sundar, 'USERS', FALSE, @user_lokesh),
+(UUID(), @chamber_sundar, 'RPT', FALSE, @user_lokesh),
+(UUID(), @chamber_sundar, 'SET', TRUE, @user_lokesh);
 
 -- =============================================================================
--- 19.3  Role Permissions  (VK chamber — Admin, Senior, Clerk)
+-- 19. SEED DATA — TIER 4 (Roles & Permissions) — NEW DESIGN
 -- =============================================================================
 
+-- 19.1 Master Security Roles (Global Templates)
+INSERT INTO security_roles (role_name, description, is_system, created_by) VALUES
+('Administrator', 'Full access to all modules', TRUE, @user_vijay),
+('Senior Advocate', 'Manage cases, hearings and clients', TRUE, @user_vijay),
+('Clerk', 'Basic data entry and viewing only', TRUE, @user_vijay);
+
+-- 19.2 Chamber-specific Roles (Copy from master)
+INSERT INTO chamber_roles (chamber_id, role_name, description, is_system, created_by) VALUES
+(@chamber_vk, 'Administrator', 'Full access to all modules', TRUE, @user_vijay),
+(@chamber_vk, 'Senior Advocate', 'Manage cases, hearings and clients', TRUE, @user_vijay),
+
+(@chamber_sundar, 'Administrator', 'Full access to all modules', TRUE, @user_lokesh),
+(@chamber_sundar, 'Senior Advocate', 'Manage cases, hearings and clients', TRUE, @user_lokesh);
+
+-- 19.3 User Roles (link to chamber_roles)
+SET @link_vijay_vk   = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_vijay AND chamber_id = @chamber_vk);
+SET @link_priya_vk   = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_priya AND chamber_id = @chamber_vk);
+SET @link_karthik_vk = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_karthik AND chamber_id = @chamber_vk);
+SET @link_lokesh_sundar = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_lokesh AND chamber_id = @chamber_sundar);
+
+SET @role_admin_vk   = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk AND role_name = 'Administrator');
+SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk AND role_name = 'Senior Advocate');
+SET @role_admin_sundar = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar AND role_name = 'Administrator');
+
+INSERT INTO user_roles (link_id, chamber_role_id, start_date, created_by) VALUES
+(@link_vijay_vk,   @role_admin_vk,   '2024-01-15', @user_vijay),
+(@link_priya_vk,   @role_senior_vk,  '2024-02-01', @user_vijay),
+(@link_karthik_vk, @role_senior_vk,   '2024-03-10', @user_vijay),
+(@link_lokesh_sundar, @role_admin_sundar, '2024-01-20', @user_lokesh);
+
+-- 19.4 Role Permissions (per chamber role)
 SET @cm_dash  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'DASH');
 SET @cm_cases = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'CASES');
 SET @cm_hear  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'HEAR');
@@ -283,45 +271,51 @@ SET @cm_users = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id 
 SET @cm_rpt   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'RPT');
 SET @cm_set   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'SET');
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Admin: Full access to ALL permissions (including Import/Export)
--- ─────────────────────────────────────────────────────────────────────────────
+-- Administrator - Full Access
+INSERT INTO role_permissions (chamber_role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) 
+VALUES
+(@role_admin_vk, @cm_dash,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin_vk, @cm_cases, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin_vk, @cm_hear,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin_vk, @cm_cal,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin_vk, @cm_users, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin_vk, @cm_rpt,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_admin_vk, @cm_set,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
 
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_admin, @cm_dash,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_cases, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_hear,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_cal,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_users, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_rpt,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin, @cm_set,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
+-- Senior Advocate - Limited but strong on core modules
+INSERT INTO role_permissions (chamber_role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) 
+VALUES
+(@role_senior_vk, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_senior_vk, @cm_hear,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),
+(@role_senior_vk, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_senior_vk, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_senior_vk, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_vijay),
+(@role_senior_vk, @cm_set,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Senior: Manage cases & hearings, read-only elsewhere
--- Import/Export only for Cases, Hearings, Reports
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================================================
+-- Add Role Permissions for Sundar Associates
+-- =============================================================================
 
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_senior, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_cases, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),  -- ✅ Import/Export for cases
-(@role_senior, @cm_hear,  FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),  -- ✅ Import/Export for hearings
-(@role_senior, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_vijay),  -- ✅ Export for reports
-(@role_senior, @cm_set,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
+-- Get chamber_module_ids for Sundar Associates
+SET @cm_dash_s  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'DASH');
+SET @cm_cases_s = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'CASES');
+SET @cm_hear_s  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'HEAR');
+SET @cm_cal_s   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'CAL');
+SET @cm_users_s = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'USERS');
+SET @cm_rpt_s   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'RPT');
+SET @cm_set_s   = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_sundar AND module_code = 'SET');
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Clerk: Read-only, NO Import/Export
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_clerk, @cm_dash,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_cases, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_hear,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_cal,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_users, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_rpt,   FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk, @cm_set,   FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
+-- Administrator for Sundar - Full Access
+INSERT INTO role_permissions 
+    (chamber_role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) 
+VALUES
+(@role_admin_sundar, @cm_dash_s,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_cases_s, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_hear_s,  TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_cal_s,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_users_s, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_rpt_s,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_set_s,   TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh);
 
 
 -- =============================================================================
@@ -504,7 +498,7 @@ VALUES
 (@chamber_vk, 'newlawyer@example.com', @role_senior, @user_vijay, '2026-03-20', '2026-04-19',
         'PN', 'Welcome to VijayKrishnan & Associates! Please accept this invitation.',
         @user_vijay),
-(@chamber_vk, 'clerk@example.com', @role_clerk, @user_vijay, '2026-03-22', '2026-04-21',
+(@chamber_vk, 'senlawyer@example.com', @role_senior, @user_vijay, '2026-03-22', '2026-04-21',
         'PN', 'Join our team as a clerk.',
         @user_vijay);
 
@@ -553,34 +547,51 @@ INSERT INTO login_audit (user_id, chamber_id, email, ip_address, user_agent, sta
 
 
 -- =============================================================================
--- 26. VERIFICATION QUERIES (Dashboard Data Check)
+-- 26. VERIFICATION QUERIES (Dashboard Data Check) — FIXED
 -- =============================================================================
 
--- Practice Overview Stats
-SELECT 
-    'Practice Overview' AS widget,
-    (SELECT COUNT(*) FROM cases WHERE chamber_id = @chamber_vk AND status_code = 'AC' AND is_deleted = FALSE) AS active_cases,
-    (SELECT COUNT(*) FROM hearings WHERE chamber_id = @chamber_vk AND hearing_date = '2026-03-24' AND is_deleted = FALSE) AS today_hearings,
-    (SELECT COUNT(*) FROM cases WHERE chamber_id = @chamber_vk AND status_code = 'AC' AND next_hearing_date < '2026-03-24' AND is_deleted = FALSE) AS overdue_cases;
+-- 1. Confirm 'role_code' column no longer exists in users table (as expected)
+SELECT COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'courtdiary'
+  AND COLUMN_NAME = 'role_code';
+-- Should return 0 rows
 
--- Chamber Management Stats
+-- 2. Verify Chamber Roles (per chamber)
 SELECT 
-    'Chamber Management' AS widget,
-    (SELECT COUNT(*) FROM user_chamber_link WHERE chamber_id = @chamber_vk AND left_date IS NULL AND status_ind = TRUE) AS total_users,
-    (SELECT COUNT(*) FROM security_roles) AS total_roles,
-    (SELECT COUNT(*) FROM user_invitations WHERE chamber_id = @chamber_vk AND status_code = 'PN') AS pending_invites;
+    cr.role_id,
+    c.chamber_name,
+    cr.role_name,
+    cr.description,
+    cr.is_system
+FROM chamber_roles cr
+JOIN chamber c ON cr.chamber_id = c.chamber_id
+ORDER BY c.chamber_name, cr.role_name;
 
--- Recent Activity
+-- 3. Verify User Role Assignments (Fixed)
+SELECT
+    u.email,
+    c.chamber_name,
+    cr.role_name,
+    ur.start_date,
+    ur.end_date
+FROM user_roles ur
+JOIN user_chamber_link ucl ON ur.link_id = ucl.link_id
+JOIN users u ON ucl.user_id = u.user_id
+JOIN chamber c ON ucl.chamber_id = c.chamber_id
+JOIN chamber_roles cr ON ur.chamber_role_id = cr.role_id     -- ← FIXED: Use chamber_role_id
+ORDER BY c.chamber_name, u.email;
+
+-- 4. Bonus: Check how many permissions exist per chamber role
 SELECT 
-    al.action,
-    al.target,
-    CONCAT(u.first_name, ' ', u.last_name) AS user_name,
-    al.created_date
-FROM activity_log al
-LEFT JOIN users u ON al.user_id = u.user_id
-WHERE al.chamber_id = @chamber_vk
-ORDER BY al.created_date DESC
-LIMIT 10;
+    c.chamber_name,
+    cr.role_name,
+    COUNT(rp.permission_id) AS permission_count
+FROM chamber_roles cr
+JOIN chamber c ON cr.chamber_id = c.chamber_id
+LEFT JOIN role_permissions rp ON rp.chamber_role_id = cr.role_id
+GROUP BY c.chamber_name, cr.role_name
+ORDER BY c.chamber_name, cr.role_name;
 
 -- =============================================================================
 -- END OF SEED DATA

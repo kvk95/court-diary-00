@@ -34,28 +34,28 @@ async def get_current_user(
     payload = decode_token(token)
     
     if not payload or payload.get("type") != "access":
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload")
+        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload q")
 
     user_id = payload.get("sub")
     chamber_id = payload.get("chamber_id") 
     
     if not user_id:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload")
+        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 2")
 
     try:
-        user_id_int = int(user_id)
+        user_id_val = user_id
     except ValueError:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload")
+        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 3")
 
     # Fetch user from DB
-    user = await UsersRepository().get_by_id(session=session, id_values=user_id_int)
+    user = await UsersRepository().get_by_id(session=session, id_values=user_id_val)
     if not user or user.is_deleted:
         raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="User not found or deleted")
 
     # ✅ Build context DTO (fixed field names)
     user_context = CurrentUserContext(
         user_id=user.user_id,
-        chamber_id=chamber_id if chamber_id!=None else 0,  # ✅ Changed from company_id
+        chamber_id=chamber_id if chamber_id!=None else "",  # ✅ Changed from company_id
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,

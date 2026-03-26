@@ -23,7 +23,7 @@ class AorController(BaseController):
     )
     async def aors_get_by_case(
         self,
-        case_id: int = Path(..., gt=0),
+        case_id: str = Path(..., gt=0),
         service: AorService = Depends(get_aor_service),
     ) -> BaseOutDto[List[AorOut]]:
         return self.success(result=await service.aors_get_by_case(case_id=case_id))
@@ -79,7 +79,7 @@ class AorController(BaseController):
     )
     async def aors_remove(
         self,
-        case_aor_id: int = Path(..., gt=0),
+        case_aor_id: str = Path(..., gt=0),
         service: AorService = Depends(get_aor_service),
     ) -> BaseOutDto[dict]:
         return self.success(result=await service.aors_remove(case_aor_id=case_aor_id))

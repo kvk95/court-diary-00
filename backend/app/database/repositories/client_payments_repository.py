@@ -1,6 +1,5 @@
 """client_payments_repository.py — All DB operations for ClientPayments"""
 
-from typing import List
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +14,7 @@ class ClientPaymentsRepository(BaseRepository[ClientPayments]):
     def __init__(self):
         super().__init__(ClientPayments)
 
-    async def get_total_paid_for_bill(self, session: AsyncSession, bill_id: int) -> float:
+    async def get_total_paid_for_bill(self, session: AsyncSession, bill_id: str) -> float:
         """Sum of all payments on a bill — used by recalculate logic."""
         result = await session.scalar(
             select(func.coalesce(func.sum(ClientPayments.amount), 0))

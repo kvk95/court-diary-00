@@ -1,7 +1,7 @@
 """cases_dto.py — DTOs for Cases, Hearings, Case Notes, Case Clients"""
 
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import field_validator
 
@@ -13,7 +13,7 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CaseListOut(BaseRecordData):
-    case_id: int
+    case_id: str
     case_number: str
     status_code: Optional[str] = None
     status_description: Optional[str] = None
@@ -26,8 +26,8 @@ class CaseListOut(BaseRecordData):
 
 
 class CaseDetailOut(BaseRecordData):
-    case_id: int
-    chamber_id: int
+    case_id: str
+    chamber_id: str
     case_number: str
     court_id: int
     court_name: Optional[str] = None
@@ -36,7 +36,7 @@ class CaseDetailOut(BaseRecordData):
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
-    aor_user_id: Optional[int] = None
+    aor_user_id: Optional[str] = None
     aor_name: Optional[str] = None
     case_summary: Optional[str] = None
     status_code: Optional[str] = None
@@ -68,7 +68,7 @@ class CaseCreate(BaseInData):
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
-    aor_user_id: Optional[int] = None
+    aor_user_id: Optional[str] = None
     case_summary: Optional[str] = None
     status_code: str = "AC"
     next_hearing_date: Optional[date] = None
@@ -96,21 +96,21 @@ class CaseCreate(BaseInData):
 
 
 class CaseEdit(BaseInData):
-    case_id: int
+    case_id: str
     case_number: Optional[str] = None
     court_id: Optional[int] = None
     case_type_code: Optional[str] = None
     filing_year: Optional[int] = None
     petitioner: Optional[str] = None
     respondent: Optional[str] = None
-    aor_user_id: Optional[int] = None
+    aor_user_id: Optional[str] = None
     case_summary: Optional[str] = None
     status_code: Optional[str] = None
     next_hearing_date: Optional[date] = None
 
 
 class CaseDelete(BaseInData):
-    case_id: int
+    case_id: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,8 +118,8 @@ class CaseDelete(BaseInData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class HearingOut(BaseRecordData):
-    hearing_id: int
-    case_id: int
+    hearing_id: str
+    case_id: str
     hearing_date: date
     status_code: Optional[str] = None
     status_description: Optional[str] = None
@@ -133,7 +133,7 @@ class HearingOut(BaseRecordData):
 
 
 class HearingCreate(BaseInData):
-    case_id: int
+    case_id: str
     hearing_date: date
     status_code: str = "SC"
     purpose: Optional[str] = None
@@ -143,7 +143,7 @@ class HearingCreate(BaseInData):
 
 
 class HearingEdit(BaseInData):
-    hearing_id: int
+    hearing_id: str
     hearing_date: Optional[date] = None
     status_code: Optional[str] = None
     purpose: Optional[str] = None
@@ -153,7 +153,7 @@ class HearingEdit(BaseInData):
 
 
 class HearingDelete(BaseInData):
-    hearing_id: int
+    hearing_id: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -161,9 +161,9 @@ class HearingDelete(BaseInData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CaseNoteOut(BaseRecordData):
-    note_id: int
-    case_id: int
-    user_id: int
+    note_id: str
+    case_id: str
+    user_id: str
     author_name: Optional[str] = None
     note_text: str
     is_private: bool = False
@@ -172,7 +172,7 @@ class CaseNoteOut(BaseRecordData):
 
 
 class CaseNoteCreate(BaseInData):
-    case_id: int
+    case_id: str
     note_text: str
     is_private: bool = False
 
@@ -185,13 +185,13 @@ class CaseNoteCreate(BaseInData):
 
 
 class CaseNoteEdit(BaseInData):
-    note_id: int
+    note_id: str
     note_text: Optional[str] = None
     is_private: Optional[bool] = None
 
 
 class CaseNoteDelete(BaseInData):
-    note_id: int
+    note_id: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -199,8 +199,8 @@ class CaseNoteDelete(BaseInData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CaseClientOut(BaseRecordData):
-    case_client_id: int
-    client_id: int
+    case_client_id: str
+    client_id: str
     client_name: str
     client_type: str
     party_role: str
@@ -212,7 +212,7 @@ class CaseClientOut(BaseRecordData):
 
 
 class CaseClientLinkPayload(BaseInData):
-    client_id: int
+    client_id: str
     party_role: str
     is_primary: bool = False
     engagement_type: Optional[str] = None
@@ -226,7 +226,7 @@ class CaseClientLinkPayload(BaseInData):
 
 
 class CaseClientUnlinkPayload(BaseInData):
-    case_client_id: int
+    case_client_id: str
 
 
 # ─────────────────────────────────────────────────────────────────────────────

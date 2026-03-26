@@ -38,7 +38,7 @@ class AorService(BaseSecuredService):
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _get_case_or_404(self, case_id: int) -> Cases:
+    async def _get_case_or_404(self, case_id: str) -> Cases:
         case = await self.cases_repo.get_by_id(
             session=self.session,
             filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
@@ -47,7 +47,7 @@ class AorService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
         return case
 
-    async def _get_aor_or_404(self, case_aor_id: int) -> CaseAors:
+    async def _get_aor_or_404(self, case_aor_id: str) -> CaseAors:
         aor = await self.aors_repo.get_by_id(
             session=self.session,
             filters={CaseAors.case_aor_id: case_aor_id, CaseAors.chamber_id: self.chamber_id},
@@ -56,7 +56,7 @@ class AorService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="AOR record not found")
         return aor
 
-    async def _user_name(self, user_id: int) -> str:
+    async def _user_name(self, user_id: str) -> str:
         u = await self.session.get(Users, user_id)
         return _full_name(u.first_name, u.last_name) if u else ""
 
@@ -79,7 +79,7 @@ class AorService(BaseSecuredService):
     # LIST
     # ─────────────────────────────────────────────────────────────────────
 
-    async def aors_get_by_case(self, case_id: int) -> List[AorOut]:
+    async def aors_get_by_case(self, case_id: str) -> List[AorOut]:
         await self._get_case_or_404(case_id)
         aors = await self.aors_repo.list_all(
             session=self.session,
@@ -207,7 +207,7 @@ class AorService(BaseSecuredService):
     # REMOVE
     # ─────────────────────────────────────────────────────────────────────
 
-    async def aors_remove(self, case_aor_id: int) -> dict:
+    async def aors_remove(self, case_aor_id: str) -> dict:
         await self._get_aor_or_404(case_aor_id)
         await self.aors_repo.delete(session=self.session, id_values=case_aor_id, soft=False)
         return {"case_aor_id": case_aor_id, "deleted": True}
@@ -216,7 +216,7 @@ class AorService(BaseSecuredService):
     # PRIVATE
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _demote_existing_primary(self, case_id: int) -> None:
+    async def _demote_existing_primary(self, case_id: str) -> None:
         """Set is_primary=False on any currently-primary AOR for this case."""
         existing_primary = await self.session.execute(
             select(CaseAors).where(

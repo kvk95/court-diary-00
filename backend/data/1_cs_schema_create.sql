@@ -1,13 +1,10 @@
 -- =============================================================================
 -- COURT DIARY — FULL SCHEMA (Production-Ready with Contextual Membership)
--- Design : Users are chamber-agnostic; membership via user_chamber_link
---          Roles are assigned per user-chamber context (link_id)
--- Order  : REFM Tier-0 → REFM Tier-1 → Core Entities → Bridge/Modules
---          → Roles → Business → Clients → Config → Collaboration
---          → Audit/Logs → Deferred FKs & Indexes → Data
--- 2025/2026 version
+-- Design: Users are chamber-agnostic; membership via user_chamber_link
+--         Roles are assigned per user-chamber context (link_id)
+--         ALL entity tables use UUID v7 for security
+--         Reference tables keep code-based PKs (refm_*)
 -- =============================================================================
-
 
 -- =============================================================================
 -- 1. DATABASE SETUP
@@ -18,7 +15,6 @@ CREATE DATABASE courtdiary
     DEFAULT CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 USE courtdiary;
-
 
 -- =============================================================================
 -- 2. REFERENCE TABLES — TIER 0 (No foreign key dependencies)
@@ -205,7 +201,6 @@ CREATE TABLE refm_collab_access (
     status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Collaboration access levels';
 
-
 -- =============================================================================
 -- 3. REFERENCE TABLES — TIER 1 (FK to other REFM only)
 -- =============================================================================
@@ -226,7 +221,7 @@ CREATE TABLE refm_states (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='States / Union Territories';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3.2  Courts  →  refm_states
+-- 3.2  Courts  →  refm_states (Keep INT AUTO_INCREMENT - small lookup table)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS refm_courts;
@@ -244,9 +239,8 @@ CREATE TABLE refm_courts (
         FOREIGN KEY (state_code) REFERENCES refm_states(code) ON DELETE RESTRICT
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Courts / benches';
 
-
 -- =============================================================================
--- 4. CORE ENTITIES — TIER 2
+-- 4. CORE ENTITIES — TIER 2 (UUID v7 Primary Keys)
 --    chamber  →  REFM only   (user FKs deferred — Section 11)
 --    users    →  self only   (chamber-agnostic)
 -- =============================================================================
@@ -257,7 +251,7 @@ CREATE TABLE refm_courts (
 
 DROP TABLE IF EXISTS chamber;
 CREATE TABLE chamber (
-    chamber_id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    chamber_id         CHAR(36)     PRIMARY KEY,  
     chamber_name       VARCHAR(150) NOT NULL,
     email              VARCHAR(120) NULL UNIQUE,
     phone              VARCHAR(20)  NULL,
@@ -273,36 +267,37 @@ CREATE TABLE chamber (
     status_ind         BOOLEAN      NOT NULL DEFAULT TRUE,
     is_deleted         BOOLEAN      DEFAULT FALSE,
     deleted_date       TIMESTAMP    NULL,
-    deleted_by         BIGINT       NULL,   -- deferred FK → users.user_id
+    deleted_by         CHAR(36)     NULL,  
     created_date       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by         BIGINT       NULL,   -- deferred FK → users.user_id
+    created_by         CHAR(36)     NULL,  
     updated_date       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by         BIGINT       NULL,   -- deferred FK → users.user_id
+    updated_by         CHAR(36)     NULL,  
     CONSTRAINT fk_chamber_state
         FOREIGN KEY (state_code)   REFERENCES refm_states(code)      ON DELETE RESTRICT,
     CONSTRAINT fk_chamber_country
         FOREIGN KEY (country_code) REFERENCES refm_countries(code)   ON DELETE RESTRICT,
     CONSTRAINT fk_chamber_plan
-        FOREIGN KEY (plan_code)    REFERENCES refm_plan_types(code)  ON DELETE RESTRICT
+        FOREIGN KEY (plan_code)    REFERENCES refm_plan_types(code)  ON DELETE RESTRICT,
+    INDEX idx_chamber_email (email),
+    INDEX idx_chamber_status (status_ind, is_deleted)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Law chamber / firm';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 4.2  Users (Chamber-agnostic — NO chamber_id column)
+-- 4.2  Users (Chamber-agnostic)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS users;
 CREATE TABLE users (
-    user_id               BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    user_id               CHAR(36)     PRIMARY KEY,  
     email                 VARCHAR(120) NOT NULL,
     password_hash         VARCHAR(255) NOT NULL,
     first_name            VARCHAR(60)  NOT NULL,
     last_name             VARCHAR(60)  NULL,
     phone                 VARCHAR(20)  NULL,
-    role_code             CHAR(4)      DEFAULT 'MEMB',
     status_ind            BOOLEAN      NOT NULL DEFAULT TRUE,
     is_deleted            BOOLEAN      DEFAULT FALSE,
     deleted_date          TIMESTAMP    NULL,
-    deleted_by            BIGINT       NULL,
+    deleted_by            CHAR(36)     NULL,  
     email_verified_ind    BOOLEAN      DEFAULT FALSE,
     phone_verified_ind    BOOLEAN      DEFAULT FALSE,
     two_factor_ind        BOOLEAN      DEFAULT FALSE,
@@ -310,20 +305,16 @@ CREATE TABLE users (
     last_login_date       TIMESTAMP    NULL,
     password_changed_date TIMESTAMP    NULL,
     created_date          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by            BIGINT       NULL,
+    created_by            CHAR(36)     NULL,  
     updated_date          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by            BIGINT       NULL,
+    updated_by            CHAR(36)     NULL,  
     CONSTRAINT uk_user_email
         UNIQUE KEY (email),
-    CONSTRAINT fk_users_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
-    CONSTRAINT fk_users_updated_by
-        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Users (advocates, clerks, admins) — chamber-agnostic';
-
+    INDEX idx_users_status (status_ind, is_deleted)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Users (chamber-agnostic)';
 
 -- =============================================================================
--- 5. TIER 3  —  Depends on chamber + users
+-- 5. TIER 3 — Bridge Tables (UUID v7)
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -332,8 +323,8 @@ CREATE TABLE users (
 
 DROP TABLE IF EXISTS user_profiles;
 CREATE TABLE user_profiles (
-    profile_id    BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    user_id       BIGINT       NOT NULL UNIQUE,
+    profile_id    CHAR(36)     PRIMARY KEY,  
+    user_id       CHAR(36)     NOT NULL UNIQUE,  
     address       TEXT         NULL,
     country       CHAR(2)      NULL,
     state         CHAR(4)      NULL,
@@ -344,7 +335,7 @@ CREATE TABLE user_profiles (
     primary_color VARCHAR(20)  DEFAULT '32.4 99% 63%',
     font_family   VARCHAR(50)  DEFAULT 'Nunito, sans-serif',
     updated_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by    BIGINT       NULL,
+    updated_by    CHAR(36)     NULL,  
     CONSTRAINT fk_profiles_user
         FOREIGN KEY (user_id)    REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_profiles_updated_by
@@ -357,19 +348,17 @@ CREATE TABLE user_profiles (
 
 DROP TABLE IF EXISTS user_chamber_link;
 CREATE TABLE user_chamber_link (
-    link_id               BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    user_id               BIGINT       NOT NULL,
-    chamber_id            BIGINT       NOT NULL,
-    is_primary            BOOLEAN      DEFAULT FALSE COMMENT 'User''s default/home chamber',
+    link_id               CHAR(36)     PRIMARY KEY,  
+    user_id               CHAR(36)     NOT NULL,  
+    chamber_id            CHAR(36)     NOT NULL,  
+    is_primary            BOOLEAN      DEFAULT FALSE,
     joined_date           DATE         NOT NULL DEFAULT (CURRENT_DATE),
-    left_date             DATE         NULL COMMENT 'NULL = still active',
-    role_override         CHAR(4)      NULL  COMMENT 'Overrides global role_code for this chamber',
-    display_name_override VARCHAR(100) NULL  COMMENT 'How user appears in this chamber',
+    left_date             DATE         NULL,
     status_ind            BOOLEAN      NOT NULL DEFAULT TRUE,
     created_date          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by            BIGINT       NULL,
+    created_by            CHAR(36)     NULL,  
     updated_date          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by            BIGINT       NULL,
+    updated_by            CHAR(36)     NULL,  
     CONSTRAINT uk_user_chamber_active
         UNIQUE KEY (user_id, chamber_id, left_date),
     CONSTRAINT fk_ucl_user
@@ -383,7 +372,7 @@ CREATE TABLE user_chamber_link (
     INDEX idx_ucl_user_primary    (user_id, is_primary),
     INDEX idx_ucl_chamber_active  (chamber_id, status_ind, left_date),
     INDEX idx_ucl_lookup          (user_id, chamber_id, status_ind)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='User ↔ Chamber membership with contextual overrides';
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='User ↔ Chamber membership';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5.3  Chamber Modules  →  chamber, refm_modules, users
@@ -391,14 +380,14 @@ CREATE TABLE user_chamber_link (
 
 DROP TABLE IF EXISTS chamber_modules;
 CREATE TABLE chamber_modules (
-    chamber_module_id INT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id        BIGINT    NOT NULL,
-    module_code       CHAR(8)   NOT NULL,
-    is_active         BOOLEAN   DEFAULT TRUE,
-    created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT    NULL,
-    updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        BIGINT    NULL,
+    chamber_module_id CHAR(36)     PRIMARY KEY,  
+    chamber_id        CHAR(36)     NOT NULL,  
+    module_code       CHAR(8)      NOT NULL,
+    is_active         BOOLEAN      DEFAULT TRUE,
+    created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by        CHAR(36)     NULL,  
+    updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by        CHAR(36)     NULL,  
     CONSTRAINT uk_cmodule_chamber
         UNIQUE KEY (chamber_id, module_code),
     CONSTRAINT fk_cmodule_chamber
@@ -411,60 +400,80 @@ CREATE TABLE chamber_modules (
         FOREIGN KEY (updated_by)  REFERENCES users(user_id)        ON DELETE SET NULL
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Modules allocated per chamber';
 
-
 -- =============================================================================
--- 6. TIER 4  —  Roles (Depends on Tier 3)
+-- 6. TIER 4 — Roles (INT for security_roles, UUID v7 for others)
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 6.1  Security Roles  →  users (audit only)
+-- 6.1  Security Roles  →  users (audit only) - Keep INT (small lookup table < 20 rows)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS security_roles;
 CREATE TABLE security_roles (
-    role_id      INT          AUTO_INCREMENT PRIMARY KEY,
+    role_id      INT          AUTO_INCREMENT PRIMARY KEY,  -- Keep INT (small table)
     role_name    VARCHAR(80)  NOT NULL,
-    role_code    CHAR(4)      NOT NULL,
     description  TEXT         NULL,
+    is_system    BOOLEAN      NOT NULL DEFAULT TRUE,
     status_ind   BOOLEAN      NOT NULL DEFAULT TRUE,
     is_deleted   BOOLEAN      DEFAULT FALSE,
     deleted_date TIMESTAMP    NULL,
-    deleted_by   BIGINT       NULL,
+    deleted_by   CHAR(36)     NULL,  
     created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by   BIGINT       NULL,
+    created_by   CHAR(36)     NULL,  
     updated_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by   BIGINT       NULL,
-    CONSTRAINT uk_role_code
-        UNIQUE KEY (role_code)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Roles (global definitions)';
+    updated_by   CHAR(36)     NULL,  
+    CONSTRAINT uk_role_name
+        UNIQUE KEY (role_name)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Master role templates';
+
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 6.2  User Roles  →  user_chamber_link, security_roles, users
+-- 6.1b Chamber Roles (Chamber-Specific Instances)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+DROP TABLE IF EXISTS chamber_roles;
+CREATE TABLE chamber_roles (
+    role_id INT AUTO_INCREMENT PRIMARY KEY,
+    chamber_id CHAR(36) NOT NULL,
+    role_name VARCHAR(80) NOT NULL,
+    description TEXT NULL,
+    is_system BOOLEAN NOT NULL DEFAULT TRUE,
+    status_ind BOOLEAN NOT NULL DEFAULT TRUE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_date TIMESTAMP NULL,
+    deleted_by CHAR(36) NULL,
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    CONSTRAINT uk_chamber_role_name UNIQUE KEY (chamber_id, role_name),
+    CONSTRAINT fk_croles_chamber FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
+    CONSTRAINT fk_croles_created_by FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_croles_updated_by FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_croles_chamber (chamber_id, status_ind)
+) ENGINE=InnoDB COMMENT='Chamber-specific role instances';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.2  User Roles for PK, INT for role_id FK
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS user_roles;
 CREATE TABLE user_roles (
-    user_role_id BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    link_id      BIGINT    NOT NULL  COMMENT 'Context = user_chamber_link.link_id',
-    role_id      INT       NOT NULL,
-    start_date   DATE      NOT NULL DEFAULT (CURRENT_DATE),
-    end_date     DATE      NULL,
+    user_role_id CHAR(36) PRIMARY KEY,
+    link_id CHAR(36) NOT NULL,
+    chamber_role_id INT NOT NULL,
+    start_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    end_date DATE NULL,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by   BIGINT    NULL,
+    created_by CHAR(36) NULL,
     updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by   BIGINT    NULL,
-    CONSTRAINT uk_user_role_active
-        UNIQUE KEY (link_id, role_id, start_date),
-    CONSTRAINT fk_user_roles_link
-        FOREIGN KEY (link_id)    REFERENCES user_chamber_link(link_id)  ON DELETE CASCADE,
-    CONSTRAINT fk_user_roles_role
-        FOREIGN KEY (role_id)    REFERENCES security_roles(role_id)     ON DELETE CASCADE,
-    CONSTRAINT fk_user_roles_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id)              ON DELETE SET NULL,
-    CONSTRAINT fk_user_roles_updated_by
-        FOREIGN KEY (updated_by) REFERENCES users(user_id)              ON DELETE SET NULL,
-    INDEX idx_user_roles_link_role (link_id, role_id, end_date)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Role assignments per user-chamber context';
+    updated_by CHAR(36) NULL,
+    CONSTRAINT uk_user_role_active UNIQUE KEY (link_id, chamber_role_id, start_date),
+    CONSTRAINT fk_user_roles_link FOREIGN KEY (link_id) REFERENCES user_chamber_link(link_id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_roles_chamber_role FOREIGN KEY (chamber_role_id) REFERENCES chamber_roles(role_id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_roles_created_by FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_user_roles_updated_by FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB COMMENT='Role assignments per user-chamber context';
 
 
 -- =============================================================================
@@ -477,31 +486,24 @@ CREATE TABLE user_roles (
 
 DROP TABLE IF EXISTS role_permissions;
 CREATE TABLE role_permissions (
-    permission_id     BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    role_id           INT       NOT NULL,
-    chamber_module_id INT       NOT NULL,
-    allow_all_ind     BOOLEAN   NOT NULL DEFAULT FALSE,
-    read_ind          BOOLEAN   NOT NULL DEFAULT TRUE,
-    write_ind         BOOLEAN   NOT NULL DEFAULT FALSE,
-    create_ind        BOOLEAN   NOT NULL DEFAULT FALSE,
-    delete_ind        BOOLEAN   NOT NULL DEFAULT FALSE,
-    import_ind        BOOLEAN   NOT NULL DEFAULT FALSE,  -- ✅ NEW
-    export_ind        BOOLEAN   NOT NULL DEFAULT FALSE,  -- ✅ NEW
-    created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT    NULL,
-    updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        BIGINT    NULL,
-    CONSTRAINT uk_role_module
-        UNIQUE KEY (role_id, chamber_module_id),
-    CONSTRAINT fk_role_permissions_role
-        FOREIGN KEY (role_id)           REFERENCES security_roles(role_id)                ON DELETE CASCADE,
-    CONSTRAINT fk_role_permissions_module
-        FOREIGN KEY (chamber_module_id) REFERENCES chamber_modules(chamber_module_id)     ON DELETE CASCADE,
-    CONSTRAINT fk_role_permissions_created_by
-        FOREIGN KEY (created_by)        REFERENCES users(user_id)                         ON DELETE SET NULL,
-    CONSTRAINT fk_role_permissions_updated_by
-        FOREIGN KEY (updated_by)        REFERENCES users(user_id)                         ON DELETE SET NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Role-module CRUD + Import/Export permissions';
+    permission_id CHAR(36) PRIMARY KEY,
+    chamber_role_id INT NOT NULL,           -- ← Changed
+    chamber_module_id CHAR(36) NOT NULL,
+    allow_all_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    read_ind BOOLEAN NOT NULL DEFAULT TRUE,
+    write_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    create_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    delete_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    import_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    export_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    CONSTRAINT uk_role_module UNIQUE KEY (chamber_role_id, chamber_module_id),
+    CONSTRAINT fk_role_permissions_chamber_role FOREIGN KEY (chamber_role_id) REFERENCES chamber_roles(role_id) ON DELETE CASCADE,
+    CONSTRAINT fk_role_permissions_module FOREIGN KEY (chamber_module_id) REFERENCES chamber_modules(chamber_module_id) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Role-module permissions';
 
 
 -- =============================================================================
@@ -509,28 +511,32 @@ CREATE TABLE role_permissions (
 --    →  chamber, refm_courts, refm_case_types, refm_case_status, users
 -- =============================================================================
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.1  Cases
+-- ─────────────────────────────────────────────────────────────────────────────
+
 DROP TABLE IF EXISTS cases;
 CREATE TABLE cases (
-    case_id           BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id        BIGINT       NOT NULL,
+    case_id           CHAR(36)     PRIMARY KEY,  
+    chamber_id        CHAR(36)     NOT NULL,  
     case_number       VARCHAR(120) NOT NULL,
     court_id          INT          NOT NULL,
     case_type_code    CHAR(4)      NULL,
     filing_year       INT          NULL,
     petitioner        TEXT         NOT NULL,
     respondent        TEXT         NOT NULL,
-    aor_user_id       BIGINT       NULL,
+    aor_user_id       CHAR(36)     NULL,  
     case_summary      TEXT         NULL,
     status_code       CHAR(4)      DEFAULT 'AC',
     next_hearing_date DATE         NULL,
     last_hearing_date DATE         NULL,
     is_deleted        BOOLEAN      DEFAULT FALSE,
     deleted_date      TIMESTAMP    NULL,
-    deleted_by        BIGINT       NULL,
+    deleted_by        CHAR(36)     NULL,  
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT       NULL,
+    created_by        CHAR(36)     NULL,  
     updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        BIGINT       NULL,
+    updated_by        CHAR(36)     NULL,  
     CONSTRAINT uk_case_chamber_number
         UNIQUE KEY (chamber_id, case_number),
     CONSTRAINT fk_cases_chamber
@@ -542,7 +548,9 @@ CREATE TABLE cases (
     CONSTRAINT fk_cases_status
         FOREIGN KEY (status_code)    REFERENCES refm_case_status(code)     ON DELETE RESTRICT,
     CONSTRAINT fk_cases_aor
-        FOREIGN KEY (aor_user_id)    REFERENCES users(user_id)             ON DELETE SET NULL
+        FOREIGN KEY (aor_user_id)    REFERENCES users(user_id)             ON DELETE SET NULL,
+    INDEX idx_cases_chamber_status (chamber_id, status_code),
+    INDEX idx_cases_next_hearing (next_hearing_date)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Legal cases';
 
 
@@ -552,14 +560,14 @@ CREATE TABLE cases (
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 9.1  Hearings  →  chamber, cases, refm_hearing_status
+-- 7.2  Hearings  →  chamber, cases, refm_hearing_status
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS hearings;
 CREATE TABLE hearings (
-    hearing_id        BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id        BIGINT       NOT NULL,
-    case_id           BIGINT       NOT NULL,
+    hearing_id        CHAR(36)     PRIMARY KEY,  
+    chamber_id        CHAR(36)     NOT NULL,  
+    case_id           CHAR(36)     NOT NULL,  
     hearing_date      DATE         NOT NULL,
     status_code       CHAR(4)      DEFAULT 'UP',
     purpose           VARCHAR(255) NULL,
@@ -568,11 +576,11 @@ CREATE TABLE hearings (
     next_hearing_date DATE         NULL,
     is_deleted        BOOLEAN      DEFAULT FALSE,
     deleted_date      TIMESTAMP    NULL,
-    deleted_by        BIGINT       NULL,
+    deleted_by        CHAR(36)     NULL,  
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT       NULL,
+    created_by        CHAR(36)     NULL,  
     updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        BIGINT       NULL,
+    updated_by        CHAR(36)     NULL,  
     CONSTRAINT fk_hearings_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)        ON DELETE CASCADE,
     CONSTRAINT fk_hearings_case
@@ -582,24 +590,24 @@ CREATE TABLE hearings (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Court hearings';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 9.2  Case Notes  →  chamber, cases, users
+-- 7.3  Case Notes  →  chamber, cases, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS case_notes;
 CREATE TABLE case_notes (
-    note_id      BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    chamber_id   BIGINT    NOT NULL,
-    case_id      BIGINT    NOT NULL,
-    user_id      BIGINT    NOT NULL,
-    note_text    TEXT      NOT NULL,
-    is_private   BOOLEAN   DEFAULT FALSE,
-    is_deleted   BOOLEAN   DEFAULT FALSE,
-    deleted_date TIMESTAMP NULL,
-    deleted_by   BIGINT    NULL,
-    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by   BIGINT    NULL,
-    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by   BIGINT    NULL,
+    note_id      CHAR(36)     PRIMARY KEY,  
+    chamber_id   CHAR(36)     NOT NULL,  
+    case_id      CHAR(36)     NOT NULL,  
+    user_id      CHAR(36)     NOT NULL,  
+    note_text    TEXT         NOT NULL,
+    is_private   BOOLEAN      DEFAULT FALSE,
+    is_deleted   BOOLEAN      DEFAULT FALSE,
+    deleted_date TIMESTAMP    NULL,
+    deleted_by   CHAR(36)     NULL,  
+    created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by   CHAR(36)     NULL,  
+    updated_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by   CHAR(36)     NULL,  
     CONSTRAINT fk_notes_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
     CONSTRAINT fk_notes_case
@@ -612,28 +620,28 @@ CREATE TABLE case_notes (
         FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL,
     CONSTRAINT fk_notes_updated_by
         FOREIGN KEY (updated_by) REFERENCES users(user_id)      ON DELETE SET NULL,
-    INDEX idx_notes_case         (case_id),
-    INDEX idx_notes_user         (user_id),
+    INDEX idx_notes_case (case_id),
+    INDEX idx_notes_user (user_id),
     INDEX idx_notes_chamber_date (chamber_id, created_date DESC)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Internal notes on cases';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 9.3  Case AORs  →  cases, users, chamber
+-- 7.4  Case AORs  →  cases, users, chamber
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS case_aors;
 CREATE TABLE case_aors (
-    case_aor_id      BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    case_id          BIGINT    NOT NULL,
-    user_id          BIGINT    NOT NULL,
-    chamber_id       BIGINT    NOT NULL,
-    is_primary       BOOLEAN   DEFAULT FALSE COMMENT 'Primary AOR for communications',
-    appointment_date DATE      NULL,
-    withdrawal_date  DATE      NULL,
-    status_code      CHAR(2)   DEFAULT 'AC' COMMENT 'AC=Active, WD=Withdrawn, SU=Substituted',
-    notes            TEXT      NULL,
-    created_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by       BIGINT    NULL,
+    case_aor_id      CHAR(36)     PRIMARY KEY,  
+    case_id          CHAR(36)     NOT NULL,  
+    user_id          CHAR(36)     NOT NULL,  
+    chamber_id       CHAR(36)     NOT NULL,  
+    is_primary       BOOLEAN      DEFAULT FALSE,
+    appointment_date DATE         NULL,
+    withdrawal_date  DATE         NULL,
+    status_code      CHAR(2)      DEFAULT 'AC',
+    notes            TEXT         NULL,
+    created_date     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by       CHAR(36)     NULL,  
     CONSTRAINT fk_aor_case
         FOREIGN KEY (case_id)    REFERENCES cases(case_id)       ON DELETE CASCADE,
     CONSTRAINT fk_aor_user
@@ -643,29 +651,28 @@ CREATE TABLE case_aors (
     CONSTRAINT fk_aor_created_by
         FOREIGN KEY (created_by) REFERENCES users(user_id)       ON DELETE SET NULL,
     UNIQUE KEY uk_case_aor (case_id, user_id, status_code),
-    INDEX idx_aor_case   (case_id),
-    INDEX idx_aor_user   (user_id),
+    INDEX idx_aor_case (case_id),
+    INDEX idx_aor_user (user_id),
     INDEX idx_aor_status (status_code)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Multiple AORs per case';
 
-
 -- =============================================================================
--- 10. TIER 8  —  Client Management (Paid Feature)
+-- 8. TIER 6 — Client Management (Paid Feature)
 --     →  chamber, cases, refm_states, refm_countries, users
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.1  Clients Master  →  chamber, refm_states, refm_countries, users
+-- 8.1  Clients  →  chamber, refm_states, refm_countries, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS clients;
 CREATE TABLE clients (
-    client_id       BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id      BIGINT       NOT NULL,
-    client_type     CHAR(1)      NOT NULL COMMENT 'I=Individual, O=Organization',
+    client_id       CHAR(36)     PRIMARY KEY,  
+    chamber_id      CHAR(36)     NOT NULL,  
+    client_type     CHAR(1)      NOT NULL,
     client_name     VARCHAR(200) NOT NULL,
     display_name    VARCHAR(200) NULL,
-    contact_person  VARCHAR(150) NULL COMMENT 'For organizations',
+    contact_person  VARCHAR(150) NULL,
     email           VARCHAR(150) NULL,
     phone           VARCHAR(20)  NULL,
     alternate_phone VARCHAR(20)  NULL,
@@ -675,20 +682,20 @@ CREATE TABLE clients (
     state_code      CHAR(4)      NULL,
     postal_code     VARCHAR(12)  NULL,
     country_code    CHAR(2)      DEFAULT 'IN',
-    id_proof_type   VARCHAR(50)  NULL COMMENT 'Aadhaar/PAN/Passport/etc',
+    id_proof_type   VARCHAR(50)  NULL,
     id_proof_number VARCHAR(100) NULL,
-    source_code     VARCHAR(20)  NULL COMMENT 'REF=Referral, WEB=Website, WALK=Walk-in',
+    source_code     VARCHAR(20)  NULL,
     referral_source VARCHAR(150) NULL,
     client_since    DATE         NULL,
     notes           TEXT         NULL,
     status_ind      BOOLEAN      NOT NULL DEFAULT TRUE,
     is_deleted      BOOLEAN      DEFAULT FALSE,
     deleted_date    TIMESTAMP    NULL,
-    deleted_by      BIGINT       NULL,
+    deleted_by      CHAR(36)     NULL,  
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by      BIGINT       NULL,
+    created_by      CHAR(36)     NULL,  
     updated_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by      BIGINT       NULL,
+    updated_by      CHAR(36)     NULL,  
     CONSTRAINT fk_clients_chamber
         FOREIGN KEY (chamber_id)  REFERENCES chamber(chamber_id)     ON DELETE CASCADE,
     CONSTRAINT fk_clients_state
@@ -702,28 +709,28 @@ CREATE TABLE clients (
     CONSTRAINT fk_clients_updated_by
         FOREIGN KEY (updated_by)  REFERENCES users(user_id)          ON DELETE SET NULL,
     INDEX idx_clients_chamber (chamber_id),
-    INDEX idx_clients_name    (client_name),
-    INDEX idx_clients_phone   (phone),
-    INDEX idx_clients_email   (email)
+    INDEX idx_clients_name (client_name),
+    INDEX idx_clients_phone (phone),
+    INDEX idx_clients_email (email)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Clients of chamber';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.2  Case ↔ Client Link  →  chamber, cases, clients, users
+-- 8.2  Case Clients ↔ Client Link  →  chamber, cases, clients, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS case_clients;
 CREATE TABLE case_clients (
-    case_client_id  BIGINT      AUTO_INCREMENT PRIMARY KEY,
-    chamber_id      BIGINT      NOT NULL,
-    case_id         BIGINT      NOT NULL,
-    client_id       BIGINT      NOT NULL,
-    party_role      CHAR(3)     NOT NULL COMMENT 'PET, RES, APP, DEF, WIT, AOR',
-    is_primary      BOOLEAN     DEFAULT FALSE COMMENT 'Primary client for billing/contact',
-    engagement_type VARCHAR(20) NULL COMMENT 'RETAINER, CASE, CONSUL',
-    created_date    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
-    created_by      BIGINT      NULL,
-    updated_date    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by      BIGINT      NULL,
+    case_client_id  CHAR(36)     PRIMARY KEY,  
+    chamber_id      CHAR(36)     NOT NULL,  
+    case_id         CHAR(36)     NOT NULL,  
+    client_id       CHAR(36)     NOT NULL,  
+    party_role      CHAR(3)      NOT NULL,
+    is_primary      BOOLEAN      DEFAULT FALSE,
+    engagement_type VARCHAR(20)  NULL,
+    created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by      CHAR(36)     NULL,  
+    updated_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by      CHAR(36)     NULL,  
     CONSTRAINT uk_case_client
         UNIQUE KEY (case_id, client_id, party_role),
     CONSTRAINT fk_case_clients_chamber
@@ -736,35 +743,35 @@ CREATE TABLE case_clients (
         FOREIGN KEY (created_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     CONSTRAINT fk_case_clients_updated_by
         FOREIGN KEY (updated_by) REFERENCES users(user_id)        ON DELETE SET NULL,
-    INDEX idx_case_clients_case   (case_id),
+    INDEX idx_case_clients_case (case_id),
     INDEX idx_case_clients_client (client_id)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Case ↔ Client mapping';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.3  Client Bills  →  chamber, cases, clients, users
+-- 8.3  Client Bills  →  chamber, cases, clients, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS client_bills;
 CREATE TABLE client_bills (
-    bill_id             BIGINT         AUTO_INCREMENT PRIMARY KEY,
-    chamber_id          BIGINT         NOT NULL,
-    case_id             BIGINT         NULL,
-    client_id           BIGINT         NOT NULL,
-    bill_number         VARCHAR(50)    NULL,
-    bill_date           DATE           NOT NULL,
-    due_date            DATE           NULL,
-    amount              DECIMAL(12,2)  NOT NULL,
-    tax_amount          DECIMAL(12,2)  DEFAULT 0,
-    total_amount        DECIMAL(12,2)  NOT NULL,
-    paid_amount         DECIMAL(12,2)  DEFAULT 0,
-    balance_amount      DECIMAL(12,2)  GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
-    status_code         CHAR(2)        DEFAULT 'PN' COMMENT 'PN=Pending, PD=Paid, OV=Overdue, CN=Cancelled',
-    service_description TEXT           NULL,
-    notes               TEXT           NULL,
-    created_date        TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
-    created_by          BIGINT         NULL,
-    updated_date        TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by          BIGINT         NULL,
+    bill_id             CHAR(36)     PRIMARY KEY,  
+    chamber_id          CHAR(36)     NOT NULL,  
+    case_id             CHAR(36)     NULL,  
+    client_id           CHAR(36)     NOT NULL,  
+    bill_number         VARCHAR(50)  NULL,
+    bill_date           DATE         NOT NULL,
+    due_date            DATE         NULL,
+    amount              DECIMAL(12,2) NOT NULL,
+    tax_amount          DECIMAL(12,2) DEFAULT 0,
+    total_amount        DECIMAL(12,2) NOT NULL,
+    paid_amount         DECIMAL(12,2) DEFAULT 0,
+    balance_amount      DECIMAL(12,2) GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
+    status_code         CHAR(2)      DEFAULT 'PN',
+    service_description TEXT         NULL,
+    notes               TEXT         NULL,
+    created_date        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by          CHAR(36)     NULL,  
+    updated_date        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by          CHAR(36)     NULL,  
     CONSTRAINT fk_bills_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)   ON DELETE CASCADE,
     CONSTRAINT fk_bills_case
@@ -777,31 +784,31 @@ CREATE TABLE client_bills (
         FOREIGN KEY (updated_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     INDEX idx_bills_client (client_id),
     INDEX idx_bills_status (status_code),
-    INDEX idx_bills_date   (bill_date)
+    INDEX idx_bills_date (bill_date)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client billing records';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.4  Client Payments  →  client_bills, clients, chamber, users
+-- 8.4  Client Payments  →  client_bills, clients, chamber, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS client_payments;
 CREATE TABLE client_payments (
-    payment_id     BIGINT        AUTO_INCREMENT PRIMARY KEY,
-    chamber_id     BIGINT        NOT NULL,
-    bill_id        BIGINT        NOT NULL,
-    client_id      BIGINT        NOT NULL,
-    payment_date   DATE          NOT NULL,
+    payment_id     CHAR(36)     PRIMARY KEY,  
+    chamber_id     CHAR(36)     NOT NULL,  
+    bill_id        CHAR(36)     NOT NULL,  
+    client_id      CHAR(36)     NOT NULL,  
+    payment_date   DATE         NOT NULL,
     amount         DECIMAL(12,2) NOT NULL,
     payment_mode   VARCHAR(20)   NULL COMMENT 'CASH, UPI, NEFT, CHQ, CARD',
-    reference_no   VARCHAR(100)  NULL COMMENT 'Transaction ID / Cheque Number',
-    bank_name      VARCHAR(100)  NULL,
-    receipt_number VARCHAR(50)   NULL,
-    receipt_date   DATE          NULL,
-    notes          TEXT          NULL,
-    created_date   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-    created_by     BIGINT        NULL,
-    updated_date   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by     BIGINT        NULL,
+    reference_no   VARCHAR(100) NULL,
+    bank_name      VARCHAR(100) NULL,
+    receipt_number VARCHAR(50)  NULL,
+    receipt_date   DATE         NULL,
+    notes          TEXT         NULL,
+    created_date   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by     CHAR(36)     NULL,  
+    updated_date   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by     CHAR(36)     NULL,  
     CONSTRAINT fk_payments_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)       ON DELETE CASCADE,
     CONSTRAINT fk_payments_bill
@@ -813,34 +820,34 @@ CREATE TABLE client_payments (
     CONSTRAINT fk_payments_updated_by
         FOREIGN KEY (updated_by) REFERENCES users(user_id)            ON DELETE SET NULL,
     INDEX idx_payments_client (client_id),
-    INDEX idx_payments_date   (payment_date)
+    INDEX idx_payments_date (payment_date)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Payments from clients';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.5  Client Documents  →  chamber, clients, cases, users
+-- 8.5  Client Documents  →  chamber, clients, cases, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS client_documents;
 CREATE TABLE client_documents (
-    document_id       BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id        BIGINT       NOT NULL,
-    client_id         BIGINT       NOT NULL,
-    case_id           BIGINT       NULL,
+    document_id       CHAR(36)     PRIMARY KEY,  
+    chamber_id        CHAR(36)     NOT NULL,  
+    client_id         CHAR(36)     NOT NULL,  
+    case_id           CHAR(36)     NULL,  
     document_name     VARCHAR(255) NOT NULL,
-    document_type     VARCHAR(50)  NULL COMMENT 'ORIGINAL, COPY, CERT, PDF',
-    document_category VARCHAR(50)  NULL COMMENT 'ID, PROP, COURT, FIN',
+    document_type     VARCHAR(50)  NULL,
+    document_category VARCHAR(50)  NULL,
     received_date     DATE         NULL,
     received_from     VARCHAR(150) NULL,
     returned_date     DATE         NULL,
     returned_to       VARCHAR(150) NULL,
-    custody_status    CHAR(1)      DEFAULT 'H' COMMENT 'H=Held, R=Returned, L=Lost, D=Destroyed',
+    custody_status    CHAR(1)      DEFAULT 'H',
     storage_location  VARCHAR(100) NULL,
     file_number       VARCHAR(50)  NULL,
     notes             TEXT         NULL,
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT       NULL,
+    created_by        CHAR(36)     NULL,  
     updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        BIGINT       NULL,
+    updated_by        CHAR(36)     NULL,  
     CONSTRAINT fk_doc_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)   ON DELETE CASCADE,
     CONSTRAINT fk_doc_client
@@ -851,33 +858,33 @@ CREATE TABLE client_documents (
         FOREIGN KEY (created_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     CONSTRAINT fk_doc_updated_by
         FOREIGN KEY (updated_by) REFERENCES users(user_id)        ON DELETE SET NULL,
-    INDEX idx_doc_client  (client_id),
-    INDEX idx_doc_case    (case_id),
+    INDEX idx_doc_client (client_id),
+    INDEX idx_doc_case (case_id),
     INDEX idx_doc_custody (custody_status)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client documents in custody';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.6  Client Communications  →  chamber, clients, cases, users
+-- 8.6  Client Communications  →  chamber, clients, cases, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS client_communications;
 CREATE TABLE client_communications (
-    comm_id         BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id      BIGINT       NOT NULL,
-    client_id       BIGINT       NOT NULL,
-    case_id         BIGINT       NULL,
-    user_id         BIGINT       NULL,
-    comm_type       CHAR(2)      NOT NULL COMMENT 'EM=Email, SM=SMS, WH=WhatsApp, CL=Call, MT=Meeting',
+    comm_id         CHAR(36)     PRIMARY KEY,  
+    chamber_id      CHAR(36)     NOT NULL,  
+    client_id       CHAR(36)     NOT NULL,  
+    case_id         CHAR(36)     NULL,  
+    user_id         CHAR(36)     NULL,  
+    comm_type       CHAR(2)      NOT NULL,
     subject         VARCHAR(255) NULL,
     message_preview TEXT         NULL,
-    status_code     CHAR(2)      DEFAULT 'PN' COMMENT 'PN=Pending, SN=Sent, DL=Delivered, RD=Read, FD=Failed',
+    status_code     CHAR(2)      DEFAULT 'PN',
     scheduled_at    DATETIME     NULL,
-    sent_at         DATETIME     NULL,
+    sent_at        DATETIME     NULL,
     delivered_at    DATETIME     NULL,
     read_at         DATETIME     NULL,
     notes           TEXT         NULL,
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by      BIGINT       NULL,
+    created_by      CHAR(36)     NULL,  
     CONSTRAINT fk_comm_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)   ON DELETE CASCADE,
     CONSTRAINT fk_comm_client
@@ -889,44 +896,44 @@ CREATE TABLE client_communications (
     CONSTRAINT fk_comm_created_by
         FOREIGN KEY (created_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     INDEX idx_comm_client (client_id),
-    INDEX idx_comm_case   (case_id),
-    INDEX idx_comm_type   (comm_type),
+    INDEX idx_comm_case (case_id),
+    INDEX idx_comm_type (comm_type),
     INDEX idx_comm_status (status_code)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client communications and notifications';
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client communications';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.7  Client Aliases  →  clients, users
+-- 8.7  Client Aliases  →  clients, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS client_aliases;
 CREATE TABLE client_aliases (
-    alias_id     BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    client_id    BIGINT       NOT NULL,
+    alias_id     CHAR(36)     PRIMARY KEY,  
+    client_id    CHAR(36)     NOT NULL,  
     alias_name   VARCHAR(200) NOT NULL,
-    alias_type   VARCHAR(50)  NULL COMMENT 'AKA, DBA, OLD',
+    alias_type   VARCHAR(50)  NULL,
     created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by   BIGINT       NULL,
+    created_by   CHAR(36)     NULL,  
     CONSTRAINT fk_aliases_client
         FOREIGN KEY (client_id)  REFERENCES clients(client_id) ON DELETE CASCADE,
     CONSTRAINT fk_aliases_created_by
         FOREIGN KEY (created_by) REFERENCES users(user_id)     ON DELETE SET NULL,
     INDEX idx_aliases_name (alias_name)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client alternate names for conflict checking';
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client alternate names';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10.8  Client Relationships  →  clients, users
+-- 8.8  Client Relationships  →  clients, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS client_relationships;
 CREATE TABLE client_relationships (
-    relationship_id   BIGINT      AUTO_INCREMENT PRIMARY KEY,
-    client_id_from    BIGINT      NOT NULL,
-    client_id_to      BIGINT      NOT NULL,
-    relationship_type VARCHAR(50) NOT NULL COMMENT 'SPOUSE, PRNT, CHLD, SIBL, DIR, PART',
-    is_active         BOOLEAN     DEFAULT TRUE,
-    notes             TEXT        NULL,
-    created_date      TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT      NULL,
+    relationship_id   CHAR(36)     PRIMARY KEY,  
+    client_id_from    CHAR(36)     NOT NULL,  
+    client_id_to      CHAR(36)     NOT NULL,  
+    relationship_type VARCHAR(50)  NOT NULL,
+    is_active         BOOLEAN      DEFAULT TRUE,
+    notes             TEXT         NULL,
+    created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by        CHAR(36)     NULL,  
     CONSTRAINT fk_rel_client_from
         FOREIGN KEY (client_id_from) REFERENCES clients(client_id) ON DELETE CASCADE,
     CONSTRAINT fk_rel_client_to
@@ -934,23 +941,22 @@ CREATE TABLE client_relationships (
     CONSTRAINT fk_rel_created_by
         FOREIGN KEY (created_by)     REFERENCES users(user_id)     ON DELETE SET NULL,
     INDEX idx_rel_from (client_id_from),
-    INDEX idx_rel_to   (client_id_to)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client relationships (family/corporate)';
-
+    INDEX idx_rel_to (client_id_to)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client relationships';
 
 -- =============================================================================
--- 11. TIER 9  —  Configuration & Utility
+-- 9. TIER 7 — Configuration & Utility
 --     →  chamber, refm_*, users
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 11.1  Email Settings  →  chamber, refm_email_encryption, users
+-- 9.1  Email Settings  →  chamber, refm_email_encryption, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS email_settings;
 CREATE TABLE email_settings (
     id                INT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id        BIGINT    NOT NULL,
+    chamber_id        CHAR(36)  NOT NULL,  
     from_email        VARCHAR(150) NOT NULL,
     smtp_host         VARCHAR(100) NOT NULL,
     smtp_port         SMALLINT UNSIGNED NOT NULL DEFAULT 587,
@@ -961,9 +967,9 @@ CREATE TABLE email_settings (
     is_default        BOOLEAN   DEFAULT FALSE,
     status_ind        BOOLEAN   NOT NULL DEFAULT TRUE,
     created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by        BIGINT    NULL,
+    created_by        CHAR(36)  NULL,  
     updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        BIGINT    NULL,
+    updated_by        CHAR(36)  NULL,  
     CONSTRAINT uk_chamber_default
         UNIQUE KEY (chamber_id, is_default),
     CONSTRAINT fk_email_settings_chamber
@@ -977,13 +983,13 @@ CREATE TABLE email_settings (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='SMTP settings per chamber';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 11.2  Email Templates (Custom)  →  chamber, refm_email_templates, users
+-- 9.2  Email Templates (Custom)  →  chamber, refm_email_templates, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS email_templates;
 CREATE TABLE email_templates (
     id            INT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id    BIGINT    NOT NULL,
+    chamber_id    CHAR(36)  NOT NULL,  
     code          CHAR(30)  NOT NULL,
     subject       VARCHAR(255) NOT NULL,
     content       LONGTEXT  NOT NULL,
@@ -991,9 +997,9 @@ CREATE TABLE email_templates (
     enabled_ind   BOOLEAN   DEFAULT TRUE,
     version       SMALLINT UNSIGNED DEFAULT 1,
     created_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by    BIGINT    NULL,
+    created_by    CHAR(36)  NULL,  
     updated_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by    BIGINT    NULL,
+    updated_by    CHAR(36)  NULL,  
     CONSTRAINT uk_chamber_template_version
         UNIQUE KEY (chamber_id, code, version),
     CONSTRAINT fk_email_templates_chamber
@@ -1007,22 +1013,22 @@ CREATE TABLE email_templates (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Custom email templates per chamber';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 11.3  Delete Account Requests  →  chamber, users, refm_user_deletion_status
+-- 9.3  Delete Account Requests  →  chamber, users, refm_user_deletion_status
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS delete_account_requests;
 CREATE TABLE delete_account_requests (
     request_id   INT          AUTO_INCREMENT PRIMARY KEY,
-    chamber_id   BIGINT       NOT NULL,
+    chamber_id   CHAR(36)     NOT NULL,  
     request_no   VARCHAR(30)  NOT NULL UNIQUE,
-    user_id      BIGINT       NOT NULL,
+    user_id      CHAR(36)     NOT NULL,  
     request_date DATE         NOT NULL,
     status_code  CHAR(1)      DEFAULT 'P',
     notes        TEXT         NULL,
     created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by   BIGINT       NULL,
+    created_by   CHAR(36)     NULL,  
     updated_date TIMESTAMP    NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    updated_by   BIGINT       NULL,
+    updated_by   CHAR(36)     NULL,  
     CONSTRAINT fk_delete_req_chamber
         FOREIGN KEY (chamber_id)  REFERENCES chamber(chamber_id)               ON DELETE CASCADE,
     CONSTRAINT fk_delete_req_user
@@ -1037,30 +1043,30 @@ CREATE TABLE delete_account_requests (
 
 
 -- =============================================================================
--- 12. TIER 10  —  Multi-Chamber Collaboration & Invitations
+-- 10. TIER 10  —  Multi-Chamber Collaboration & Invitations
 --     →  cases, chamber, security_roles, users
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 12.1  Case Collaborations  →  cases, chamber, users
+-- 10.1  Case Collaborations  →  cases, chamber, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS case_collaborations;
 CREATE TABLE case_collaborations (
-    collaboration_id        BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    case_id                 BIGINT    NOT NULL,
-    owner_chamber_id        BIGINT    NOT NULL,
-    collaborator_chamber_id BIGINT    NOT NULL,
-    access_level            CHAR(2)   DEFAULT 'RO' COMMENT 'RO=Read Only, RW=Read Write, FU=Full',
-    invited_by              BIGINT    NULL,
-    invited_date            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    accepted_date           TIMESTAMP NULL,
-    status_code             CHAR(2)   DEFAULT 'PN' COMMENT 'PN=Pending, AC=Active, RJ=Rejected, RV=Revoked',
-    notes                   TEXT      NULL,
-    created_date            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by              BIGINT    NULL,
-    updated_date            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by              BIGINT    NULL,
+    collaboration_id        CHAR(36)     PRIMARY KEY,  
+    case_id                 CHAR(36)     NOT NULL,  
+    owner_chamber_id        CHAR(36)     NOT NULL,  
+    collaborator_chamber_id CHAR(36)     NOT NULL,  
+    access_level            CHAR(2)      DEFAULT 'RO',
+    invited_by              CHAR(36)     NULL,  
+    invited_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    accepted_date           TIMESTAMP    NULL,
+    status_code             CHAR(2)      DEFAULT 'PN',
+    notes                   TEXT         NULL,
+    created_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by              CHAR(36)     NULL,  
+    updated_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by              CHAR(36)     NULL,  
     CONSTRAINT fk_collab_case
         FOREIGN KEY (case_id)                 REFERENCES cases(case_id)         ON DELETE CASCADE,
     CONSTRAINT fk_collab_owner
@@ -1074,30 +1080,30 @@ CREATE TABLE case_collaborations (
     CONSTRAINT fk_collab_updated_by
         FOREIGN KEY (updated_by)              REFERENCES users(user_id)         ON DELETE SET NULL,
     UNIQUE KEY uk_case_collaboration (case_id, collaborator_chamber_id),
-    INDEX idx_collab_case    (case_id),
+    INDEX idx_collab_case (case_id),
     INDEX idx_collab_chamber (collaborator_chamber_id),
-    INDEX idx_collab_status  (status_code)
+    INDEX idx_collab_status (status_code)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Case collaboration between chambers';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 12.2  User Invitations  →  chamber, security_roles, users
+-- 10.2  User Invitations  →  chamber, security_roles, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS user_invitations;
 CREATE TABLE user_invitations (
-    invitation_id BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id    BIGINT       NOT NULL,
+    invitation_id CHAR(36)     PRIMARY KEY,  
+    chamber_id    CHAR(36)     NOT NULL,  
     email         VARCHAR(150) NOT NULL,
-    role_id       INT          NULL,
-    invited_by    BIGINT       NOT NULL,
+    role_id       INT          NULL,  -- INT FK to security_roles
+    invited_by    CHAR(36)     NOT NULL,  
     invited_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     expires_date  DATE         NULL,
-    status_code   CHAR(2)      DEFAULT 'PN' COMMENT 'PN=Pending, AC=Accepted, RJ=Rejected, EX=Expired',
+    status_code   CHAR(2)      DEFAULT 'PN',
     message       TEXT         NULL,
     accepted_date TIMESTAMP    NULL,
-    accepted_by   BIGINT       NULL,
+    accepted_by   CHAR(36)     NULL,  
     created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by    BIGINT       NULL,
+    created_by    CHAR(36)     NULL,  
     CONSTRAINT fk_inv_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)       ON DELETE CASCADE,
     CONSTRAINT fk_inv_role
@@ -1109,22 +1115,25 @@ CREATE TABLE user_invitations (
     CONSTRAINT fk_inv_created_by
         FOREIGN KEY (created_by)  REFERENCES users(user_id)           ON DELETE SET NULL,
     UNIQUE KEY uk_invitation_email_chamber (chamber_id, email, status_code),
-    INDEX idx_inv_email   (email),
-    INDEX idx_inv_status  (status_code),
+    INDEX idx_inv_email (email),
+    INDEX idx_inv_status (status_code),
     INDEX idx_inv_chamber (chamber_id)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Pending user invitations to chamber';
-
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Pending user invitations';
 
 -- =============================================================================
--- 13. TIER 11  —  Logging & Audit
+-- 11. TIER 11  —  Logging & Audit
 --     →  chamber, users, refm_login_status, refm_email_templates, refm_email_status
 -- =============================================================================
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.1  Login Audit
+-- ─────────────────────────────────────────────────────────────────────────────
+
 DROP TABLE IF EXISTS login_audit;
 CREATE TABLE login_audit (
-    login_id       BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    user_id        BIGINT       NULL,
-    chamber_id     BIGINT       NOT NULL,
+    login_id       CHAR(36)     PRIMARY KEY,  
+    user_id        CHAR(36)     NULL,  
+    chamber_id     CHAR(36)     NOT NULL,  
     email          VARCHAR(120) NULL,
     status_code    CHAR(2)      NULL,
     failure_reason VARCHAR(255) NULL,
@@ -1140,21 +1149,25 @@ CREATE TABLE login_audit (
     INDEX idx_login_time (login_time DESC)
 ) ENGINE=InnoDB COMMENT='Login attempts log';
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.2  DB Call Log
+-- ─────────────────────────────────────────────────────────────────────────────
+
 DROP TABLE IF EXISTS db_call_log;
 CREATE TABLE db_call_log (
-    id            BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    chamber_id    BIGINT    NULL,
-    user_id       BIGINT    NULL,
-    timestamp     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    duration_ms   DOUBLE    NOT NULL,
-    raw_query     LONGTEXT  NOT NULL,
-    params        JSON      NULL,
-    final_query   LONGTEXT  NULL,
+    id            CHAR(36)     PRIMARY KEY,  
+    chamber_id    CHAR(36)     NULL,  
+    user_id       CHAR(36)     NULL,  
+    timestamp     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    duration_ms   DOUBLE       NOT NULL,
+    raw_query     LONGTEXT     NOT NULL,
+    params        JSON         NULL,
+    final_query   LONGTEXT     NULL,
     repo          VARCHAR(255) NULL,
-    error         LONGTEXT  NULL,
-    metadata_json JSON      NULL,
-    created_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by    BIGINT    NULL,
+    error         LONGTEXT     NULL,
+    metadata_json JSON         NULL,
+    created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by    CHAR(36)     NULL,  
     CONSTRAINT fk_db_log_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE SET NULL,
     CONSTRAINT fk_db_log_user
@@ -1163,11 +1176,15 @@ CREATE TABLE db_call_log (
         FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='DB query log';
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.3  Exception Log
+-- ─────────────────────────────────────────────────────────────────────────────
+
 DROP TABLE IF EXISTS exception_log;
 CREATE TABLE exception_log (
-    id             BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id     BIGINT       NULL,
-    user_id        BIGINT       NULL,
+    id             CHAR(36)     PRIMARY KEY,  
+    chamber_id     CHAR(36)     NULL,  
+    user_id        CHAR(36)     NULL,  
     timestamp      DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     exception_type VARCHAR(255) NOT NULL,
     message        LONGTEXT     NULL,
@@ -1180,7 +1197,7 @@ CREATE TABLE exception_log (
     error_code     VARCHAR(50)  NULL,
     metadata_json  JSON         NULL,
     created_date   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by     BIGINT       NULL,
+    created_by     CHAR(36)     NULL,  
     CONSTRAINT fk_exc_log_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE SET NULL,
     CONSTRAINT fk_exc_log_user
@@ -1189,18 +1206,22 @@ CREATE TABLE exception_log (
         FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Application errors log';
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.4  Activity Log
+-- ─────────────────────────────────────────────────────────────────────────────
+
 DROP TABLE IF EXISTS activity_log;
 CREATE TABLE activity_log (
-    id            BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id    BIGINT       NOT NULL,
-    user_id       BIGINT       NULL,
+    id            CHAR(36)     PRIMARY KEY,  
+    chamber_id    CHAR(36)     NOT NULL,  
+    user_id       CHAR(36)     NULL,  
     timestamp     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     action        VARCHAR(255) NOT NULL,
     target        VARCHAR(255) NULL,
     metadata_json JSON         NULL,
     ip_address    VARCHAR(45)  NULL,
     created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by    BIGINT       NULL,
+    created_by    CHAR(36)     NULL,  
     CONSTRAINT fk_activity_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
     CONSTRAINT fk_activity_user
@@ -1209,11 +1230,15 @@ CREATE TABLE activity_log (
         FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='User actions audit';
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.5  Email Log
+-- ─────────────────────────────────────────────────────────────────────────────
+
 DROP TABLE IF EXISTS email_log;
 CREATE TABLE email_log (
-    email_id        BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id      BIGINT       NOT NULL,
-    user_id         BIGINT       NULL,
+    email_id        CHAR(36)     PRIMARY KEY,  
+    chamber_id      CHAR(36)     NOT NULL,  
+    user_id         CHAR(36)     NULL,  
     template_code   CHAR(30)     NULL,
     recipient_email VARCHAR(255) NOT NULL,
     recipient_name  VARCHAR(120) NULL,
@@ -1228,7 +1253,7 @@ CREATE TABLE email_log (
     next_retry_at   DATETIME     NULL,
     metadata_json   JSON         NULL,
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by      BIGINT       NULL,
+    created_by      CHAR(36)     NULL,  
     CONSTRAINT fk_email_log_chamber
         FOREIGN KEY (chamber_id)    REFERENCES chamber(chamber_id)           ON DELETE CASCADE,
     CONSTRAINT fk_email_log_user
@@ -1239,9 +1264,8 @@ CREATE TABLE email_log (
         FOREIGN KEY (status_code)   REFERENCES refm_email_status(code)     ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Email delivery log';
 
-
 -- =============================================================================
--- 14. TIER 12  —  Deferred Foreign Keys & Performance Indexes
+-- 12.  —  Deferred Foreign Keys & Performance Indexes
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1262,17 +1286,20 @@ ALTER TABLE chamber
 
 -- Cases
 CREATE INDEX idx_cases_status_hearing ON cases(status_code, next_hearing_date);
-CREATE INDEX idx_cases_number         ON cases(case_number);
+CREATE INDEX idx_cases_number ON cases(case_number);
 
 -- Hearings
-CREATE INDEX idx_hearings_date        ON hearings(hearing_date);
+CREATE INDEX idx_hearings_date ON hearings(hearing_date);
 
 -- Users
-CREATE INDEX idx_users_email          ON users(email);
+CREATE INDEX idx_users_email ON users(email);
 
--- User ↔ Chamber
-CREATE INDEX idx_ucl_user_active      ON user_chamber_link(user_id, status_ind, left_date);
-CREATE INDEX idx_ucl_chamber_users    ON user_chamber_link(chamber_id, is_primary, status_ind);
+-- User Chamber Links
+CREATE INDEX idx_ucl_user_active ON user_chamber_link(user_id, status_ind, left_date);
+CREATE INDEX idx_ucl_chamber_users ON user_chamber_link(chamber_id, is_primary, status_ind);
+
+-- User Roles
+CREATE INDEX idx_user_roles_link_role ON user_roles(link_id, chamber_role_id, end_date);
 
 -- Activity Log
 CREATE INDEX idx_activity_chamber_time ON activity_log(chamber_id, timestamp DESC);
@@ -1280,8 +1307,7 @@ CREATE INDEX idx_activity_chamber_time ON activity_log(chamber_id, timestamp DES
 -- Email Log
 CREATE INDEX idx_email_log_status      ON email_log(status_code, created_date);
 
-
-SELECT '✅ Court Diary schema creation completed successfully!' AS status_message;
+SELECT '✅ Court Diary schema with UUID v7 created successfully!' AS status_message;
 
 -- ===========================================================================
 -- END OF SCHEMA & SEED DATA

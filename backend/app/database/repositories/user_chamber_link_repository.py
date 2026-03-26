@@ -20,8 +20,8 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def get_active_link(
         self,
         session: AsyncSession,
-        user_id: int,
-        chamber_id: int,
+        user_id: str,
+        chamber_id: str,
     ) -> Optional[UserChamberLink]:
         """Get active user_chamber_link for user in chamber."""
         return await self.get_first(
@@ -39,8 +39,8 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def get_link_for_user_chamber(
         self,
         session: AsyncSession,
-        user_id: int,
-        chamber_id: int,
+        user_id: str,
+        chamber_id: str,
     ) -> Optional[UserChamberLink]:
         """
         Get ANY link for user+chamber (active or inactive).
@@ -57,8 +57,8 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def reactivate_chamber_link(
         self,
         session: AsyncSession,
-        link_id: int,
-        current_user_id: int,
+        link_id: str,
+        current_user_id: str,
     ) -> None:
         """
         Reactivate a previously deleted chamber link.
@@ -83,7 +83,7 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def get_all_active_links_for_user(
         self,
         session: AsyncSession,
-        user_id: int,
+        user_id: str,
     ) -> List[UserChamberLink]:
         """Get all active chamber links for a user."""
         return await self.list_all(
@@ -98,9 +98,9 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def unlink_user_from_chamber(
         self,
         session: AsyncSession,
-        user_id: int,
-        chamber_id: int,
-        current_user_id: int,
+        user_id: str,
+        chamber_id: str,
+        current_user_id: str,
     ) -> None:
         """
         Unlink user from a specific chamber (set left_date and status_ind=False).
@@ -131,8 +131,8 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def unlink_user_from_all_chambers(
         self,
         session: AsyncSession,
-        user_id: int,
-        current_user_id: int,
+        user_id: str,
+        current_user_id: str,
     ) -> None:
         """Unlink user from all chambers."""
         stmt = (
@@ -158,10 +158,10 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def create_chamber_link(
         self,
         session: AsyncSession,
-        user_id: int,
-        chamber_id: int,
+        user_id: str,
+        chamber_id: str,
         is_primary: bool,
-        created_by: int,
+        created_by: str,
     ) -> UserChamberLink:
         """Create a new user-chamber link."""
         return await self.create(
@@ -179,7 +179,7 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
     async def get_primary_link(
         self,
         session: AsyncSession,
-        user_id: int,
+        user_id: str,
     ) -> Optional[UserChamberLink]:
         """Get user's primary chamber link."""
         return await self.get_first(

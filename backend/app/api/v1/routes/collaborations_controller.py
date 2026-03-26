@@ -66,7 +66,7 @@ class CollaborationsController(BaseController):
     )
     async def collabs_get_by_case(
         self,
-        case_id: int = Path(..., gt=0),
+        case_id: str = Path(..., gt=0),
         service: CollaborationsService = Depends(get_collaborations_service),
     ) -> BaseOutDto[List[CollaborationOut]]:
         return self.success(

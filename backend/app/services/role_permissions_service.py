@@ -75,7 +75,6 @@ class RolePermissionsService(BaseSecuredService):
             RolePermissionsSummaryOut(
                 role_id=row["role_id"],
                 role_name=row["role_name"],
-                role_code=row["role_code"],
                 description=row["description"],
                 status_ind=row["status_ind"],
                 total_modules=row["total_modules"],
@@ -107,7 +106,6 @@ class RolePermissionsService(BaseSecuredService):
                 roles_dict[row["role_id"]] = {
                     "role_id": row["role_id"],
                     "role_name": row["role_name"],
-                    "role_code": row["role_code"],
                 }
 
             # Build modules list
@@ -193,7 +191,7 @@ class RolePermissionsService(BaseSecuredService):
             await self.role_permissions_repo.upsert(
                 session=self.session,
                 filters={
-                    RolePermissions.role_id: role_id,
+                    RolePermissions.chamber_role_id: role_id,
                     RolePermissions.chamber_module_id: dto.chamber_module_id,
                 },
                 data=perm_data,
@@ -217,6 +215,5 @@ class RolePermissionsService(BaseSecuredService):
         return RolePermissionMatrixOut(
             role_id=role_id,
             role_name=role.role_name,
-            role_code=role.role_code,
             permissions=permissions,
         )

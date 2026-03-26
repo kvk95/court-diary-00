@@ -9,7 +9,7 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 
 class InvitationOut(BaseRecordData):
-    invitation_id: int
+    invitation_id: str
     email: str
     role_id: Optional[int] = None
     role_name: Optional[str] = None
@@ -35,7 +35,7 @@ class InvitationCreate(BaseInData):
 
 
 class InvitationResend(BaseInData):
-    invitation_id: int
+    invitation_id: str
 
 class InvitationRevoke(BaseInData):
-    invitation_id: int
+    invitation_id: str

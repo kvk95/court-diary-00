@@ -1,3 +1,5 @@
+# app\database\models\base\timestampmixin.py
+
 from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime

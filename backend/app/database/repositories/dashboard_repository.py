@@ -13,7 +13,7 @@ from app.database.models.refm_courts import RefmCourts
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_invitations import UserInvitations
 from app.database.models.user_roles import UserRoles
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.users import Users
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -33,7 +33,7 @@ class DashboardRepository(BaseRepository[Cases]):
     # ===================================================================
 
     async def get_practice_overview(
-        self, session: AsyncSession, chamber_id: int, today: date
+        self, session: AsyncSession, chamber_id: str, today: date
     ) -> Dict[str, Any]:
         week_end = today + timedelta(days=6)
 
@@ -95,7 +95,7 @@ class DashboardRepository(BaseRepository[Cases]):
     # ===================================================================
 
     async def get_overdue_cases(
-        self, session: AsyncSession, chamber_id: int, today: date, limit: int = 10
+        self, session: AsyncSession, chamber_id: str, today: date, limit: int = 10
     ) -> list:
         rows = await session.execute(
             select(
@@ -152,7 +152,7 @@ class DashboardRepository(BaseRepository[Cases]):
     # ===================================================================
 
     async def get_hearings_for_date(
-        self, session: AsyncSession, chamber_id: int, hearing_date: date
+        self, session: AsyncSession, chamber_id: str, hearing_date: date
     ) -> list:
         rows = await session.execute(
             select(
@@ -183,7 +183,7 @@ class DashboardRepository(BaseRepository[Cases]):
     # ===================================================================
 
     async def get_chamber_management_stats(
-        self, session: AsyncSession, chamber_id: int, today: date
+        self, session: AsyncSession, chamber_id: str, today: date
     ) -> Dict[str, Any]:
         """Returns stats + MoM trends."""
 
@@ -208,7 +208,7 @@ class DashboardRepository(BaseRepository[Cases]):
         ) or 0
 
         roles_count = await session.scalar(
-            select(func.count(func.distinct(UserRoles.role_id)))
+            select(func.count(func.distinct(UserRoles.chamber_role_id)))
             .join(UserChamberLink, UserChamberLink.link_id == UserRoles.link_id)
             .where(
                 UserChamberLink.chamber_id == chamber_id,
@@ -238,8 +238,8 @@ class DashboardRepository(BaseRepository[Cases]):
             )
         ) or 0
 
-        users_trend = round(((total_users - prev_total_users) / prev_total_users * 100), 1) if prev_total_users > 0 else None
-        active_trend = round(((active_users - prev_total_users) / prev_total_users * 100), 1) if prev_total_users > 0 else None
+        users_trend = round(((total_users - prev_total_users) / prev_total_users * 100), 1) if prev_total_users > 0 else 0
+        active_trend = round(((active_users - prev_total_users) / prev_total_users * 100), 1) if prev_total_users > 0 else 0
 
         return {
             "total_users": total_users,
@@ -255,7 +255,7 @@ class DashboardRepository(BaseRepository[Cases]):
     # ===================================================================
 
     async def get_pending_invitations(
-        self, session: AsyncSession, chamber_id: int, limit: int = 10
+        self, session: AsyncSession, chamber_id: str, limit: int = 10
     ) -> list:
         rows = await session.execute(
             select(
@@ -264,9 +264,9 @@ class DashboardRepository(BaseRepository[Cases]):
                 UserInvitations.invited_date,
                 UserInvitations.expires_date,
                 UserInvitations.status_code,
-                SecurityRoles.role_name,
+                ChamberRoles.role_name,
             )
-            .outerjoin(SecurityRoles, UserInvitations.role_id == SecurityRoles.role_id)
+            .outerjoin(ChamberRoles, UserInvitations.role_id == ChamberRoles.role_id)
             .where(
                 UserInvitations.chamber_id == chamber_id,
                 UserInvitations.status_code == "PN",
@@ -277,7 +277,7 @@ class DashboardRepository(BaseRepository[Cases]):
         return [dict(row._mapping) for row in rows.all()]
 
     async def get_recent_activity(
-        self, session: AsyncSession, chamber_id: int, limit: int = 10
+        self, session: AsyncSession, chamber_id: str, limit: int = 10
     ) -> list:
         rows = await session.execute(
             select(

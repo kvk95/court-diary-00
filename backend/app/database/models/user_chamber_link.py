@@ -1,6 +1,6 @@
 """user_chamber_link"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, CHAR, Date, String
+from sqlalchemy import ForeignKey, Boolean, CHAR, Date
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -13,14 +13,14 @@ from app.database.models.base.timestampmixin import TimestampMixin
 class UserChamberLink(BaseModel, TimestampMixin):
     __tablename__ = 'user_chamber_link'
 
-    # link_id : BIGINT
-    link_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # link_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    link_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # user_id : BIGINT
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    # user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    user_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # is_primary : TINYINT
     is_primary: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
@@ -31,20 +31,14 @@ class UserChamberLink(BaseModel, TimestampMixin):
     # left_date : DATE
     left_date: Mapped[Optional[date]] = mapped_column(Date)
 
-    # role_override : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    role_override: Mapped[Optional[str]] = mapped_column(CHAR(4))
-
-    # display_name_override : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
-    display_name_override: Mapped[Optional[str]] = mapped_column(String(100))
-
     # status_ind : TINYINT
     status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
-    # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

@@ -14,7 +14,7 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 class ClientSearchOut(BaseRecordData):
     """Slim DTO for Link Client modal search results."""
-    client_id: int
+    client_id: str
     client_name: str
     display_name: Optional[str] = None
     client_type: str
@@ -23,7 +23,7 @@ class ClientSearchOut(BaseRecordData):
 
 
 class ClientListOut(BaseRecordData):
-    client_id: int
+    client_id: str
     client_type: str
     client_name: str
     display_name: Optional[str] = None
@@ -38,8 +38,8 @@ class ClientListOut(BaseRecordData):
 
 
 class ClientDetailOut(BaseRecordData):
-    client_id: int
-    chamber_id: int
+    client_id: str
+    chamber_id: str
     client_type: str
     client_name: str
     display_name: Optional[str] = None

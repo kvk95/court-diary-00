@@ -1,6 +1,6 @@
 """cases"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, CHAR, Date, DateTime, Integer, String, Text
+from sqlalchemy import ForeignKey, Boolean, CHAR, Date, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -13,11 +13,11 @@ from app.database.models.base.timestampmixin import TimestampMixin
 class Cases(BaseModel, TimestampMixin):
     __tablename__ = 'cases'
 
-    # case_id : BIGINT
-    case_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # case_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    case_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # case_number : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     case_number: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -37,8 +37,8 @@ class Cases(BaseModel, TimestampMixin):
     # respondent : TEXT COLLATE "utf8mb4_unicode_ci"
     respondent: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # aor_user_id : BIGINT
-    aor_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # aor_user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    aor_user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # case_summary : TEXT COLLATE "utf8mb4_unicode_ci"
     case_summary: Mapped[Optional[str]] = mapped_column(Text)
@@ -58,14 +58,14 @@ class Cases(BaseModel, TimestampMixin):
     # deleted_date : TIMESTAMP
     deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    # deleted_by : BIGINT
-    deleted_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # deleted_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    deleted_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
-    # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

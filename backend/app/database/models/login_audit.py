@@ -1,6 +1,6 @@
 """login_audit"""
 
-from sqlalchemy import ForeignKey, BigInteger, CHAR, DateTime, String, Text
+from sqlalchemy import ForeignKey, CHAR, DateTime, String, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -12,14 +12,14 @@ from app.database.models.base.base_model import BaseModel
 class LoginAudit(BaseModel):
     __tablename__ = 'login_audit'
 
-    # login_id : BIGINT
-    login_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # login_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    login_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # user_id : BIGINT
-    user_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
-    # chamber_id : BIGINT
-    chamber_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     email: Mapped[Optional[str]] = mapped_column(String(120))

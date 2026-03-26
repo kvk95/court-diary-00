@@ -1,7 +1,6 @@
 """users"""
 
-from sqlalchemy import ForeignKey, BigInteger, Boolean, CHAR, DateTime, String
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import Boolean, CHAR, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from datetime import datetime
@@ -13,8 +12,8 @@ from app.database.models.base.timestampmixin import TimestampMixin
 class Users(BaseModel, TimestampMixin):
     __tablename__ = 'users'
 
-    # user_id : BIGINT
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    # user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    user_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
     # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     email: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -31,9 +30,6 @@ class Users(BaseModel, TimestampMixin):
     # phone : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
     phone: Mapped[Optional[str]] = mapped_column(String(20))
 
-    # role_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    role_code: Mapped[Optional[str]] = mapped_column(CHAR(4), default='MEMB')
-
     # status_ind : TINYINT
     status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -43,8 +39,8 @@ class Users(BaseModel, TimestampMixin):
     # deleted_date : TIMESTAMP
     deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    # deleted_by : BIGINT
-    deleted_by: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # deleted_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    deleted_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
     # email_verified_ind : TINYINT
     email_verified_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
@@ -64,28 +60,16 @@ class Users(BaseModel, TimestampMixin):
     # password_changed_date : TIMESTAMP
     password_changed_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    # created_by : BIGINT
-    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
-    # updated_by : BIGINT
-    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"))
+    # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # users.created_by -> users.user_id
-    users_created_by_users = relationship(
-        "Users",
-        foreign_keys=[created_by], remote_side=[user_id], 
-        backref=backref("users_created_by_userss", cascade="all, delete-orphan")
-    )
-
-    # users.updated_by -> users.user_id
-    users_updated_by_users = relationship(
-        "Users",
-        foreign_keys=[updated_by], remote_side=[user_id], 
-        backref=backref("users_updated_by_userss", cascade="all, delete-orphan")
-    )
+    #    -- No relationships defined. --
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 

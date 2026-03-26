@@ -1,5 +1,5 @@
-from typing import List, Optional, Tuple
-from sqlalchemy import and_, func, or_, select
+from typing import List
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.clients import Clients
 from app.database.repositories.base.base_repository import BaseRepository
@@ -13,7 +13,7 @@ class ClientsRepository(BaseRepository[Clients]):
     async def search_clients(
         self,
         session: AsyncSession,
-        chamber_id: int,
+        chamber_id: str,
         query: str,
         limit: int = 20,
     ) -> List[Clients]:

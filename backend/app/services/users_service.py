@@ -81,7 +81,7 @@ class UsersService(BaseSecuredService):
     # HELPERS (Now Just Call Repository Methods - No Query Logic)
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def _get_active_link(self, user_id: int) -> Optional[UserChamberLink]:
+    async def _get_active_link(self, user_id: str) -> Optional[UserChamberLink]:
         """Get the active user_chamber_link for this user in the current chamber."""
         return await self.user_chamber_link_repo.get_active_link(
             session=self.session,
@@ -89,7 +89,7 @@ class UsersService(BaseSecuredService):
             chamber_id=self.chamber_id,
         )
 
-    async def _set_user_role(self, link_id: int, role_id: int) -> None:
+    async def _set_user_role(self, link_id: str, role_id: int) -> None:
         """
         Replace the current active role for a link with a new one.
         ✅ FIXED: Now delegates to repository method (no query logic in service).
@@ -101,7 +101,7 @@ class UsersService(BaseSecuredService):
             current_user_id=self.user_id,
         )
 
-    async def _unlink_user_from_all_chambers(self, user_id: int) -> None:
+    async def _unlink_user_from_all_chambers(self, user_id: str) -> None:
         """
         Unlink user from all chambers.
         ✅ FIXED: Now delegates to repository method (no query logic in service).
@@ -141,7 +141,7 @@ class UsersService(BaseSecuredService):
             "active_chamber_ids": [link.chamber_id for link in all_links],
         }
 
-    async def _reactivate_user(self, user_id: int) -> None:
+    async def _reactivate_user(self, user_id: str) -> None:
         """Undelete a user - delegates to repository."""
         await self.users_repo.reactivate_deleted_user(
             session=self.session,
@@ -155,9 +155,9 @@ class UsersService(BaseSecuredService):
 
     async def get_user_full_details(
         self,
-        user_id: Optional[int] = None,
+        user_id: Optional[str] = None,
         email: Optional[str] = None,
-        chamber_id: Optional[int] = None,
+        chamber_id: Optional[str] = None,
     ) -> UserOut:
         """Get complete user output with profile, permissions, and chamber info."""
         chamber_id = chamber_id if chamber_id else self.chamber_id
@@ -177,14 +177,13 @@ class UsersService(BaseSecuredService):
 
         return self._build_user_dto(user_data, chamber_id)
 
-    def _build_user_dto(self, user_data: dict, chamber_id: int) -> UserOut:
+    def _build_user_dto(self, user_data: dict, chamber_id: str) -> UserOut:
         """Transform repository dict output to UserOut DTO."""
         role: Optional[RoleOut] = None
         if user_data.get("role"):
             role = RoleOut(
                 role_id=user_data["role"]["role_id"],
                 role_name=user_data["role"]["role_name"],
-                role_code=user_data["role"]["role_code"],
                 description=user_data["role"]["description"],
                 status_ind=user_data["role"]["status_ind"],
             )
@@ -208,7 +207,7 @@ class UsersService(BaseSecuredService):
                 module_code=p["module_code"],
                 module_name=p["module_name"],
                 permission_id=p.get("permission_id"),
-                role_id=p["role_id"],
+                role_id=p["chamber_role_id"],
                 allow_all_ind=p["allow_all_ind"],
                 read_ind=p["read_ind"],
                 write_ind=p["write_ind"],
@@ -275,7 +274,7 @@ class UsersService(BaseSecuredService):
     # GET SINGLE
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def users_get_by_id(self, user_id: int) -> UserOut:
+    async def users_get_by_id(self, user_id: str) -> UserOut:
         """Get full user output by ID."""
         return await self.get_user_full_details(user_id=user_id)
 
@@ -436,7 +435,7 @@ class UsersService(BaseSecuredService):
     # EDIT
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def users_edit(self, user_id: int, payload: UserEdit) -> UserOut:
+    async def users_edit(self, user_id: str, payload: UserEdit) -> UserOut:
         """Edit user details."""
         link = await self.user_chamber_link_repo.get_active_link(
             session=self.session,
@@ -516,7 +515,7 @@ class UsersService(BaseSecuredService):
     # DELETE REQUEST
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def users_delete(self, user_id: int) -> dict:
+    async def users_delete(self, user_id: str) -> dict:
         """Create a deletion request (does NOT immediately delete). Needs admin approval."""
         if user_id == self.user_id:
             raise ValidationErrorDetail(
@@ -722,7 +721,7 @@ class UsersService(BaseSecuredService):
     # REMOVE FROM CHAMBER
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def users_remove_from_chamber(self, user_id: int) -> dict:
+    async def users_remove_from_chamber(self, user_id: str) -> dict:
         """Soft-removes a user from this chamber."""
         if user_id == self.user_id:
             raise ValidationErrorDetail(

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class RolePermissionBase(BaseModel):
     """Base permission fields."""
-    chamber_module_id: int
+    chamber_module_id: str
     allow_all_ind: bool = False
     read_ind: bool = False
     write_ind: bool = False
@@ -22,12 +22,12 @@ class RolePermissionEdit(RolePermissionBase):
 
 
 class RolePermissionModuleOut(BaseModel):
-    chamber_module_id: int
-    chamber_id: int
+    chamber_module_id: str
+    chamber_id: str
     chamber_name: str
     module_code: str
     module_name: str
-    permission_id: Optional[int] = None
+    permission_id: Optional[str] = None
     role_id:int
     allow_all_ind: bool
     read_ind: bool
@@ -42,14 +42,12 @@ class RolePermissionMatrixOut(BaseModel):
     """Full permission matrix for a role."""
     role_id: int
     role_name: str
-    role_code: Optional[str]
     permissions: list[RolePermissionModuleOut]
 
 class RolePermissionsSummaryOut(BaseModel):
     """Summary of permissions for all roles (for admin view)."""
     role_id: int
     role_name: str
-    role_code: Optional[str]
     description: Optional[str]
     status_ind: bool
     total_modules: int = 0
