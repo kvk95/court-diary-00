@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.user_roles import UserRoles
-from app.database.repositories.security_roles_repository import SecurityRolesRepository
+from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.roles_dto import (
     RoleCreate,
@@ -23,10 +23,10 @@ class RolesService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
-        security_roles_repo: Optional[SecurityRolesRepository] = None,
+        chamber_roles_repo: Optional[ChamberRolesRepository] = None,
     ):
         super().__init__(session)
-        self.security_roles_repo = security_roles_repo or SecurityRolesRepository()
+        self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
 
     async def roles_get_paged(
         self,
@@ -36,41 +36,17 @@ class RolesService(BaseSecuredService):
         status: Optional[bool] = None,
     ) -> PagingData[RoleWithStatsOut]:
         """Paginated roles with active user count."""
-        stmt = (
-            select(
-                ChamberRoles,
-                func.count(UserRoles.user_role_id).label("user_count"),
-            )
-            .outerjoin(
-                UserRoles,
-                and_(
-                    ChamberRoles.role_id == UserRoles.chamber_role_id,
-                    UserRoles.end_date.is_(None),
-                ),
-            )
-            .where(ChamberRoles.is_deleted.is_(False))
-            .group_by(ChamberRoles.role_id)
-        )
-
-        if search and search.strip():
-            stmt = stmt.where(ChamberRoles.role_name.ilike(f"%{search.strip()}%"))
-
-        if status is not None:
-            stmt = stmt.where(ChamberRoles.status_ind == status)
-
-        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
-        count_result = await self.session.execute(count_stmt)
-        total = count_result.scalar_one() or 0
-
-        stmt = stmt.order_by(ChamberRoles.role_name.asc())
-        stmt = stmt.offset((page - 1) * limit).limit(limit)
-
-        result = await self.session.execute(stmt)
-        rows = result.all()
+        total, rows = await self.chamber_roles_repo.get_roles_paged(
+            session=self.session,
+            page=page,
+            limit= limit, 
+            search=search, 
+            status=status)
 
         roles = [
             RoleWithStatsOut(
-                role_id=role_row.chamber_role_id,
+                role_id=role_row.role_id,
+                role_name=role_row.role_name,
                 description=role_row.description,
                 status_ind=role_row.status_ind,
                 user_count=user_count or 0,
@@ -82,7 +58,7 @@ class RolesService(BaseSecuredService):
         return builder.build(records=roles)
 
     async def get_role_by_id(self, role_id: int) -> RoleOut:
-        role = await self.security_roles_repo.get_by_id(
+        role = await self.chamber_roles_repo.get_by_id(
             session=self.session, id_values=role_id
         )
         if not role:
@@ -98,7 +74,7 @@ class RolesService(BaseSecuredService):
             )
 
         # ✅ Check role name (non-deleted only - names can be reused)
-        existing = await self.security_roles_repo.get_first(
+        existing = await self.chamber_roles_repo.get_first(
             self.session,
             filters={ChamberRoles.role_name: payload.role_name.strip()},
             where=[ChamberRoles.is_deleted.is_(False)],
@@ -109,12 +85,12 @@ class RolesService(BaseSecuredService):
                 message=f"Role name '{payload.role_name}' already exists",
             )
 
-        # ✅ FIXED: Check role code (ALL roles, including deleted)
-        if payload.role_code:
+        # ✅ Check role name (ALL roles, including deleted)
+        if payload.role_name:
             # ❌ DON'T USE: get_first() - applies soft-delete filter
             # ✅ USE: Raw query to check ALL roles
             stmt = select(ChamberRoles).where(
-                ChamberRoles.role_code == payload.role_code.upper()
+                ChamberRoles.role_name == payload.role_name.upper()
             )
             result = await self.session.execute(stmt)
             existing_code = result.scalars().first()
@@ -123,20 +99,19 @@ class RolesService(BaseSecuredService):
                 if existing_code.is_deleted:
                     raise ValidationErrorDetail(
                         code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"Role code '{payload.role_code}' was previously used by a deleted role. "
+                        message=f"Role name '{payload.role_name}' was previously used by a deleted role. "
                             f"Please use a different code.",
                     )
                 else:
                     raise ValidationErrorDetail(
                         code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"Role code '{payload.role_code}' already exists",
+                        message=f"Role name '{payload.role_name}' already exists",
                     )
 
-        role = await self.security_roles_repo.create(
+        role = await self.chamber_roles_repo.create(
             session=self.session,
             data={
                 "role_name": payload.role_name.strip(),
-                "role_code": (payload.role_code or "").upper() or None,
                 "description": payload.description,
                 "status_ind": payload.status_ind if payload.status_ind is not None else True,
             },
@@ -144,7 +119,7 @@ class RolesService(BaseSecuredService):
         return RoleOut.model_validate(role)
 
     async def roles_update(self, role_id: int, payload: RoleUpdate) -> RoleOut:
-        existing = await self.security_roles_repo.get_by_id(
+        existing = await self.chamber_roles_repo.get_by_id(
             session=self.session, id_values=role_id
         )
         if not existing:
@@ -154,12 +129,11 @@ class RolesService(BaseSecuredService):
 
         # ✅ Check role name (non-deleted only, excluding current role)
         if payload.role_name:
-            duplicate = await self.security_roles_repo.get_first(
+            duplicate = await self.chamber_roles_repo.get_first(
                 self.session,
                 filters={ChamberRoles.role_name: payload.role_name.strip()},
                 where=[
                     ChamberRoles.role_id != role_id,
-                    ChamberRoles.is_deleted.is_(False),
                 ],
             )
             if duplicate:
@@ -168,10 +142,10 @@ class RolesService(BaseSecuredService):
                     message=f"Role name '{payload.role_name}' already exists",
                 )
 
-        # ✅ FIXED: Check role code (ALL roles, including deleted)
-        if payload.role_code:
+        # ✅ Check role name (ALL roles, including deleted)
+        if payload.role_name:
             stmt = select(ChamberRoles).where(
-                ChamberRoles.role_code == payload.role_code.upper(),
+                ChamberRoles.role_name == payload.role_name.upper(),
                 ChamberRoles.role_id != role_id,
             )
             result = await self.session.execute(stmt)
@@ -181,20 +155,18 @@ class RolesService(BaseSecuredService):
                 if duplicate_code.is_deleted:
                     raise ValidationErrorDetail(
                         code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"Role code '{payload.role_code}' was previously used by a deleted role. "
+                        message=f"Role name '{payload.role_name}' was previously used by a deleted role. "
                             f"Please use a different code.",
                     )
                 else:
                     raise ValidationErrorDetail(
                         code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"Role code '{payload.role_code}' already exists",
+                        message=f"Role name '{payload.role_name}' already exists",
                     )
 
         update_data: dict = {}
         if payload.role_name is not None:
             update_data["role_name"] = payload.role_name.strip()
-        if payload.role_code is not None:
-            update_data["role_code"] = payload.role_code.upper()
         if payload.description is not None:
             update_data["description"] = payload.description
         if payload.status_ind is not None:
@@ -203,13 +175,13 @@ class RolesService(BaseSecuredService):
         if not update_data:
             return RoleOut.model_validate(existing)
 
-        updated_role = await self.security_roles_repo.update(
+        updated_role = await self.chamber_roles_repo.update(
             session=self.session, id_values=role_id, data=update_data
         )
         return RoleOut.model_validate(updated_role)
 
     async def roles_delete(self, role_id: int) -> bool:
-        role = await self.security_roles_repo.get_by_id(
+        role = await self.chamber_roles_repo.get_by_id(
             session=self.session, id_values=role_id
         )
         if not role:
@@ -230,7 +202,7 @@ class RolesService(BaseSecuredService):
                 message=f"Cannot delete role: {user_count} user(s) are currently assigned to it",
             )
 
-        await self.security_roles_repo.delete(
+        await self.chamber_roles_repo.delete(
             session=self.session, id_values=role_id, soft=True
         )
         return True
@@ -245,7 +217,7 @@ class RolesService(BaseSecuredService):
 
     async def get_all_roles(self) -> list[RoleOut]:
         """Lightweight list for dropdowns (no pagination needed)."""
-        roles = await self.security_roles_repo.list_all(
+        roles = await self.chamber_roles_repo.list_all(
             session=self.session,
             where=[ChamberRoles.is_deleted.is_(False), ChamberRoles.status_ind.is_(True)],
             order_by=[ChamberRoles.role_name.asc()],

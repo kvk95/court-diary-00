@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_modules import ChamberModules
 from app.database.models.role_permissions import RolePermissions
-from app.database.models.security_roles import SecurityRoles
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
+from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
 from app.dtos.role_permissions_dto import (
     RolePermissionEdit,
     RolePermissionMatrixOut,
@@ -24,9 +25,11 @@ class RolePermissionsService(BaseSecuredService):
         self,
         session: AsyncSession,
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
+        chamber_roles_repo: Optional[ChamberRolesRepository] = None,
     ):
         super().__init__(session)
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
+        self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
 
     async def get_permission_matrix(
         self,
@@ -147,9 +150,9 @@ class RolePermissionsService(BaseSecuredService):
         """Bulk upsert permissions for a role from the toggle matrix."""
         # Verify role exists and is not deleted
         role_result = await self.session.execute(
-            select(SecurityRoles).where(
-                SecurityRoles.role_id == role_id,
-                SecurityRoles.is_deleted.is_(False),
+            select(ChamberRoles).where(
+                ChamberRoles.role_id == role_id,
+                ChamberRoles.is_deleted.is_(False),
             )
         )
         role = role_result.scalars().first()
@@ -202,7 +205,7 @@ class RolePermissionsService(BaseSecuredService):
     async def get_role_permissions_summary(self, role_id: int) -> RolePermissionMatrixOut:
         """Full permission matrix + role info (for the detail page)."""
         role_result = await self.session.execute(
-            select(SecurityRoles).where(SecurityRoles.role_id == role_id)
+            select(ChamberRoles).where(ChamberRoles.role_id == role_id)
         )
         role = role_result.scalars().first()
         if not role:

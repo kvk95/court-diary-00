@@ -114,6 +114,7 @@ class BaseRepository(Generic[ModelType]):
         """
         Centralized execute with logging.
         """
+        stmt = self._apply_chamber_id_filter(stmt)
         self._log_stmt(stmt, session)
         return await session.execute(stmt)
 
@@ -172,7 +173,20 @@ class BaseRepository(Generic[ModelType]):
 
     # ────────────────────────────────────────────────
     # ──────── PRIVATE HELPERS ────────
-    # ────────────────────────────────────────────────
+    # ────────────────────────────────────────────────    
+
+    def _apply_chamber_id_filter(self, stmt: Select) -> Select:
+        """
+        Apply chamber_id_ filter if the model has chamber_id.
+        Supports two conventions:
+        - is_deleted: bool flag
+        - deleted_date: nullable datetime when deleted
+        """
+        ctx = get_request_context()
+        chamber_id = cast(str, ctx.get("chamber_id"))
+        if hasattr(self.model, "chamber_id"):
+            stmt = stmt.where(self.model.chamber_id == chamber_id)
+        return stmt
 
     def _apply_soft_delete_filter(self, stmt: Select) -> Select:
         """
@@ -275,6 +289,7 @@ class BaseRepository(Generic[ModelType]):
 
         # Soft delete
         stmt = self._apply_soft_delete_filter(stmt)
+        stmt = self._apply_chamber_id_filter(stmt)
 
         # Ordering
         if order_by:
@@ -287,7 +302,8 @@ class BaseRepository(Generic[ModelType]):
         Inject audit fields (created_by, updated_by) using current user from context.
         """
         ctx = get_request_context()
-        user_id = ctx.get("user_id")  # This comes from the current request
+        user_id = ctx.get("user_id")
+        chamber_id = cast(str, ctx.get("chamber_id"))
 
         if user_id is None:
             return data
@@ -296,7 +312,9 @@ class BaseRepository(Generic[ModelType]):
         if hasattr(self.model, "created_by") and "created_by" not in result:
             result["created_by"] = user_id
         if hasattr(self.model, "updated_by") and "updated_by" not in result:
-            result["updated_by"] = user_id
+            result["updated_by"] = user_id        
+        if hasattr(self.model, "chamber_id") and "chamber_id" not in result:
+            result["chamber_id"] = chamber_id
         return result
 
     async def _do_update(
@@ -312,8 +330,11 @@ class BaseRepository(Generic[ModelType]):
         update_data = data.copy()
         ctx = get_request_context()
         user_id = ctx.get("user_id")
+        chamber_id = cast(str, ctx.get("chamber_id"))
         if hasattr(self.model, "updated_by"):
             update_data["updated_by"] = user_id
+        if hasattr(self.model, "chamber_id"):
+                update_data["chamber_id"] = chamber_id
 
         stmt = (
             update(self.model)
@@ -325,6 +346,8 @@ class BaseRepository(Generic[ModelType]):
 
         reload_stmt = select(self.model).where(*filters_exprs)
         reload_stmt = self._apply_soft_delete_filter(reload_stmt)
+        reload_stmt = self._apply_chamber_id_filter(reload_stmt)
+        
         result = await self.execute(reload_stmt, session)
         return result.scalars().first()
 
@@ -365,6 +388,7 @@ class BaseRepository(Generic[ModelType]):
             pk_filters = self._pk_filters_from_values(id_values)
             base = select(self.model).where(*pk_filters)
             stmt = self._apply_soft_delete_filter(base)
+            stmt = self._apply_chamber_id_filter(stmt)
 
         result = await self.execute(stmt=stmt, session=session)
         return result.scalars().first()
@@ -608,6 +632,7 @@ class BaseRepository(Generic[ModelType]):
             pk_filters = self._pk_filters_from_values(id_values)
             stmt = select(self.model).where(*pk_filters)
             stmt = self._apply_soft_delete_filter(stmt)
+            stmt = self._apply_chamber_id_filter(stmt)
 
         result = await self.execute(stmt=stmt, session=session)
         existing = result.scalars().first()
@@ -683,6 +708,7 @@ class BaseRepository(Generic[ModelType]):
         
         ctx = get_request_context()
         user_id = ctx.get("user_id")
+        chamber_id = cast(str, ctx.get("chamber_id"))
 
         if soft and (
             hasattr(obj, "is_deleted")
@@ -699,6 +725,8 @@ class BaseRepository(Generic[ModelType]):
                 obj.deleted_date = now_utc
             if hasattr(obj, "deleted_by"):
                 obj.deleted_by = user_id
+            if hasattr(obj, "chamber_id"):
+                obj.chamber_id = chamber_id
             session.add(obj)
         else:
             await session.delete(obj)

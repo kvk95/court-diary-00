@@ -145,7 +145,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 Chamber,
                 Chamber.chamber_id == ChamberModules.chamber_id
             )
-            .outerjoin(
+            .join(
                 RolePermissions,
                 and_(
                     RolePermissions.chamber_module_id == ChamberModules.chamber_module_id,
@@ -216,34 +216,6 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             return perm.allow_all_ind or perm.export_ind
 
         return False
-
-    async def get_permissions_by_role_and_chamber(
-        self,
-        session: AsyncSession,
-        role_id: int,
-        chamber_id: str,
-    ) -> List[RolePermissions]:
-        """
-        Get raw RolePermissions objects for a role in a chamber.
-        """
-        stmt = (
-            select(RolePermissions)
-            .join(
-                ChamberModules,
-                RolePermissions.chamber_module_id == ChamberModules.chamber_module_id,
-            )
-            .where(
-                and_(
-                    RolePermissions.chamber_role_id == role_id,
-                    ChamberModules.chamber_id == chamber_id,
-                    ChamberModules.is_active == True,
-                )
-            )
-        )
-
-        self._log_stmt(stmt, session)
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
     
     async def get_all_roles_permissions_summary(
         self,
@@ -281,7 +253,10 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 ),
             )
             .where(
-                ChamberRoles.is_deleted.is_(False),
+                and_(
+                    ChamberRoles.is_deleted.is_(False),
+                    ChamberRoles.chamber_id==chamber_id
+                )
             )
             .group_by(
                 ChamberRoles.role_id,
@@ -297,7 +272,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
 
         return [
             {
-                "role_id": row.chamber_role_id,
+                "role_id": row.role_id,
                 "role_name": row.role_name,
                 "description": row.description,
                 "status_ind": row.status_ind,

@@ -62,4 +62,6 @@ journalctl -u api.casdia.service -n 50 --no-pager
 su - myuser
 cd working/court-diary-00/backend/
 mysql -u devuser -p < data/1_cs_schema_create.sql
+mysql -u devuser -p < data/001_create_uuid_v7_function.sql
+mysql -u devuser -p < data/002_create_uuid_triggers.sql
 mysql -u devuser -p < data/2_cs_data_inserts.sql
