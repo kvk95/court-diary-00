@@ -34,8 +34,8 @@ class Chamber(BaseModel, TimestampMixin):
     # city : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
     city: Mapped[Optional[str]] = mapped_column(String(80))
 
-    # state_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    state_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_states.code", ondelete="RESTRICT"), default='TN')
+    # state_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
+    state_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_states.code", ondelete="RESTRICT"), default='TN')
 
     # postal_code : VARCHAR(12) COLLATE "utf8mb4_unicode_ci"
     postal_code: Mapped[Optional[str]] = mapped_column(String(12))

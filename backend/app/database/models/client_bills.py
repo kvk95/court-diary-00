@@ -49,8 +49,8 @@ class ClientBills(BaseModel, TimestampMixin):
     # balance_amount : DECIMAL(12, 2)
     balance_amount: Mapped[Optional[float]] = mapped_column(Numeric)
 
-    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(2), default='PN')
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_billing_status.code", ondelete="SET NULL"), default='BSPN')
 
     # service_description : TEXT COLLATE "utf8mb4_unicode_ci"
     service_description: Mapped[Optional[str]] = mapped_column(Text)
@@ -86,6 +86,13 @@ class ClientBills(BaseModel, TimestampMixin):
         "Clients",
         foreign_keys=[client_id], 
         backref=backref("client_bills_client_id_clientss", cascade="all, delete-orphan")
+    )
+
+    # client_bills.status_code -> refm_billing_status.code
+    client_bills_status_code_refm_billing_status = relationship(
+        "RefmBillingStatus",
+        foreign_keys=[status_code], 
+        backref=backref("client_bills_status_code_refm_billing_statuss", cascade="all, delete-orphan")
     )
 
     # client_bills.created_by -> users.user_id

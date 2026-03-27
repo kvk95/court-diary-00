@@ -25,8 +25,8 @@ class CaseCollaborations(BaseModel, TimestampMixin):
     # collaborator_chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     collaborator_chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
-    # access_level : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    access_level: Mapped[Optional[str]] = mapped_column(CHAR(2), default='RO')
+    # access_level : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    access_level: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_collab_access.code", ondelete="CASCADE"), default='CARO')
 
     # invited_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     invited_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
@@ -37,8 +37,8 @@ class CaseCollaborations(BaseModel, TimestampMixin):
     # accepted_date : TIMESTAMP
     accepted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
-    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(2), default='PN')
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), default='PN')
 
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -71,6 +71,13 @@ class CaseCollaborations(BaseModel, TimestampMixin):
         "Chamber",
         foreign_keys=[collaborator_chamber_id], 
         backref=backref("case_collaborations_collaborator_chamber_id_chambers", cascade="all, delete-orphan")
+    )
+
+    # case_collaborations.access_level -> refm_collab_access.code
+    case_collaborations_access_level_refm_collab_access = relationship(
+        "RefmCollabAccess",
+        foreign_keys=[access_level], 
+        backref=backref("case_collaborations_access_level_refm_collab_accesss", cascade="all, delete-orphan")
     )
 
     # case_collaborations.invited_by -> users.user_id

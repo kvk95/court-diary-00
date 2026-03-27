@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmPartyRoles(BaseModel):
     __tablename__ = 'refm_party_roles'
 
-    # code : CHAR(3) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(3), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(60), nullable=False)
@@ -34,10 +34,10 @@ class RefmPartyRoles(BaseModel):
 
 
 class RefmPartyRolesConstants:
-    PETITIONER = 'PET'
-    RESPONDENT = 'RES'
-    APPELLANT = 'APP'
-    DEFENDANT = 'DEF'
-    PLAINTIFF = 'PLT'
-    WITNESS = 'WIT'
-    ADVOCATE_ON_RECORD = 'AOR'
+    PETITIONER = 'PRPE'
+    RESPONDENT = 'PRRE'
+    APPELLANT = 'PRAP'
+    DEFENDANT = 'PRDE'
+    PLAINTIFF = 'PRPL'
+    WITNESS = 'PRWI'
+    ADVOCATE_ON_RECORD = 'PRAO'

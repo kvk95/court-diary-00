@@ -31,10 +31,10 @@ class RefmCaseTypes(BaseModel):
 
 
 class RefmCaseTypesConstants:
-    CRIMINAL = 'CRIM'
-    CIVIL_SUIT = 'CIVL'
-    WRIT_PETITION = 'WRIT'
-    FAMILY_MATTER = 'FAM'
-    LABOUR_CASE = 'LAB'
-    TAX_MATTER = 'TAX'
-    CONSUMER_CASE = 'CON'
+    CRIMINAL = 'CTCR'
+    CIVIL_SUIT = 'CTCV'
+    WRIT_PETITION = 'CTWR'
+    FAMILY_MATTER = 'CTFM'
+    LABOUR_CASE = 'CTLB'
+    TAX_MATTER = 'CTTX'
+    CONSUMER_CASE = 'CTCN'

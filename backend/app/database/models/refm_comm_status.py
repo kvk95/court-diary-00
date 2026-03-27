@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmCommStatus(BaseModel):
     __tablename__ = 'refm_comm_status'
 
-    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -34,8 +34,8 @@ class RefmCommStatus(BaseModel):
 
 
 class RefmCommStatusConstants:
-    PENDING = 'PN'
-    SENT = 'SN'
-    DELIVERED = 'DL'
-    READ = 'RD'
-    FAILED = 'FD'
+    PENDING = 'CSPN'
+    SENT = 'CSSN'
+    DELIVERED = 'CSDL'
+    READ = 'CSRD'
+    FAILED = 'CSFL'

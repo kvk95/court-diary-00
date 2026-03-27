@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmCollabAccess(BaseModel):
     __tablename__ = 'refm_collab_access'
 
-    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -37,6 +37,6 @@ class RefmCollabAccess(BaseModel):
 
 
 class RefmCollabAccessConstants:
-    READ_ONLY = 'RO'
-    READ_WRITE = 'RW'
-    FULL_ACCESS = 'FU'
+    READ_ONLY = 'CARO'
+    READ_WRITE = 'CARW'
+    FULL_ACCESS = 'CAFU'

@@ -36,8 +36,8 @@ class EmailLog(BaseModel):
     # body_preview : TEXT COLLATE "utf8mb4_unicode_ci"
     body_preview: Mapped[Optional[str]] = mapped_column(Text)
 
-    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_email_status.code", ondelete="SET NULL"), default='P')
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_email_status.code", ondelete="SET NULL"), default='ESPN')
 
     # sent_at : DATETIME
     sent_at: Mapped[Optional[date]] = mapped_column(Date)

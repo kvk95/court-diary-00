@@ -34,9 +34,9 @@ class RefmHearingStatus(BaseModel):
 
 
 class RefmHearingStatusConstants:
-    UPCOMING = 'UP'
-    SCHEDULED = 'SC'
-    COMPLETED = 'CMP'
-    ADJOURNED = 'ADJ'
-    ORDER_RESERVED = 'OR'
-    DISPOSED = 'DIS'
+    UPCOMING = 'HSUP'
+    SCHEDULED = 'HSSC'
+    COMPLETED = 'HSCP'
+    ADJOURNED = 'HSAD'
+    ORDER_RESERVED = 'HSOR'
+    DISPOSED = 'HSDI'

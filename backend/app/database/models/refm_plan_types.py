@@ -46,6 +46,6 @@ class RefmPlanTypes(BaseModel):
 
 
 class RefmPlanTypesConstants:
-    FREE = 'FREE'
-    PRO = 'PRO'
-    ENTERPRISE = 'ENT'
+    FREE = 'PTFR'
+    PRO = 'PTPR'
+    ENTERPRISE = 'PTEN'

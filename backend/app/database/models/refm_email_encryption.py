@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmEmailEncryption(BaseModel):
     __tablename__ = 'refm_email_encryption'
 
-    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -31,7 +31,7 @@ class RefmEmailEncryption(BaseModel):
 
 
 class RefmEmailEncryptionConstants:
-    NONE = 'N'
-    TLS = 'T'
-    SSL = 'S'
-    BOTH = 'B'
+    NONE = 'EENN'
+    TLS = 'EETL'
+    SSL = 'EESS'
+    BOTH = 'EEBT'

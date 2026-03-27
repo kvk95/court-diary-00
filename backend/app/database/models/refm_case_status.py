@@ -34,8 +34,8 @@ class RefmCaseStatus(BaseModel):
 
 
 class RefmCaseStatusConstants:
-    ACTIVE = 'AC'
-    ADJOURNED = 'ADJ'
-    DISPOSED = 'DIS'
-    CLOSED = 'CLO'
-    OVERDUE = 'OVD'
+    ACTIVE = 'CSAC'
+    ADJOURNED = 'CSAD'
+    DISPOSED = 'CSDI'
+    CLOSED = 'CSCL'
+    OVERDUE = 'CSOV'

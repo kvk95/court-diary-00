@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmBillingStatus(BaseModel):
     __tablename__ = 'refm_billing_status'
 
-    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -34,8 +34,8 @@ class RefmBillingStatus(BaseModel):
 
 
 class RefmBillingStatusConstants:
-    PENDING = 'PN'
-    PAID = 'PD'
-    OVERDUE = 'OV'
-    CANCELLED = 'CN'
-    ADJUSTED = 'AD'
+    PENDING = 'BSPN'
+    PAID = 'BSPD'
+    OVERDUE = 'BSOV'
+    CANCELLED = 'BSCN'
+    ADJUSTED = 'BSAD'

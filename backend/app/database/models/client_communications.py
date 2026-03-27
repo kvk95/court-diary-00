@@ -27,8 +27,8 @@ class ClientCommunications(BaseModel):
     # user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
-    # comm_type : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    comm_type: Mapped[str] = mapped_column(CHAR(2), nullable=False)
+    # comm_type : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    comm_type: Mapped[str] = mapped_column(CHAR(4), nullable=False)
 
     # subject : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     subject: Mapped[Optional[str]] = mapped_column(String(255))
@@ -36,8 +36,8 @@ class ClientCommunications(BaseModel):
     # message_preview : TEXT COLLATE "utf8mb4_unicode_ci"
     message_preview: Mapped[Optional[str]] = mapped_column(Text)
 
-    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(2), default='PN')
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_comm_status.code", ondelete="SET NULL"), default='CSPN')
 
     # scheduled_at : DATETIME
     scheduled_at: Mapped[Optional[date]] = mapped_column(Date)
@@ -89,6 +89,13 @@ class ClientCommunications(BaseModel):
         "Users",
         foreign_keys=[user_id], 
         backref=backref("client_communications_user_id_userss", cascade="all, delete-orphan")
+    )
+
+    # client_communications.status_code -> refm_comm_status.code
+    client_communications_status_code_refm_comm_status = relationship(
+        "RefmCommStatus",
+        foreign_keys=[status_code], 
+        backref=backref("client_communications_status_code_refm_comm_statuss", cascade="all, delete-orphan")
     )
 
     # client_communications.created_by -> users.user_id

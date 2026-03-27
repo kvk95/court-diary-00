@@ -24,8 +24,8 @@ class LoginAudit(BaseModel):
     # email : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     email: Mapped[Optional[str]] = mapped_column(String(120))
 
-    # status_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_login_status.code", ondelete="SET NULL"))
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_login_status.code", ondelete="SET NULL"))
 
     # failure_reason : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     failure_reason: Mapped[Optional[str]] = mapped_column(String(255))

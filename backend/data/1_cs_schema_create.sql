@@ -95,7 +95,7 @@ CREATE TABLE refm_case_types (
 
 DROP TABLE IF EXISTS refm_email_encryption;
 CREATE TABLE refm_email_encryption (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     sort_order    INT         NOT NULL,
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
@@ -103,7 +103,7 @@ CREATE TABLE refm_email_encryption (
 
 DROP TABLE IF EXISTS refm_email_status;
 CREATE TABLE refm_email_status (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(40) NOT NULL,
     color_code    CHAR(7)     DEFAULT '#64748b',
     sort_order    INT         NOT NULL
@@ -124,7 +124,7 @@ CREATE TABLE refm_email_templates (
 
 DROP TABLE IF EXISTS refm_comm_status;
 CREATE TABLE refm_comm_status (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7)     DEFAULT '#64748b',
     sort_order    INT         NOT NULL,
@@ -137,14 +137,14 @@ CREATE TABLE refm_comm_status (
 
 DROP TABLE IF EXISTS refm_login_status;
 CREATE TABLE refm_login_status (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(20) NOT NULL,
     sort_order    INT         NOT NULL
 ) ENGINE=InnoDB COMMENT='Login status codes';
 
 DROP TABLE IF EXISTS refm_user_deletion_status;
 CREATE TABLE refm_user_deletion_status (
-    code          CHAR(1)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7)     DEFAULT '#64748b',
     sort_order    INT         NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE refm_user_deletion_status (
 
 DROP TABLE IF EXISTS refm_invitation_status;
 CREATE TABLE refm_invitation_status (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7)     DEFAULT '#64748b',
     sort_order    INT         NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE refm_invitation_status (
 
 DROP TABLE IF EXISTS refm_billing_status;
 CREATE TABLE refm_billing_status (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7)     DEFAULT '#64748b',
     sort_order    INT         NOT NULL,
@@ -175,7 +175,7 @@ CREATE TABLE refm_billing_status (
 
 DROP TABLE IF EXISTS refm_party_roles;
 CREATE TABLE refm_party_roles (
-    code          CHAR(3)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(60) NOT NULL,
     category      VARCHAR(30) NULL COMMENT 'PARTY=Main Party, REP=Representative, OTHR=Other',
     sort_order    INT         NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE refm_party_roles (
 
 DROP TABLE IF EXISTS refm_aor_status;
 CREATE TABLE refm_aor_status (
-    code          CHAR(2)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     color_code    CHAR(7)     DEFAULT '#64748b',
     sort_order    INT         NOT NULL,
@@ -193,7 +193,7 @@ CREATE TABLE refm_aor_status (
 
 DROP TABLE IF EXISTS refm_collab_access;
 CREATE TABLE refm_collab_access (
-    code          CHAR(2)      PRIMARY KEY,
+    code          CHAR(4)      PRIMARY KEY,
     description   VARCHAR(50)  NOT NULL,
     permissions   VARCHAR(255) NULL COMMENT 'Comma-separated: view,edit,delete,share',
     color_code    CHAR(7)      DEFAULT '#64748b',
@@ -211,7 +211,7 @@ CREATE TABLE refm_collab_access (
 
 DROP TABLE IF EXISTS refm_states;
 CREATE TABLE refm_states (
-    code          CHAR(4)      PRIMARY KEY,
+    code          CHAR(2)      PRIMARY KEY,
     description   VARCHAR(100) NOT NULL,
     country_code  CHAR(2)      NOT NULL,
     sort_order    INT          NOT NULL DEFAULT 0,
@@ -258,7 +258,7 @@ CREATE TABLE chamber (
     address_line1      VARCHAR(255) NULL,
     address_line2      VARCHAR(255) NULL,
     city               VARCHAR(80)  NULL,
-    state_code         CHAR(4)      DEFAULT 'TN',
+    state_code         CHAR(2)      DEFAULT 'TN',
     postal_code        VARCHAR(12)  NULL,
     country_code       CHAR(2)      DEFAULT 'IN',
     plan_code          CHAR(4)      DEFAULT 'FREE',
@@ -640,7 +640,7 @@ CREATE TABLE case_aors (
     primary_ind       BOOLEAN      DEFAULT FALSE,
     appointment_date DATE         NULL,
     withdrawal_date  DATE         NULL,
-    status_code      CHAR(2)      DEFAULT 'AC',
+    status_code      CHAR(4)      DEFAULT 'CSAC',
     notes            TEXT         NULL,
     created_date     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by       CHAR(36)     NULL,  
@@ -767,7 +767,7 @@ CREATE TABLE client_bills (
     total_amount        DECIMAL(12,2) NOT NULL,
     paid_amount         DECIMAL(12,2) DEFAULT 0,
     balance_amount      DECIMAL(12,2) GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
-    status_code         CHAR(2)      DEFAULT 'PN',
+    status_code         CHAR(4)      DEFAULT 'BSPN',
     service_description TEXT         NULL,
     notes               TEXT         NULL,
     created_date        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -784,6 +784,8 @@ CREATE TABLE client_bills (
         FOREIGN KEY (created_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     CONSTRAINT fk_bills_updated_by
         FOREIGN KEY (updated_by) REFERENCES users(user_id)        ON DELETE SET NULL,
+    CONSTRAINT fk_bills_status_by
+        FOREIGN KEY (status_code) REFERENCES refm_billing_status(code)        ON DELETE SET NULL,
     INDEX idx_bills_client (client_id),
     INDEX idx_bills_status (status_code),
     INDEX idx_bills_date (bill_date)
@@ -876,10 +878,10 @@ CREATE TABLE client_communications (
     client_id       CHAR(36)     NOT NULL,  
     case_id         CHAR(36)     NULL,  
     user_id         CHAR(36)     NULL,  
-    comm_type       CHAR(2)      NOT NULL,
+    comm_type       CHAR(4)      NOT NULL,
     subject         VARCHAR(255) NULL,
     message_preview TEXT         NULL,
-    status_code     CHAR(2)      DEFAULT 'PN',
+    status_code     CHAR(4)      DEFAULT 'CSPN',
     scheduled_at    DATETIME     NULL,
     sent_at        DATETIME     NULL,
     delivered_at    DATETIME     NULL,
@@ -893,6 +895,8 @@ CREATE TABLE client_communications (
         FOREIGN KEY (client_id)  REFERENCES clients(client_id)    ON DELETE CASCADE,
     CONSTRAINT fk_comm_case
         FOREIGN KEY (case_id)    REFERENCES cases(case_id)        ON DELETE SET NULL,
+    CONSTRAINT fk_comm_status_code
+        FOREIGN KEY (status_code)    REFERENCES refm_comm_status(code)        ON DELETE SET NULL,
     CONSTRAINT fk_comm_user
         FOREIGN KEY (user_id)    REFERENCES users(user_id)        ON DELETE SET NULL,
     CONSTRAINT fk_comm_created_by
@@ -964,7 +968,7 @@ CREATE TABLE email_settings (
     smtp_port         SMALLINT UNSIGNED NOT NULL DEFAULT 587,
     smtp_user         VARCHAR(150) NOT NULL,
     smtp_password     VARCHAR(255) NOT NULL,
-    encryption_code   CHAR(2)   NOT NULL DEFAULT 'T',
+    encryption_code   CHAR(4)   NOT NULL DEFAULT 'EETL',
     auth_required_ind BOOLEAN   DEFAULT TRUE,
     default_ind        BOOLEAN   DEFAULT FALSE,
     status_ind        BOOLEAN   NOT NULL DEFAULT TRUE,
@@ -1025,7 +1029,7 @@ CREATE TABLE delete_account_requests (
     request_no   VARCHAR(30)  NOT NULL UNIQUE,
     user_id      CHAR(36)     NOT NULL,  
     request_date DATE         NOT NULL,
-    status_code  CHAR(1)      DEFAULT 'P',
+    status_code  CHAR(4)      DEFAULT 'DSPN',
     notes        TEXT         NULL,
     created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by   CHAR(36)     NULL,  
@@ -1059,11 +1063,11 @@ CREATE TABLE case_collaborations (
     case_id                 CHAR(36)     NOT NULL,  
     owner_chamber_id        CHAR(36)     NOT NULL,  
     collaborator_chamber_id CHAR(36)     NOT NULL,  
-    access_level            CHAR(2)      DEFAULT 'RO',
+    access_level            CHAR(4)      DEFAULT 'CARO',
     invited_by              CHAR(36)     NULL,  
     invited_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     accepted_date           TIMESTAMP    NULL,
-    status_code             CHAR(2)      DEFAULT 'PN',
+    status_code             CHAR(4)      DEFAULT 'PN',
     notes                   TEXT         NULL,
     created_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by              CHAR(36)     NULL,  
@@ -1075,6 +1079,8 @@ CREATE TABLE case_collaborations (
         FOREIGN KEY (owner_chamber_id)        REFERENCES chamber(chamber_id)    ON DELETE CASCADE,
     CONSTRAINT fk_collab_collaborator
         FOREIGN KEY (collaborator_chamber_id) REFERENCES chamber(chamber_id)    ON DELETE CASCADE,
+    CONSTRAINT fk_collab_access_level
+        FOREIGN KEY (access_level) REFERENCES refm_collab_access(code)    ON DELETE CASCADE,
     CONSTRAINT fk_collab_invited_by
         FOREIGN KEY (invited_by)              REFERENCES users(user_id)         ON DELETE SET NULL,
     CONSTRAINT fk_collab_created_by
@@ -1100,7 +1106,7 @@ CREATE TABLE user_invitations (
     invited_by    CHAR(36)     NOT NULL,  
     invited_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     expires_date  DATE         NULL,
-    status_code   CHAR(2)      DEFAULT 'PN',
+    status_code   CHAR(4)      DEFAULT 'PN',
     message       TEXT         NULL,
     accepted_date TIMESTAMP    NULL,
     accepted_by   CHAR(36)     NULL,  
@@ -1137,7 +1143,7 @@ CREATE TABLE login_audit (
     user_id        CHAR(36)     NULL,  
     chamber_id     CHAR(36)     NOT NULL,  
     email          VARCHAR(120) NULL,
-    status_code    CHAR(2)      NULL,
+    status_code    CHAR(4)      NULL,
     failure_reason VARCHAR(255) NULL,
     login_time     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     ip_address     VARCHAR(45)  NULL,
@@ -1246,7 +1252,7 @@ CREATE TABLE email_log (
     recipient_name  VARCHAR(120) NULL,
     subject         VARCHAR(500) NULL,
     body_preview    TEXT         NULL,
-    status_code     CHAR(2)      DEFAULT 'P',
+    status_code     CHAR(4)      DEFAULT 'ESPN',
     sent_at         DATETIME(6)  NULL,
     delivered_at    DATETIME(6)  NULL,
     opened_at       DATETIME(6)  NULL,

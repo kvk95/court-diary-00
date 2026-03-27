@@ -11,8 +11,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmStates(BaseModel):
     __tablename__ = 'refm_states'
 
-    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
+    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
 
     # description : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(100), nullable=False)

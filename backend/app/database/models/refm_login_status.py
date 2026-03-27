@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmLoginStatus(BaseModel):
     __tablename__ = 'refm_login_status'
 
-    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -28,5 +28,5 @@ class RefmLoginStatus(BaseModel):
 
 
 class RefmLoginStatusConstants:
-    SUCCESS = 'S'
-    FAILED = 'F'
+    SUCCESS = 'LSSU'
+    FAILED = 'LSFA'

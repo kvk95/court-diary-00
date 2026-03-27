@@ -28,8 +28,8 @@ class DeleteAccountRequests(BaseModel, TimestampMixin):
     # request_date : DATE
     request_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    # status_code : CHAR(1) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(1), ForeignKey("refm_user_deletion_status.code", ondelete="RESTRICT"), default='P')
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_user_deletion_status.code", ondelete="RESTRICT"), default='DSPN')
 
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)

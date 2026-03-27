@@ -33,8 +33,8 @@ class EmailSettings(BaseModel, TimestampMixin):
     # smtp_password : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     smtp_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # encryption_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    encryption_code: Mapped[str] = mapped_column(CHAR(2), ForeignKey("refm_email_encryption.code", ondelete="RESTRICT"), default='T', nullable=False)
+    # encryption_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    encryption_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_email_encryption.code", ondelete="RESTRICT"), default='EETL', nullable=False)
 
     # auth_required_ind : TINYINT
     auth_required_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)

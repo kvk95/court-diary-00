@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmUserDeletionStatus(BaseModel):
     __tablename__ = 'refm_user_deletion_status'
 
-    # code : CHAR(1) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(1), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -34,6 +34,6 @@ class RefmUserDeletionStatus(BaseModel):
 
 
 class RefmUserDeletionStatusConstants:
-    PENDING = 'P'
-    DELETED = 'D'
-    REJECTED = 'R'
+    PENDING = 'DSPN'
+    DELETED = 'DSDE'
+    REJECTED = 'DSRJ'

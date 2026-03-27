@@ -10,8 +10,8 @@ from app.database.models.base.base_model import BaseModel
 class RefmEmailStatus(BaseModel):
     __tablename__ = 'refm_email_status'
 
-    # code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(2), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # description : VARCHAR(40) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -31,9 +31,9 @@ class RefmEmailStatus(BaseModel):
 
 
 class RefmEmailStatusConstants:
-    PENDING = 'P'
-    SENT = 'S'
-    DELIVERED = 'D'
-    OPENED = 'O'
-    FAILED = 'F'
-    BOUNCED = 'B'
+    PENDING = 'ESPN'
+    SENT = 'ESSN'
+    DELIVERED = 'ESDL'
+    OPENED = 'ESOP'
+    FAILED = 'ESFL'
+    BOUNCED = 'ESBN'
