@@ -290,7 +290,6 @@ class BaseRepository(Generic[ModelType]):
 
         # Soft delete
         stmt = self._apply_soft_delete_filter(stmt)
-        stmt = self._apply_chamber_id_filter(stmt)
 
         # Ordering
         if order_by:
@@ -374,7 +373,6 @@ class BaseRepository(Generic[ModelType]):
 
         reload_stmt = select(self.model).where(*filters_exprs)
         reload_stmt = self._apply_soft_delete_filter(reload_stmt)
-        reload_stmt = self._apply_chamber_id_filter(reload_stmt)
         
         result = await self.execute(reload_stmt, session)
         return result.scalars().first()
@@ -416,7 +414,6 @@ class BaseRepository(Generic[ModelType]):
             pk_filters = self._pk_filters_from_values(id_values)
             base = select(self.model).where(*pk_filters)
             stmt = self._apply_soft_delete_filter(base)
-            stmt = self._apply_chamber_id_filter(stmt)
 
         result = await self.execute(stmt=stmt, session=session)
         return result.scalars().first()
@@ -660,7 +657,6 @@ class BaseRepository(Generic[ModelType]):
             pk_filters = self._pk_filters_from_values(id_values)
             stmt = select(self.model).where(*pk_filters)
             stmt = self._apply_soft_delete_filter(stmt)
-            stmt = self._apply_chamber_id_filter(stmt)
 
         result = await self.execute(stmt=stmt, session=session)
         existing = result.scalars().first()
@@ -767,6 +763,62 @@ class BaseRepository(Generic[ModelType]):
             await session.delete(obj)
 
         await session.flush()
+
+    async def undelete(
+        self,
+        session: AsyncSession,
+        *,
+        id_values: Optional[Union[Any, Dict[str, Any]]] = None,
+        filters: Optional[Dict[FilterKey, Any]] = None,
+        where: Optional[Sequence[Any]] = None,
+    ) -> Optional[ModelType]:
+        """
+        Restore a soft-deleted record.
+        """
+        self._validate_query_params(filters=filters, where=where)
+
+        # Build filters
+        if filters or where:
+            built_filters: List[BinaryExpression] = []
+            if filters:
+                for column, value in filters.items():
+                    built_filters.append(column == value)
+            if where:
+                built_filters.extend(where)
+            filters_exprs = built_filters
+        else:
+            filters_exprs = self._pk_filters_from_values(id_values)
+
+        update_data = {}
+
+        # Reset soft delete flags
+        if hasattr(self.model, "is_deleted"):
+            update_data["is_deleted"] = False
+        if hasattr(self.model, "deleted_date"):
+            update_data["deleted_date"] = None
+        if hasattr(self.model, "deleted_by"):
+            update_data["deleted_by"] = None
+
+        # Apply update directly (bypass soft-delete filter)
+        stmt = (
+            update(self.model)
+            .where(*filters_exprs)
+            .values(**update_data)
+            .execution_options(synchronize_session="fetch")
+        )
+
+        await self.execute(stmt, session)
+
+        # Reload using normal flow (now visible again)
+        obj = await self.get_by_id(session=session, id_values=id_values)
+
+        if obj is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{self.model.__name__} not found after undelete"
+            )
+
+        return obj
 
     @classmethod
     def get_bool_fields(cls, table: Table) -> set[str]:

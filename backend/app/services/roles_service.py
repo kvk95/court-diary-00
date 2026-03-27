@@ -97,16 +97,22 @@ class RolesService(BaseSecuredService):
 
         if existing_code:
             if existing_code.is_deleted:
-                # 🔥 revive
+                # 🔥 Step 1: undelete
+                await self.chamber_roles_repo.undelete(
+                    session=self.session,
+                    id_values=existing_code.role_id
+                )
+
+                # 🔥 Step 2: update normally
                 revived = await self.chamber_roles_repo.update(
                     session=self.session,
                     id_values=existing_code.role_id,
                     data={
-                        "is_deleted": False,
                         "description": payload.description,
                         "status_ind": payload.status_ind if payload.status_ind is not None else True,
                     }
                 )
+
                 return RoleOut.model_validate(revived)
 
             else:
