@@ -66,7 +66,7 @@ class AorService(BaseSecuredService):
             case_id=aor.case_id,
             user_id=aor.user_id,
             advocate_name=advocate_name,
-            is_primary=bool(aor.is_primary),
+            primary_ind=bool(aor.primary_ind),
             status_code=aor.status_code or "AC",
             status_description=_STATUS_LABELS.get(aor.status_code or "AC"),
             appointment_date=aor.appointment_date,
@@ -87,7 +87,7 @@ class AorService(BaseSecuredService):
                 CaseAors.case_id == case_id,
                 CaseAors.chamber_id == self.chamber_id,
             ],
-            order_by=[CaseAors.is_primary.desc(), CaseAors.appointment_date.asc()],
+            order_by=[CaseAors.primary_ind.desc(), CaseAors.appointment_date.asc()],
         )
         # Batch-load user names
         user_ids = list({a.user_id for a in aors})
@@ -141,14 +141,14 @@ class AorService(BaseSecuredService):
             )
 
         # If new AOR is primary, demote any existing primary
-        if payload.is_primary:
+        if payload.primary_ind:
             await self._demote_existing_primary(payload.case_id)
 
         data = {
             "case_id": payload.case_id,
             "user_id": payload.user_id,
             "chamber_id": self.chamber_id,
-            "is_primary": payload.is_primary,
+            "primary_ind": payload.primary_ind,
             "appointment_date": payload.appointment_date or date.today(),
             "status_code": "AC",
             "notes": payload.notes,
@@ -167,7 +167,7 @@ class AorService(BaseSecuredService):
     async def aors_edit(self, payload: AorEdit) -> AorOut:
         aor = await self._get_aor_or_404(payload.case_aor_id)
 
-        if payload.is_primary is True and not aor.is_primary:
+        if payload.primary_ind is True and not aor.primary_ind:
             await self._demote_existing_primary(aor.case_id)
 
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
@@ -197,7 +197,7 @@ class AorService(BaseSecuredService):
             data={
                 "status_code": "WD",
                 "withdrawal_date": payload.withdrawal_date or date.today(),
-                "is_primary": False,
+                "primary_ind": False,
                 "notes": payload.notes or aor.notes,
             },
         )
@@ -217,15 +217,15 @@ class AorService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def _demote_existing_primary(self, case_id: str) -> None:
-        """Set is_primary=False on any currently-primary AOR for this case."""
+        """Set primary_ind=False on any currently-primary AOR for this case."""
         existing_primary = await self.session.execute(
             select(CaseAors).where(
                 CaseAors.case_id == case_id,
                 CaseAors.chamber_id == self.chamber_id,
-                CaseAors.is_primary.is_(True),
+                CaseAors.primary_ind.is_(True),
                 CaseAors.status_code == "AC",
             )
         )
         for old in existing_primary.scalars().all():
-            old.is_primary = False
+            old.primary_ind = False
         await self.session.flush()

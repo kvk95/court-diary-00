@@ -15,8 +15,8 @@ class RolePermissions(BaseModel, TimestampMixin):
     # permission_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     permission_id: Mapped[str] = mapped_column(CHAR(36), primary_key=True, nullable=False)
 
-    # chamber_role_id : INTEGER
-    chamber_role_id: Mapped[int] = mapped_column(Integer, ForeignKey("chamber_roles.role_id", ondelete="CASCADE"), nullable=False)
+    # role_id : INTEGER
+    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("chamber_roles.role_id", ondelete="CASCADE"), nullable=False)
 
     # chamber_module_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     chamber_module_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber_modules.chamber_module_id", ondelete="CASCADE"), nullable=False)
@@ -51,11 +51,11 @@ class RolePermissions(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    # role_permissions.chamber_role_id -> chamber_roles.role_id
-    role_permissions_chamber_role_id_chamber_roles = relationship(
+    # role_permissions.role_id -> chamber_roles.role_id
+    role_permissions_role_id_chamber_roles = relationship(
         "ChamberRoles",
-        foreign_keys=[chamber_role_id], 
-        backref=backref("role_permissions_chamber_role_id_chamber_roless", cascade="all, delete-orphan")
+        foreign_keys=[role_id], 
+        backref=backref("role_permissions_role_id_chamber_roless", cascade="all, delete-orphan")
     )
 
     # role_permissions.chamber_module_id -> chamber_modules.chamber_module_id

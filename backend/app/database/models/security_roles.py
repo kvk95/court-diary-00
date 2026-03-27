@@ -21,14 +21,17 @@ class SecurityRoles(BaseModel, TimestampMixin):
     # description : TEXT COLLATE "utf8mb4_unicode_ci"
     description: Mapped[Optional[str]] = mapped_column(Text)
 
-    # is_system : TINYINT
-    is_system: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # system_ind : TINYINT
+    system_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # admin_ind : TINYINT
+    admin_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # status_ind : TINYINT
     status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # is_deleted : TINYINT
-    is_deleted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # deleted_ind : TINYINT
+    deleted_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # deleted_date : TIMESTAMP
     deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)

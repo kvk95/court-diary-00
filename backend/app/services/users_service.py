@@ -135,7 +135,7 @@ class UsersService(BaseSecuredService):
             "exists": True,
             "user": user,
             "user_id": user.user_id,
-            "is_deleted": user.is_deleted,
+            "deleted_ind": user.deleted_ind,
             "active_links": all_links,
             "active_chambers_count": len(all_links),
             "active_chamber_ids": [link.chamber_id for link in all_links],
@@ -186,6 +186,7 @@ class UsersService(BaseSecuredService):
                 role_name=user_data["role"]["role_name"],
                 description=user_data["role"]["description"],
                 status_ind=user_data["role"]["status_ind"],
+                admin_ind=user_data["role"]["admin_ind"],
             )
 
         profile: Optional[UserProfileOut] = None
@@ -199,6 +200,9 @@ class UsersService(BaseSecuredService):
                 )
             )
 
+
+        print(f"*********************\n{user_data.get("permissions", [])}\n*******************")
+
         permissions = [
             RolePermissionModuleOut(
                 chamber_module_id=p["chamber_module_id"],
@@ -207,7 +211,7 @@ class UsersService(BaseSecuredService):
                 module_code=p["module_code"],
                 module_name=p["module_name"],
                 permission_id=p.get("permission_id"),
-                role_id=p["chamber_role_id"],
+                role_id=p["role_id"],
                 allow_all_ind=p["allow_all_ind"],
                 read_ind=p["read_ind"],
                 write_ind=p["write_ind"],
@@ -227,7 +231,7 @@ class UsersService(BaseSecuredService):
             email=user_data["email"],
             phone=user_data["phone"],
             role=role,
-            is_active=user_data["status_ind"],
+            active_ind=user_data["status_ind"],
             image="/assets/images/avatar/none.png",
             created_date=user_data["created_date"],
             chamber_name=user_data.get("chamber", {}).get("chamber_name"),
@@ -353,14 +357,14 @@ class UsersService(BaseSecuredService):
                 session=self.session,
                 user_id=user.user_id,
                 chamber_id=self.chamber_id,
-                is_primary=True,
+                primary_ind=True,
                 created_by=self.user_id,
             )
 
             if payload.role_id and link:
                 await self._set_user_role(link.link_id, payload.role_id)
 
-        elif membership["is_deleted"]:
+        elif membership["deleted_ind"]:
             # ─────────────────────────────────────────────────────────────────
             # SCENARIO 2 & 3: Deleted User - Reactivate and Link
             # ─────────────────────────────────────────────────────────────────
@@ -407,7 +411,7 @@ class UsersService(BaseSecuredService):
                     session=self.session,
                     user_id=user.user_id,
                     chamber_id=self.chamber_id,
-                    is_primary=True,
+                    primary_ind=True,
                     created_by=self.user_id,
                 )
 
@@ -718,8 +722,71 @@ class UsersService(BaseSecuredService):
         return builder.build(records=records)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # REMOVE FROM CHAMBER
+    # ADD / REMOVE USER FROM CHAMBER
     # ─────────────────────────────────────────────────────────────────────────
+
+    async def users_add_to_chamber(self, user_id: str) -> dict:
+        """Adds (or reactivates) a user in this chamber."""
+
+        # 1. Validate user exists
+        user = await self.users_repo.get_by_id(
+            session=self.session,
+            id_values=user_id
+        )
+        if not user:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message=f"User {user_id} not found",
+            )
+
+        # 2. Check ACTIVE link
+        active_link = await self.user_chamber_link_repo.get_active_link(
+            session=self.session,
+            user_id=user_id,
+            chamber_id=self.chamber_id,
+        )
+
+        if active_link:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="User is already a member of this chamber",
+            )
+
+        # 3. Check existing (inactive) link
+        stmt = select(UserChamberLink).where(
+            UserChamberLink.user_id == user_id,
+            UserChamberLink.chamber_id == self.chamber_id,
+        )
+        result = await self.user_chamber_link_repo.execute(stmt, self.session)
+        existing_link = result.scalars().first()
+
+        if existing_link:
+            # 🔥 Reactivate (same pattern as undelete)
+            updated = await self.user_chamber_link_repo.update(
+                session=self.session,
+                id_values=existing_link.link_id,
+                data={
+                    "left_date": None,
+                    "status_ind": True,
+                },
+            )
+        else:
+            # 🔥 Create new link
+            updated = await self.user_chamber_link_repo.create(
+                session=self.session,
+                data={
+                    "user_id": user_id,
+                    "chamber_id": self.chamber_id,
+                    "primary_ind": False,
+                },
+            )
+
+        return {
+            "user_id": user_id,
+            "user_email": user.email,
+            "added": True,
+            "message": "User has been added to this chamber.",
+        }
 
     async def users_remove_from_chamber(self, user_id: str) -> dict:
         """Soft-removes a user from this chamber."""
@@ -749,7 +816,6 @@ class UsersService(BaseSecuredService):
             data={
                 "left_date": date.today(),
                 "status_ind": False,
-                "updated_by": self.user_id,
             },
         )
 

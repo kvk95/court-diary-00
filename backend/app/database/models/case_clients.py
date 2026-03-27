@@ -27,8 +27,8 @@ class CaseClients(BaseModel, TimestampMixin):
     # party_role : CHAR(3) COLLATE "utf8mb4_unicode_ci"
     party_role: Mapped[str] = mapped_column(CHAR(3), nullable=False)
 
-    # is_primary : TINYINT
-    is_primary: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # primary_ind : TINYINT
+    primary_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # engagement_type : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
     engagement_type: Mapped[Optional[str]] = mapped_column(String(20))

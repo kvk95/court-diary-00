@@ -78,7 +78,7 @@ class AuthService(BaseService):
         if not chamber_id:
             stmt = select(UserChamberLink.chamber_id).where(
                 UserChamberLink.user_id == user.user_id,
-                UserChamberLink.is_primary == True,
+                UserChamberLink.primary_ind == True,
                 UserChamberLink.left_date == None,
                 UserChamberLink.status_ind == True,
             )

@@ -65,6 +65,7 @@ class UsersRepository(BaseRepository[Users]):
                 ChamberRoles.role_name,
                 ChamberRoles.description.label("role_description"),
                 ChamberRoles.status_ind.label("role_status_ind"),
+                ChamberRoles.admin_ind,
                 # Chamber fields
                 Chamber.chamber_id,
                 Chamber.chamber_name,
@@ -86,9 +87,9 @@ class UsersRepository(BaseRepository[Users]):
                     UserRoles.end_date.is_(None),
                 )
             )
-            .outerjoin(ChamberRoles, UserRoles.chamber_role_id == ChamberRoles.role_id)
+            .outerjoin(ChamberRoles, UserRoles.role_id == ChamberRoles.role_id)
             .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
-            .where(Users.is_deleted.is_(False))
+            .where(Users.deleted_ind.is_(False))
         )
 
         if user_id:
@@ -130,6 +131,7 @@ class UsersRepository(BaseRepository[Users]):
                 "role_name": row.role_name,
                 "description": row.role_description,
                 "status_ind": row.role_status_ind,
+                "admin_ind": row.admin_ind,
             } if row.role_id else None,
             "chamber": {
                 "chamber_id": row.chamber_id,
@@ -168,6 +170,7 @@ class UsersRepository(BaseRepository[Users]):
                 ChamberRoles.role_name,
                 ChamberRoles.description.label("role_description"),
                 ChamberRoles.status_ind.label("role_status_ind"),
+                ChamberRoles.admin_ind,
                 UserProfiles.header_color,
                 UserProfiles.sidebar_color,
                 UserProfiles.primary_color,
@@ -182,11 +185,11 @@ class UsersRepository(BaseRepository[Users]):
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .outerjoin(ChamberRoles, UserRoles.chamber_role_id == ChamberRoles.role_id)
+            .outerjoin(ChamberRoles, UserRoles.role_id == ChamberRoles.role_id)
             .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
             .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .where(
-                Users.is_deleted.is_(False),
+                Users.deleted_ind.is_(False),
                 UserChamberLink.chamber_id == chamber_id,
                 UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind.is_(True),
@@ -207,12 +210,12 @@ class UsersRepository(BaseRepository[Users]):
 
         # Count before pagination
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
-        count_result = await session.execute(count_stmt)
+        count_result = await self.execute(session=session,stmt=count_stmt)
         total_records: int = count_result.scalar_one() or 0
 
         stmt = stmt.order_by(Users.user_id.desc()).offset((page - 1) * limit).limit(limit)
 
-        result = await session.execute(stmt)
+        result = await self.execute(session=session,stmt=stmt)
         rows = result.all()
 
         # Return raw dicts for service to transform
@@ -227,11 +230,12 @@ class UsersRepository(BaseRepository[Users]):
                 "status_ind": row.status_ind,
                 "created_date": row.created_date,
                 "role": {
-                    "role_id": row.chamber_role_id,
+                    "role_id": row.role_id,
                     "role_name": row.role_name,
                     "description": row.role_description,
                     "status_ind": row.role_status_ind,
-                } if row.chamber_role_id else None,
+                    "admin_ind": row.admin_ind,
+                } if row.role_id else None,
                 "profile": {
                     "header_color": row.header_color,
                     "sidebar_color": row.sidebar_color,
@@ -281,9 +285,9 @@ class UsersRepository(BaseRepository[Users]):
                         UserRoles.end_date.is_(None),
                     ),
                 )
-                .outerjoin(ChamberRoles, ChamberRoles.role_id == UserRoles.chamber_role_id)
+                .outerjoin(ChamberRoles, ChamberRoles.role_id == UserRoles.role_id)
                 .where(
-                    Users.is_deleted.is_(False),
+                    Users.deleted_ind.is_(False),
                     Users.status_ind.is_(True),
                     UserChamberLink.chamber_id == chamber_id,
                     UserChamberLink.left_date.is_(None),
@@ -302,9 +306,9 @@ class UsersRepository(BaseRepository[Users]):
                         UserRoles.end_date.is_(None),
                     ),
                 )
-                .outerjoin(ChamberRoles, ChamberRoles.role_id == UserRoles.chamber_role_id)
+                .outerjoin(ChamberRoles, ChamberRoles.role_id == UserRoles.role_id)
                 .where(
-                    Users.is_deleted.is_(False),
+                    Users.deleted_ind.is_(False),
                     Users.status_ind.is_(True),
                 )
             )
@@ -358,7 +362,7 @@ class UsersRepository(BaseRepository[Users]):
             update(Users)
             .where(Users.user_id == user_id)
             .values(
-                is_deleted=False,
+                deleted_ind=False,
                 deleted_date=None,
                 deleted_by=None,
                 status_ind=True,
@@ -398,7 +402,7 @@ class UsersRepository(BaseRepository[Users]):
         active_users = active_users_result.scalar_one() or 0
 
         # 3. Total roles defined for chamber (via user_roles)
-        total_roles_stmt = select(func.count(func.distinct(UserRoles.chamber_role_id))).join(
+        total_roles_stmt = select(func.count(func.distinct(UserRoles.role_id))).join(
             UserChamberLink,
             UserChamberLink.link_id == UserRoles.link_id
         ).where(

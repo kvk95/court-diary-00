@@ -19,8 +19,8 @@ class UserRoles(BaseModel, TimestampMixin):
     # link_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     link_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("user_chamber_link.link_id", ondelete="CASCADE"), nullable=False)
 
-    # chamber_role_id : INTEGER
-    chamber_role_id: Mapped[int] = mapped_column(Integer, ForeignKey("chamber_roles.role_id", ondelete="CASCADE"), nullable=False)
+    # role_id : INTEGER
+    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("chamber_roles.role_id", ondelete="CASCADE"), nullable=False)
 
     # start_date : DATE
     start_date: Mapped[date] = mapped_column(Date, server_default=func.curdate(), nullable=False)
@@ -44,11 +44,11 @@ class UserRoles(BaseModel, TimestampMixin):
         backref=backref("user_roles_link_id_user_chamber_links", cascade="all, delete-orphan")
     )
 
-    # user_roles.chamber_role_id -> chamber_roles.role_id
-    user_roles_chamber_role_id_chamber_roles = relationship(
+    # user_roles.role_id -> chamber_roles.role_id
+    user_roles_role_id_chamber_roles = relationship(
         "ChamberRoles",
-        foreign_keys=[chamber_role_id], 
-        backref=backref("user_roles_chamber_role_id_chamber_roless", cascade="all, delete-orphan")
+        foreign_keys=[role_id], 
+        backref=backref("user_roles_role_id_chamber_roless", cascade="all, delete-orphan")
     )
 
     # user_roles.created_by -> users.user_id

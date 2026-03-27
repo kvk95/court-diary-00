@@ -115,7 +115,7 @@ class ClientsService(BaseSecuredService):
         from sqlalchemy import or_
         conditions = [
             Clients.chamber_id == self.chamber_id,
-            Clients.is_deleted.is_(False),
+            Clients.deleted_ind.is_(False),
         ]
         if client_type:
             conditions.append(Clients.client_type == client_type.upper())

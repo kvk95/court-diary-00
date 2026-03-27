@@ -179,7 +179,7 @@ class BaseRepository(Generic[ModelType]):
         """
         Apply chamber_id_ filter if the model has chamber_id.
         Supports two conventions:
-        - is_deleted: bool flag
+        - deleted_ind: bool flag
         - deleted_date: nullable datetime when deleted
         """
         ctx = get_request_context()
@@ -193,11 +193,11 @@ class BaseRepository(Generic[ModelType]):
         """
         Apply soft-delete filter if the model supports it.
         Supports two conventions:
-        - is_deleted: bool flag
+        - deleted_ind: bool flag
         - deleted_date: nullable datetime when deleted
         """
-        if hasattr(self.model, "is_deleted"):
-            stmt = stmt.where(self.model.is_deleted.is_(False))
+        if hasattr(self.model, "deleted_ind"):
+            stmt = stmt.where(self.model.deleted_ind.is_(False))
         if hasattr(self.model, "deleted_date"):
             stmt = stmt.where(self.model.deleted_date.is_(None))
         return stmt
@@ -542,18 +542,18 @@ class BaseRepository(Generic[ModelType]):
         session: AsyncSession,
         *,
         data: Dict[str, Any],
-        is_deleted: Optional[bool] = False,
+        deleted_ind: Optional[bool] = False,
     ) -> ModelType:
         """
         Create a new record.
         - data should already be filtered via map_fields_to_db_column
         - created_by is injected to audit fields if supported
-        - is_deleted defaults to False unless explicitly set on the model
+        - deleted_ind defaults to False unless explicitly set on the model
         """
         create_data = self._set_audit_fields(data)
 
-        if hasattr(self.model, "is_deleted") and "is_deleted" not in create_data:
-            create_data["is_deleted"] = is_deleted
+        if hasattr(self.model, "deleted_ind") and "deleted_ind" not in create_data:
+            create_data["deleted_ind"] = deleted_ind
 
         # Log INSERT for visibility; ORM performs actual insert
         self._log_stmt(insert(self.model).values(**create_data), session)
@@ -719,7 +719,7 @@ class BaseRepository(Generic[ModelType]):
         - Else → fallback to primary key equality using id_values
 
         Soft-delete behavior:
-        - If model supports is_deleted or deleted_at/deleted_date, flips flags
+        - If model supports deleted_ind or deleted_at/deleted_date, flips flags
         - Otherwise performs hard delete
         """
         self._validate_query_params(
@@ -742,12 +742,12 @@ class BaseRepository(Generic[ModelType]):
         chamber_id = cast(str, ctx.get("chamber_id"))
 
         if soft and (
-            hasattr(obj, "is_deleted")
+            hasattr(obj, "deleted_ind")
             or hasattr(obj, "deleted_at")
             or hasattr(obj, "deleted_date")
         ):
-            if hasattr(obj, "is_deleted"):
-                obj.is_deleted = True
+            if hasattr(obj, "deleted_ind"):
+                obj.deleted_ind = True
             # Support common deleted fields
             now_utc = datetime.now(timezone.utc)
             if hasattr(obj, "deleted_at"):
@@ -792,8 +792,8 @@ class BaseRepository(Generic[ModelType]):
         update_data = {}
 
         # Reset soft delete flags
-        if hasattr(self.model, "is_deleted"):
-            update_data["is_deleted"] = False
+        if hasattr(self.model, "deleted_ind"):
+            update_data["deleted_ind"] = False
         if hasattr(self.model, "deleted_date"):
             update_data["deleted_date"] = None
         if hasattr(self.model, "deleted_by"):
@@ -855,7 +855,7 @@ class BaseRepository(Generic[ModelType]):
             "created_by",
             "updated_date",
             "updated_by",
-            "is_deleted",
+            "deleted_ind",
             "deleted_date",
             "deleted_by",
             "sort_order",

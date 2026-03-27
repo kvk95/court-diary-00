@@ -50,6 +50,7 @@ class RolesService(BaseSecuredService):
                 description=role_row.description,
                 status_ind=role_row.status_ind,
                 user_count=user_count or 0,
+                admin_ind=role_row.admin_ind,
             )
             for role_row, user_count in rows
         ]
@@ -80,7 +81,7 @@ class RolesService(BaseSecuredService):
         existing = await self.chamber_roles_repo.get_first(
             self.session,
             filters={ChamberRoles.role_name: role_name},
-            where=[ChamberRoles.is_deleted.is_(False)],
+            where=[ChamberRoles.deleted_ind.is_(False)],
         )
         if existing:
             raise ValidationErrorDetail(
@@ -96,7 +97,7 @@ class RolesService(BaseSecuredService):
         existing_code = result.scalars().first()
 
         if existing_code:
-            if existing_code.is_deleted:
+            if existing_code.deleted_ind:
                 # 🔥 Step 1: undelete
                 await self.chamber_roles_repo.undelete(
                     session=self.session,
@@ -172,7 +173,7 @@ class RolesService(BaseSecuredService):
                 ChamberRoles.chamber_id == self.chamber_id,
                 ChamberRoles.role_name == new_name,
                 ChamberRoles.role_id != role_id,
-                ChamberRoles.is_deleted.is_(True)
+                ChamberRoles.deleted_ind.is_(True)
             )
 
             result = await self.chamber_roles_repo.execute(stmt, self.session)
@@ -183,7 +184,7 @@ class RolesService(BaseSecuredService):
                     session=self.session,
                     id_values=soft_deleted_duplicate.role_id,
                     data={
-                        "is_deleted": False,
+                        "deleted_ind": False,
                         "role_name": new_name,
                         "description": payload.description,
                         "status_ind": payload.status_ind if payload.status_ind is not None else True,
@@ -224,7 +225,7 @@ class RolesService(BaseSecuredService):
 
         # Block deletion if role has active assignments
         stmt = select(func.count(UserRoles.user_role_id)).where(
-            and_(UserRoles.chamber_role_id == role_id, UserRoles.end_date.is_(None))
+            and_(UserRoles.role_id == role_id, UserRoles.end_date.is_(None))
         )
         result = await self.session.execute(stmt)
         user_count = result.scalar_one() or 0
@@ -242,7 +243,7 @@ class RolesService(BaseSecuredService):
 
     async def get_role_stats(self, role_id: int) -> RoleUserCountOut:
         stmt = select(func.count(UserRoles.user_role_id)).where(
-            and_(UserRoles.chamber_role_id == role_id, UserRoles.end_date.is_(None))
+            and_(UserRoles.role_id == role_id, UserRoles.end_date.is_(None))
         )
         result = await self.session.execute(stmt)
         user_count = result.scalar_one() or 0
@@ -252,7 +253,7 @@ class RolesService(BaseSecuredService):
         """Lightweight list for dropdowns (no pagination needed)."""
         roles = await self.chamber_roles_repo.list_all(
             session=self.session,
-            where=[ChamberRoles.is_deleted.is_(False), ChamberRoles.status_ind.is_(True)],
+            where=[ChamberRoles.deleted_ind.is_(False), ChamberRoles.status_ind.is_(True)],
             order_by=[ChamberRoles.role_name.asc()],
         )
         return [RoleOut.model_validate(r) for r in roles]

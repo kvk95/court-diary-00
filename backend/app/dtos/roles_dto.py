@@ -24,6 +24,7 @@ class RoleOut(BaseModel):
     role_name: str
     description: Optional[str]
     status_ind: bool
+    admin_ind: bool
 
     class Config:
         from_attributes = True

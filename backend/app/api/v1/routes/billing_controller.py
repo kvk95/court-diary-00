@@ -75,7 +75,7 @@ class BillingController(BaseController):
     )
     async def bills_get_by_id(
         self,
-        bill_id: str = Path(..., gt=0),
+        bill_id: str = Path(..., min_length=36, max_length=36),
         service: BillingService = Depends(get_billing_service),
     ) -> BaseOutDto[BillDetailOut]:
         return self.success(result=await service.bills_get_by_id(bill_id=bill_id))
@@ -131,7 +131,7 @@ class BillingController(BaseController):
     )
     async def payments_get_by_bill(
         self,
-        bill_id: str = Path(..., gt=0),
+        bill_id: str = Path(..., min_length=36, max_length=36),
         service: BillingService = Depends(get_billing_service),
     ) -> BaseOutDto[List[PaymentOut]]:
         return self.success(result=await service.payments_get_by_bill(bill_id=bill_id))
@@ -220,7 +220,7 @@ class BillingController(BaseController):
     )
     async def documents_delete(
         self,
-        document_id: str = Path(..., gt=0),
+        document_id: str = Path(..., min_length=36, max_length=36),
         service: BillingService = Depends(get_billing_service),
     ) -> BaseOutDto[dict]:
         return self.success(result=await service.documents_delete(document_id=document_id))

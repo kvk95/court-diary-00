@@ -17,7 +17,7 @@ class AorOut(BaseRecordData):
     case_id: str
     user_id: str
     advocate_name: str           # first_name + last_name of the user
-    is_primary: bool = False
+    primary_ind: bool = False
     status_code: str = "AC"
     status_description: Optional[str] = None
     appointment_date: Optional[date] = None
@@ -29,14 +29,14 @@ class AorOut(BaseRecordData):
 class AorCreate(BaseInData):
     case_id: str
     user_id: str                 # must be a chamber member
-    is_primary: bool = False
+    primary_ind: bool = False
     appointment_date: Optional[date] = None
     notes: Optional[str] = None
 
 
 class AorEdit(BaseInData):
     case_aor_id: str
-    is_primary: Optional[bool] = None
+    primary_ind: Optional[bool] = None
     status_code: Optional[str] = None      # AC | WD | SU
     appointment_date: Optional[date] = None
     withdrawal_date: Optional[date] = None

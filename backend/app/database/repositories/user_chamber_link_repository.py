@@ -160,7 +160,7 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
         session: AsyncSession,
         user_id: str,
         chamber_id: str,
-        is_primary: bool,
+        primary_ind: bool,
         created_by: str,
     ) -> UserChamberLink:
         """Create a new user-chamber link."""
@@ -169,7 +169,7 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
             data={
                 "user_id": user_id,
                 "chamber_id": chamber_id,
-                "is_primary": is_primary,
+                "primary_ind": primary_ind,
                 "joined_date": date.today(),
                 "status_ind": True,
                 "created_by": created_by,
@@ -186,7 +186,7 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
             session=session,
             filters={
                 UserChamberLink.user_id: user_id,
-                UserChamberLink.is_primary: True,
+                UserChamberLink.primary_ind: True,
             },
             where=[
                 UserChamberLink.left_date.is_(None),

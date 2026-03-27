@@ -207,14 +207,14 @@ VALUES
 (UUID(), @user_lokesh,  'Plot 78, RS Puram', 'IN', 'TN', 'Coimbatore', '641002', '225 30% 11%', '225 35% 14%', '142 76% 36%', 'Roboto, sans-serif', @user_lokesh);
 
 -- 18.2 User ↔ Chamber Links
-INSERT INTO user_chamber_link (link_id, user_id, chamber_id, is_primary, joined_date, created_by) VALUES
+INSERT INTO user_chamber_link (link_id, user_id, chamber_id, primary_ind, joined_date, created_by) VALUES
 (UUID(), @user_vijay,   @chamber_vk,     TRUE, '2024-01-15', @user_vijay),
 (UUID(), @user_priya,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
 (UUID(), @user_karthik, @chamber_vk,     TRUE, '2024-03-10', @user_vijay),
 (UUID(), @user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh);
 
 -- 18.3 Chamber Modules
-INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, is_active, created_by) VALUES
+INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, active_ind, created_by) VALUES
 (UUID(), @chamber_vk, 'ADMN', TRUE, @user_vijay),
 (UUID(), @chamber_vk, 'DASH', TRUE, @user_vijay),
 (UUID(), @chamber_vk, 'CASE', TRUE, @user_vijay),
@@ -227,7 +227,7 @@ INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, is_acti
 (UUID(), @chamber_vk, 'RPRT', TRUE, @user_vijay),
 (UUID(), @chamber_vk, 'SETT', TRUE, @user_vijay);
 
-INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, is_active, created_by) VALUES
+INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, active_ind, created_by) VALUES
 (UUID(), @chamber_sundar, 'ADMN', TRUE, @user_lokesh),
 (UUID(), @chamber_sundar, 'DASH', TRUE, @user_lokesh),
 (UUID(), @chamber_sundar, 'CASE', TRUE, @user_lokesh),
@@ -245,18 +245,17 @@ INSERT INTO chamber_modules (chamber_module_id, chamber_id, module_code, is_acti
 -- =============================================================================
 
 -- 19.1 Master Security Roles (Global Templates)
-INSERT INTO security_roles (role_name, description, is_system, created_by) VALUES
-('Administrator', 'Full access to all modules', TRUE, @user_vijay),
-('Senior Advocate', 'Manage cases, hearings and clients', TRUE, @user_vijay),
-('Clerk', 'Basic data entry and viewing only', TRUE, @user_vijay);
+INSERT INTO security_roles (role_name, description, admin_ind, system_ind, created_by) VALUES
+('Administrator', 'Full access to all modules', TRUE, TRUE, @user_vijay),
+('Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_vijay);
 
 -- 19.2 Chamber-specific Roles (Copy from master)
-INSERT INTO chamber_roles (chamber_id, role_name, description, is_system, created_by) VALUES
-(@chamber_vk, 'Administrator', 'Full access to all modules', TRUE, @user_vijay),
-(@chamber_vk, 'Senior Advocate', 'Manage cases, hearings and clients', TRUE, @user_vijay),
+INSERT INTO chamber_roles (chamber_id, role_name, description, admin_ind, system_ind, created_by) VALUES
+(@chamber_vk, 'Administrator', 'Full access to all modules', TRUE, TRUE, @user_vijay),
+(@chamber_vk, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_vijay),
 
-(@chamber_sundar, 'Administrator', 'Full access to all modules', TRUE, @user_lokesh),
-(@chamber_sundar, 'Senior Advocate', 'Manage cases, hearings and clients', TRUE, @user_lokesh);
+(@chamber_sundar, 'Administrator', 'Full access to all modules', TRUE, TRUE, @user_lokesh),
+(@chamber_sundar, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_lokesh);
 
 -- 19.3 User Roles (link to chamber_roles)
 SET @link_vijay_vk   = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_vijay AND chamber_id = @chamber_vk);
@@ -268,7 +267,7 @@ SET @role_admin_vk   = (SELECT role_id FROM chamber_roles WHERE chamber_id = @ch
 SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk AND role_name = 'Senior Advocate');
 SET @role_admin_sundar = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar AND role_name = 'Administrator');
 
-INSERT INTO user_roles (link_id, chamber_role_id, start_date, created_by) VALUES
+INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_vijay_vk,   @role_admin_vk,   '2024-01-15', @user_vijay),
 (@link_priya_vk,   @role_senior_vk,  '2024-02-01', @user_vijay),
 (@link_karthik_vk, @role_senior_vk,  '2024-03-10', @user_vijay),
@@ -288,7 +287,7 @@ SET @cm_rprt  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id 
 SET @cm_sett  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'SETT');
 
 -- Administrator - Full Access
-INSERT INTO role_permissions (chamber_role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) 
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) 
 VALUES
 (@role_admin_vk, @cm_admn, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
 (@role_admin_vk, @cm_dash, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
@@ -424,7 +423,7 @@ INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, n
 -- 22.1  Case Notes
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, is_private, created_by) VALUES
+INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, private_ind, created_by) VALUES
 (@chamber_vk, @case1, @user_priya,   'Client mentioned new evidence – witness statement from neighbour. Follow up before next hearing.', FALSE, @user_priya),
 (@chamber_vk, @case1, @user_vijay,   'Internal: Consider settlement if opposing party approaches. Max limit: 5 lakhs.',                 TRUE,  @user_vijay),
 (@chamber_vk, @case1, @user_karthik, 'Court fee receipt collected. Original filed in case file.',                                       FALSE, @user_karthik),
@@ -436,7 +435,7 @@ INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, is_private, cre
 -- 22.2  Case AORs
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO case_aors (case_id, user_id, chamber_id, is_primary, appointment_date, status_code, created_by) VALUES
+INSERT INTO case_aors (case_id, user_id, chamber_id, primary_ind, appointment_date, status_code, created_by) VALUES
 (@case1, @user_priya, @chamber_vk,     TRUE,  '2025-01-10', 'AC', @user_vijay),
 (@case2, @user_priya, @chamber_vk,     TRUE,  '2025-03-05', 'AC', @user_vijay),
 (@case3, @user_lokesh, @chamber_sundar, TRUE, '2024-08-12', 'AC', @user_lokesh),
@@ -449,11 +448,11 @@ INSERT INTO case_aors (case_id, user_id, chamber_id, is_primary, appointment_dat
 -- =============================================================================
 
 INSERT INTO email_settings (chamber_id, from_email, smtp_host, smtp_port, smtp_user,
-                             smtp_password, encryption_code, is_default, status_ind, created_by) VALUES
+                             smtp_password, encryption_code, default_ind, status_ind, created_by) VALUES
 (@chamber_vk, 'no-reply@vkchamber.in', 'smtp.gmail.com', 587, 'no-reply@vkchamber.in', 'app-password-placeholder', 'T', TRUE,  TRUE, @user_vijay),
 (@chamber_vk, 'office@vkchamber.in',   'smtp.zoho.com',  587, 'office@vkchamber.in',   'zoho-password-placeholder', 'T', FALSE, TRUE, @user_vijay);
 
-INSERT INTO email_templates (chamber_id, code, subject, content, is_customized, enabled_ind, created_by) VALUES
+INSERT INTO email_templates (chamber_id, code, subject, content, customized_ind, enabled_ind, created_by) VALUES
 (@chamber_vk, 'hearing_tomorrow',
  'Court Hearing Tomorrow – Urgent: {Case Number}',
  '<p>Dear Advocate,</p><p><strong>Tomorrow</strong> hearing:<br>Case: <b>{Case Number}</b></p><p>Prepare urgently.</p><p>VijayKrishnan & Associates</p>',
@@ -547,7 +546,7 @@ SELECT
     c.chamber_name,
     cr.role_name,
     cr.description,
-    cr.is_system
+    cr.admin_ind
 FROM chamber_roles cr
 JOIN chamber c ON cr.chamber_id = c.chamber_id
 ORDER BY c.chamber_name, cr.role_name;
@@ -563,7 +562,7 @@ FROM user_roles ur
 JOIN user_chamber_link ucl ON ur.link_id = ucl.link_id
 JOIN users u ON ucl.user_id = u.user_id
 JOIN chamber c ON ucl.chamber_id = c.chamber_id
-JOIN chamber_roles cr ON ur.chamber_role_id = cr.role_id     -- ← FIXED: Use chamber_role_id
+JOIN chamber_roles cr ON ur.role_id = cr.role_id     -- ← FIXED: Use role_id
 ORDER BY c.chamber_name, u.email;
 
 -- 4. Bonus: Check how many permissions exist per chamber role
@@ -573,7 +572,7 @@ SELECT
     COUNT(rp.permission_id) AS permission_count
 FROM chamber_roles cr
 JOIN chamber c ON cr.chamber_id = c.chamber_id
-LEFT JOIN role_permissions rp ON rp.chamber_role_id = cr.role_id
+LEFT JOIN role_permissions rp ON rp.role_id = cr.role_id
 GROUP BY c.chamber_name, cr.role_name
 ORDER BY c.chamber_name, cr.role_name;
 

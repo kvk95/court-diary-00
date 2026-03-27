@@ -41,7 +41,7 @@ class UserOut(BaseRecordData):
     email: EmailStr
     phone: Optional[str] = None
     role: Optional[RoleOut] = None
-    is_active: bool = True
+    active_ind: bool = True
     image: Optional[str] = None
     created_date: Optional[datetime] = None
     chamber_name: Optional[str] = None

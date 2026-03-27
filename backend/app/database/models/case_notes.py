@@ -28,11 +28,11 @@ class CaseNotes(BaseModel, TimestampMixin):
     # note_text : TEXT COLLATE "utf8mb4_unicode_ci"
     note_text: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # is_private : TINYINT
-    is_private: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # private_ind : TINYINT
+    private_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
-    # is_deleted : TINYINT
-    is_deleted: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # deleted_ind : TINYINT
+    deleted_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # deleted_date : TIMESTAMP
     deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)

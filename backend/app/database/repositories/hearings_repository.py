@@ -32,7 +32,7 @@ class HearingsRepository(BaseRepository[Hearings]):
         def _base():
             return select(func.count(Hearings.hearing_id)).where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
             )
 
         total = await session.scalar(_base()) or 0
@@ -73,7 +73,7 @@ class HearingsRepository(BaseRepository[Hearings]):
     ) -> int:
         conditions = [
             Hearings.chamber_id == chamber_id,
-            Hearings.is_deleted.is_(False),
+            Hearings.deleted_ind.is_(False),
             Hearings.hearing_date >= month_start,
             Hearings.hearing_date < month_end,
         ]
@@ -110,8 +110,8 @@ class HearingsRepository(BaseRepository[Hearings]):
             .join(Cases, Hearings.case_id == Cases.case_id)
             .where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
-                Cases.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
+                Cases.deleted_ind.is_(False),
                 Hearings.hearing_date >= date_from,
                 Hearings.hearing_date <= date_to,
             )
@@ -142,8 +142,8 @@ class HearingsRepository(BaseRepository[Hearings]):
             .join(Cases, Hearings.case_id == Cases.case_id)
             .where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
-                Cases.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
+                Cases.deleted_ind.is_(False),
                 Hearings.status_code.in_(["UP", "SC"]),
                 Hearings.hearing_date <= date_to,
             )

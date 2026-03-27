@@ -172,7 +172,7 @@ class RolePermissionsService(BaseSecuredService):
                 filters={
                     ChamberModules.chamber_module_id: dto.chamber_module_id
                 },
-                where=[ChamberModules.is_active.is_(True)]
+                where=[ChamberModules.active_ind.is_(True)]
             )
 
             if not module:
@@ -183,7 +183,7 @@ class RolePermissionsService(BaseSecuredService):
 
             # 3. Prepare data for upsert
             perm_data = {
-                "chamber_role_id": role_id,
+                "role_id": role_id,
                 "chamber_module_id": dto.chamber_module_id,
                 "allow_all_ind": dto.allow_all_ind or False,
                 "read_ind": dto.read_ind or False,
@@ -198,7 +198,7 @@ class RolePermissionsService(BaseSecuredService):
             await self.role_permissions_repo.upsert(
                 session=self.session,
                 filters={
-                    RolePermissions.chamber_role_id: role_id,
+                    RolePermissions.role_id: role_id,
                     RolePermissions.chamber_module_id: dto.chamber_module_id,
                 },
                 data=perm_data,

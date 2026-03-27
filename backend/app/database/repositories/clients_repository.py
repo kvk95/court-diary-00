@@ -23,7 +23,7 @@ class ClientsRepository(BaseRepository[Clients]):
             select(Clients)
             .where(
                 Clients.chamber_id == chamber_id,
-                Clients.is_deleted.is_(False),
+                Clients.deleted_ind.is_(False),
                 Clients.status_ind.is_(True),
                 or_(
                     Clients.client_name.ilike(kw),

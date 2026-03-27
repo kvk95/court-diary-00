@@ -65,7 +65,7 @@ class ClientsController(BaseController):
     )
     async def clients_get_by_id(
         self,
-        client_id: str = Path(..., gt=0),
+        client_id: str = Path(..., min_length=36, max_length=36),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[ClientDetailOut]:
         return self.success(result=await service.clients_get_by_id(client_id=client_id))
@@ -93,7 +93,7 @@ class ClientsController(BaseController):
     )
     async def clients_edit(
         self,
-        client_id: str = Path(..., gt=0),
+        client_id: str = Path(..., min_length=36, max_length=36),
         payload: ClientEdit = Body(...),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[ClientDetailOut]:
@@ -108,7 +108,7 @@ class ClientsController(BaseController):
     )
     async def clients_delete(
         self,
-        client_id: str = Path(..., gt=0),
+        client_id: str = Path(..., min_length=36, max_length=36),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[dict]:
         return self.success(result=await service.clients_delete(client_id=client_id))

@@ -40,7 +40,7 @@ class DashboardRepository(BaseRepository[Cases]):
         active_cases = await session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.status_code == "AC",
             )
         ) or 0
@@ -48,7 +48,7 @@ class DashboardRepository(BaseRepository[Cases]):
         today_hearings = await session.scalar(
             select(func.count(Hearings.hearing_id)).where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
                 Hearings.hearing_date == today,
             )
         ) or 0
@@ -58,8 +58,8 @@ class DashboardRepository(BaseRepository[Cases]):
             .join(Cases, Hearings.case_id == Cases.case_id)
             .where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
-                Cases.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
+                Cases.deleted_ind.is_(False),
                 Hearings.hearing_date == today,
                 Hearings.status_code.notin_(["CMP", "DIS"]),
             )
@@ -68,7 +68,7 @@ class DashboardRepository(BaseRepository[Cases]):
         this_week_hearings = await session.scalar(
             select(func.count(Hearings.hearing_id)).where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
                 Hearings.hearing_date.between(today, week_end),
             )
         ) or 0
@@ -76,7 +76,7 @@ class DashboardRepository(BaseRepository[Cases]):
         overdue_cases = await session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.status_code == "AC",
                 Cases.next_hearing_date < today,
             )
@@ -110,7 +110,7 @@ class DashboardRepository(BaseRepository[Cases]):
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
             .where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.status_code == "AC",
                 Cases.next_hearing_date < today,
             )
@@ -131,10 +131,10 @@ class DashboardRepository(BaseRepository[Cases]):
             )
             .where(
                 Hearings.case_id.in_(case_ids),
-                Hearings.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
                 Hearings.hearing_date == (
                     select(func.max(Hearings.hearing_date))
-                    .where(Hearings.case_id == Hearings.case_id, Hearings.is_deleted.is_(False))
+                    .where(Hearings.case_id == Hearings.case_id, Hearings.deleted_ind.is_(False))
                     .correlate(Hearings)
                     .scalar_subquery()
                 ),
@@ -170,8 +170,8 @@ class DashboardRepository(BaseRepository[Cases]):
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
             .where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.is_deleted.is_(False),
-                Cases.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
+                Cases.deleted_ind.is_(False),
                 Hearings.hearing_date == hearing_date,
             )
             .order_by(Cases.case_number.asc())
@@ -203,12 +203,12 @@ class DashboardRepository(BaseRepository[Cases]):
                 UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind.is_(True),
                 Users.status_ind.is_(True),
-                Users.is_deleted.is_(False),
+                Users.deleted_ind.is_(False),
             )
         ) or 0
 
         roles_count = await session.scalar(
-            select(func.count(func.distinct(UserRoles.chamber_role_id)))
+            select(func.count(func.distinct(UserRoles.role_id)))
             .join(UserChamberLink, UserChamberLink.link_id == UserRoles.link_id)
             .where(
                 UserChamberLink.chamber_id == chamber_id,

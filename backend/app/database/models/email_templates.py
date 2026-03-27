@@ -28,8 +28,8 @@ class EmailTemplates(BaseModel, TimestampMixin):
     # content : LONGTEXT
     content: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
 
-    # is_customized : TINYINT
-    is_customized: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # customized_ind : TINYINT
+    customized_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # enabled_ind : TINYINT
     enabled_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)

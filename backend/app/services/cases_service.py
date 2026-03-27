@@ -104,14 +104,14 @@ class CasesService(BaseSecuredService):
         hearing_count = await self.session.scalar(
             select(func.count(Hearings.hearing_id)).where(
                 Hearings.case_id == case.case_id,
-                Hearings.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
             )
         ) or 0
 
         note_count = await self.session.scalar(
             select(func.count(CaseNotes.note_id)).where(
                 CaseNotes.case_id == case.case_id,
-                CaseNotes.is_deleted.is_(False),
+                CaseNotes.deleted_ind.is_(False),
             )
         ) or 0
 
@@ -156,27 +156,27 @@ class CasesService(BaseSecuredService):
 
         total = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == cid, Cases.is_deleted.is_(False)
+                Cases.chamber_id == cid, Cases.deleted_ind.is_(False)
             )
         ) or 0
         active = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == cid,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.status_code == RefmCaseStatusConstants.ACTIVE,
             )
         ) or 0
         adjourned = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == cid,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.status_code == RefmCaseStatusConstants.ADJOURNED,
             )
         ) or 0
         overdue = await self.session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == cid,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.status_code == RefmCaseStatusConstants.ACTIVE,
                 Cases.next_hearing_date < today,
             )
@@ -199,7 +199,7 @@ class CasesService(BaseSecuredService):
     ) -> PagingData[CaseListOut]:
         conditions = [
             Cases.chamber_id == self.chamber_id,
-            Cases.is_deleted.is_(False),
+            Cases.deleted_ind.is_(False),
         ]
         if status_code and status_code.upper() != "ALL":
             conditions.append(Cases.status_code == status_code.upper())
@@ -325,7 +325,7 @@ class CasesService(BaseSecuredService):
             where=[
                 Hearings.case_id == case_id,
                 Hearings.chamber_id == self.chamber_id,
-                Hearings.is_deleted.is_(False),
+                Hearings.deleted_ind.is_(False),
             ],
             order_by=[Hearings.hearing_date.desc()],
         )
@@ -444,7 +444,7 @@ class CasesService(BaseSecuredService):
             where=[
                 CaseNotes.case_id == case_id,
                 CaseNotes.chamber_id == self.chamber_id,
-                CaseNotes.is_deleted.is_(False),
+                CaseNotes.deleted_ind.is_(False),
             ],
             order_by=[CaseNotes.created_date.desc()],
         )
@@ -459,7 +459,7 @@ class CasesService(BaseSecuredService):
             CaseNoteOut(
                 note_id=n.note_id, case_id=n.case_id, user_id=n.user_id,
                 author_name=author_map.get(n.user_id), note_text=n.note_text,
-                is_private=bool(n.is_private), created_date=n.created_date, updated_date=n.updated_date,
+                private_ind=bool(n.private_ind), created_date=n.created_date, updated_date=n.updated_date,
             )
             for n in notes
         ]
@@ -474,7 +474,7 @@ class CasesService(BaseSecuredService):
         return CaseNoteOut(
             note_id=note.note_id, case_id=note.case_id, user_id=note.user_id,
             author_name=_full_name(u.first_name, u.last_name) if u else None,
-            note_text=note.note_text, is_private=bool(note.is_private),
+            note_text=note.note_text, private_ind=bool(note.private_ind),
             created_date=note.created_date, updated_date=note.updated_date,
         )
 
@@ -494,7 +494,7 @@ class CasesService(BaseSecuredService):
         return CaseNoteOut(
             note_id=updated.note_id, case_id=updated.case_id, user_id=updated.user_id,
             author_name=_full_name(u.first_name, u.last_name) if u else None,
-            note_text=updated.note_text, is_private=bool(updated.is_private),
+            note_text=updated.note_text, private_ind=bool(updated.private_ind),
             created_date=updated.created_date, updated_date=updated.updated_date,
         )
 
@@ -519,7 +519,7 @@ class CasesService(BaseSecuredService):
                 CaseClients.case_client_id,
                 CaseClients.client_id,
                 CaseClients.party_role,
-                CaseClients.is_primary,
+                CaseClients.primary_ind,
                 CaseClients.engagement_type,
                 Clients.client_name,
                 Clients.client_type,
@@ -531,7 +531,7 @@ class CasesService(BaseSecuredService):
                 CaseClients.case_id == case_id,
                 CaseClients.chamber_id == self.chamber_id,
             )
-            .order_by(CaseClients.is_primary.desc(), Clients.client_name.asc())
+            .order_by(CaseClients.primary_ind.desc(), Clients.client_name.asc())
         )
         # Load party role descriptions
         all_roles = {}
@@ -547,7 +547,7 @@ class CasesService(BaseSecuredService):
                 client_type=r.client_type,
                 party_role=r.party_role,
                 party_role_description=all_roles.get(r.party_role),
-                is_primary=bool(r.is_primary),
+                primary_ind=bool(r.primary_ind),
                 engagement_type=r.engagement_type,
                 email=r.email,
                 phone=r.phone,
@@ -578,7 +578,7 @@ class CasesService(BaseSecuredService):
                 "case_id": case_id,
                 "client_id": payload.client_id,
                 "party_role": payload.party_role,
-                "is_primary": payload.is_primary,
+                "primary_ind": payload.primary_ind,
                 "engagement_type": payload.engagement_type,
             },
         )
@@ -596,7 +596,7 @@ class CasesService(BaseSecuredService):
             client_type=client.client_type if client else "",
             party_role=link.party_role,
             party_role_description=pr.description if pr else None,
-            is_primary=bool(link.is_primary),
+            primary_ind=bool(link.primary_ind),
             engagement_type=link.engagement_type,
             email=client.email if client else None,
             phone=client.phone if client else None,

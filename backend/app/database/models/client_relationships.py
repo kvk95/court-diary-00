@@ -24,8 +24,8 @@ class ClientRelationships(BaseModel):
     # relationship_type : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
     relationship_type: Mapped[str] = mapped_column(String(50), nullable=False)
 
-    # is_active : TINYINT
-    is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    # active_ind : TINYINT
+    active_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
 
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)

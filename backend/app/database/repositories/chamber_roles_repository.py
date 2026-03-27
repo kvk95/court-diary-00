@@ -25,11 +25,11 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
             .outerjoin(
                 UserRoles,
                 and_(
-                    ChamberRoles.role_id == UserRoles.chamber_role_id,
+                    ChamberRoles.role_id == UserRoles.role_id,
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .where(ChamberRoles.is_deleted.is_(False))
+            .where(ChamberRoles.deleted_ind.is_(False))
             .group_by(ChamberRoles.role_id)
         )
 

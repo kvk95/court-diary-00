@@ -21,21 +21,13 @@ class RolePermissionEdit(RolePermissionBase):
     pass
 
 
-class RolePermissionModuleOut(BaseModel):
-    chamber_module_id: str
+class RolePermissionModuleOut(RolePermissionBase):
     chamber_id: str
     chamber_name: str
     module_code: str
     module_name: str
     permission_id: Optional[str] = None
     role_id:int
-    allow_all_ind: bool
-    read_ind: bool
-    write_ind: bool
-    create_ind: bool
-    delete_ind: bool
-    import_ind: bool
-    export_ind: bool
 
 
 class RolePermissionMatrixOut(BaseModel):

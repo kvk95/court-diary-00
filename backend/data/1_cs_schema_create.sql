@@ -265,7 +265,7 @@ CREATE TABLE chamber (
     subscription_start DATE         NULL,
     subscription_end   DATE         NULL,
     status_ind         BOOLEAN      NOT NULL DEFAULT TRUE,
-    is_deleted         BOOLEAN      DEFAULT FALSE,
+    deleted_ind         BOOLEAN      DEFAULT FALSE,
     deleted_date       TIMESTAMP    NULL,
     deleted_by         CHAR(36)     NULL,  
     created_date       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -279,7 +279,7 @@ CREATE TABLE chamber (
     CONSTRAINT fk_chamber_plan
         FOREIGN KEY (plan_code)    REFERENCES refm_plan_types(code)  ON DELETE RESTRICT,
     INDEX idx_chamber_email (email),
-    INDEX idx_chamber_status (status_ind, is_deleted)
+    INDEX idx_chamber_status (status_ind, deleted_ind)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Law chamber / firm';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -295,7 +295,7 @@ CREATE TABLE users (
     last_name             VARCHAR(60)  NULL,
     phone                 VARCHAR(20)  NULL,
     status_ind            BOOLEAN      NOT NULL DEFAULT TRUE,
-    is_deleted            BOOLEAN      DEFAULT FALSE,
+    deleted_ind           BOOLEAN      DEFAULT FALSE,
     deleted_date          TIMESTAMP    NULL,
     deleted_by            CHAR(36)     NULL,  
     email_verified_ind    BOOLEAN      DEFAULT FALSE,
@@ -310,7 +310,7 @@ CREATE TABLE users (
     updated_by            CHAR(36)     NULL,  
     CONSTRAINT uk_user_email
         UNIQUE KEY (email),
-    INDEX idx_users_status (status_ind, is_deleted)
+    INDEX idx_users_status (status_ind, deleted_ind)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Users (chamber-agnostic)';
 
 -- =============================================================================
@@ -351,7 +351,7 @@ CREATE TABLE user_chamber_link (
     link_id               CHAR(36)     PRIMARY KEY,  
     user_id               CHAR(36)     NOT NULL,  
     chamber_id            CHAR(36)     NOT NULL,  
-    is_primary            BOOLEAN      DEFAULT FALSE,
+    primary_ind            BOOLEAN      DEFAULT FALSE,
     joined_date           DATE         NOT NULL DEFAULT (CURRENT_DATE),
     left_date             DATE         NULL,
     status_ind            BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -369,7 +369,7 @@ CREATE TABLE user_chamber_link (
         FOREIGN KEY (created_by) REFERENCES users(user_id)     ON DELETE SET NULL,
     CONSTRAINT fk_ucl_updated_by
         FOREIGN KEY (updated_by) REFERENCES users(user_id)     ON DELETE SET NULL,
-    INDEX idx_ucl_user_primary    (user_id, is_primary),
+    INDEX idx_ucl_user_primary    (user_id, primary_ind),
     INDEX idx_ucl_chamber_active  (chamber_id, status_ind, left_date),
     INDEX idx_ucl_lookup          (user_id, chamber_id, status_ind)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='User ↔ Chamber membership';
@@ -383,7 +383,7 @@ CREATE TABLE chamber_modules (
     chamber_module_id CHAR(36)     PRIMARY KEY,  
     chamber_id        CHAR(36)     NOT NULL,  
     module_code       CHAR(8)      NOT NULL,
-    is_active         BOOLEAN      DEFAULT TRUE,
+    active_ind        BOOLEAN      DEFAULT TRUE,
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by        CHAR(36)     NULL,  
     updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -413,9 +413,10 @@ CREATE TABLE security_roles (
     role_id      INT          AUTO_INCREMENT PRIMARY KEY,  -- Keep INT (small table)
     role_name    VARCHAR(80)  NOT NULL,
     description  TEXT         NULL,
-    is_system    BOOLEAN      NOT NULL DEFAULT TRUE,
+    system_ind   BOOLEAN      NOT NULL DEFAULT TRUE,
+    admin_ind    BOOLEAN      NOT NULL DEFAULT FALSE,
     status_ind   BOOLEAN      NOT NULL DEFAULT TRUE,
-    is_deleted   BOOLEAN      DEFAULT FALSE,
+    deleted_ind  BOOLEAN      DEFAULT FALSE,
     deleted_date TIMESTAMP    NULL,
     deleted_by   CHAR(36)     NULL,  
     created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -437,9 +438,10 @@ CREATE TABLE chamber_roles (
     chamber_id CHAR(36) NOT NULL,
     role_name VARCHAR(80) NOT NULL,
     description TEXT NULL,
-    is_system BOOLEAN NOT NULL DEFAULT TRUE,
+	system_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    admin_ind  BOOLEAN NOT NULL DEFAULT FALSE,
     status_ind BOOLEAN NOT NULL DEFAULT TRUE,
-    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_ind BOOLEAN DEFAULT FALSE,
     deleted_date TIMESTAMP NULL,
     deleted_by CHAR(36) NULL,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -461,16 +463,16 @@ DROP TABLE IF EXISTS user_roles;
 CREATE TABLE user_roles (
     user_role_id CHAR(36) PRIMARY KEY,
     link_id CHAR(36) NOT NULL,
-    chamber_role_id INT NOT NULL,
+    role_id INT NOT NULL,
     start_date DATE NOT NULL DEFAULT (CURRENT_DATE),
     end_date DATE NULL,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by CHAR(36) NULL,
     updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     updated_by CHAR(36) NULL,
-    CONSTRAINT uk_user_role_active UNIQUE KEY (link_id, chamber_role_id, start_date),
+    CONSTRAINT uk_user_role_active UNIQUE KEY (link_id, role_id, start_date),
     CONSTRAINT fk_user_roles_link FOREIGN KEY (link_id) REFERENCES user_chamber_link(link_id) ON DELETE CASCADE,
-    CONSTRAINT fk_user_roles_chamber_role FOREIGN KEY (chamber_role_id) REFERENCES chamber_roles(role_id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_roles_chamber_role FOREIGN KEY (role_id) REFERENCES chamber_roles(role_id) ON DELETE CASCADE,
     CONSTRAINT fk_user_roles_created_by FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
     CONSTRAINT fk_user_roles_updated_by FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Role assignments per user-chamber context';
@@ -487,7 +489,7 @@ CREATE TABLE user_roles (
 DROP TABLE IF EXISTS role_permissions;
 CREATE TABLE role_permissions (
     permission_id CHAR(36) PRIMARY KEY,
-    chamber_role_id INT NOT NULL,           -- ← Changed
+    role_id INT NOT NULL,           -- ← Changed
     chamber_module_id CHAR(36) NOT NULL,
     allow_all_ind BOOLEAN NOT NULL DEFAULT FALSE,
     read_ind BOOLEAN NOT NULL DEFAULT TRUE,
@@ -500,8 +502,8 @@ CREATE TABLE role_permissions (
     created_by CHAR(36) NULL,
     updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     updated_by CHAR(36) NULL,
-    CONSTRAINT uk_role_module UNIQUE KEY (chamber_role_id, chamber_module_id),
-    CONSTRAINT fk_role_permissions_chamber_role FOREIGN KEY (chamber_role_id) REFERENCES chamber_roles(role_id) ON DELETE CASCADE,
+    CONSTRAINT uk_role_module UNIQUE KEY (role_id, chamber_module_id),
+    CONSTRAINT fk_role_permissions_chamber_role FOREIGN KEY (role_id) REFERENCES chamber_roles(role_id) ON DELETE CASCADE,
     CONSTRAINT fk_role_permissions_module FOREIGN KEY (chamber_module_id) REFERENCES chamber_modules(chamber_module_id) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Role-module permissions';
 
@@ -530,7 +532,7 @@ CREATE TABLE cases (
     status_code       CHAR(4)      DEFAULT 'AC',
     next_hearing_date DATE         NULL,
     last_hearing_date DATE         NULL,
-    is_deleted        BOOLEAN      DEFAULT FALSE,
+    deleted_ind        BOOLEAN      DEFAULT FALSE,
     deleted_date      TIMESTAMP    NULL,
     deleted_by        CHAR(36)     NULL,  
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -574,7 +576,7 @@ CREATE TABLE hearings (
     notes             TEXT         NULL,
     order_details     TEXT         NULL,
     next_hearing_date DATE         NULL,
-    is_deleted        BOOLEAN      DEFAULT FALSE,
+    deleted_ind        BOOLEAN      DEFAULT FALSE,
     deleted_date      TIMESTAMP    NULL,
     deleted_by        CHAR(36)     NULL,  
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -600,8 +602,8 @@ CREATE TABLE case_notes (
     case_id      CHAR(36)     NOT NULL,  
     user_id      CHAR(36)     NOT NULL,  
     note_text    TEXT         NOT NULL,
-    is_private   BOOLEAN      DEFAULT FALSE,
-    is_deleted   BOOLEAN      DEFAULT FALSE,
+    private_ind  BOOLEAN      DEFAULT FALSE,
+    deleted_ind  BOOLEAN      DEFAULT FALSE,
     deleted_date TIMESTAMP    NULL,
     deleted_by   CHAR(36)     NULL,  
     created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -635,7 +637,7 @@ CREATE TABLE case_aors (
     case_id          CHAR(36)     NOT NULL,  
     user_id          CHAR(36)     NOT NULL,  
     chamber_id       CHAR(36)     NOT NULL,  
-    is_primary       BOOLEAN      DEFAULT FALSE,
+    primary_ind       BOOLEAN      DEFAULT FALSE,
     appointment_date DATE         NULL,
     withdrawal_date  DATE         NULL,
     status_code      CHAR(2)      DEFAULT 'AC',
@@ -689,7 +691,7 @@ CREATE TABLE clients (
     client_since    DATE         NULL,
     notes           TEXT         NULL,
     status_ind      BOOLEAN      NOT NULL DEFAULT TRUE,
-    is_deleted      BOOLEAN      DEFAULT FALSE,
+    deleted_ind      BOOLEAN      DEFAULT FALSE,
     deleted_date    TIMESTAMP    NULL,
     deleted_by      CHAR(36)     NULL,  
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -725,7 +727,7 @@ CREATE TABLE case_clients (
     case_id         CHAR(36)     NOT NULL,  
     client_id       CHAR(36)     NOT NULL,  
     party_role      CHAR(3)      NOT NULL,
-    is_primary      BOOLEAN      DEFAULT FALSE,
+    primary_ind      BOOLEAN      DEFAULT FALSE,
     engagement_type VARCHAR(20)  NULL,
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by      CHAR(36)     NULL,  
@@ -930,7 +932,7 @@ CREATE TABLE client_relationships (
     client_id_from    CHAR(36)     NOT NULL,  
     client_id_to      CHAR(36)     NOT NULL,  
     relationship_type VARCHAR(50)  NOT NULL,
-    is_active         BOOLEAN      DEFAULT TRUE,
+    active_ind         BOOLEAN      DEFAULT TRUE,
     notes             TEXT         NULL,
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by        CHAR(36)     NULL,  
@@ -964,14 +966,14 @@ CREATE TABLE email_settings (
     smtp_password     VARCHAR(255) NOT NULL,
     encryption_code   CHAR(2)   NOT NULL DEFAULT 'T',
     auth_required_ind BOOLEAN   DEFAULT TRUE,
-    is_default        BOOLEAN   DEFAULT FALSE,
+    default_ind        BOOLEAN   DEFAULT FALSE,
     status_ind        BOOLEAN   NOT NULL DEFAULT TRUE,
     created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by        CHAR(36)  NULL,  
     updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     updated_by        CHAR(36)  NULL,  
     CONSTRAINT uk_chamber_default
-        UNIQUE KEY (chamber_id, is_default),
+        UNIQUE KEY (chamber_id, default_ind),
     CONSTRAINT fk_email_settings_chamber
         FOREIGN KEY (chamber_id)      REFERENCES chamber(chamber_id)           ON DELETE CASCADE,
     CONSTRAINT fk_email_settings_encryption
@@ -993,7 +995,7 @@ CREATE TABLE email_templates (
     code          CHAR(30)  NOT NULL,
     subject       VARCHAR(255) NOT NULL,
     content       LONGTEXT  NOT NULL,
-    is_customized BOOLEAN   DEFAULT FALSE,
+    customized_ind BOOLEAN   DEFAULT FALSE,
     enabled_ind   BOOLEAN   DEFAULT TRUE,
     version       SMALLINT UNSIGNED DEFAULT 1,
     created_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1296,10 +1298,10 @@ CREATE INDEX idx_users_email ON users(email);
 
 -- User Chamber Links
 CREATE INDEX idx_ucl_user_active ON user_chamber_link(user_id, status_ind, left_date);
-CREATE INDEX idx_ucl_chamber_users ON user_chamber_link(chamber_id, is_primary, status_ind);
+CREATE INDEX idx_ucl_chamber_users ON user_chamber_link(chamber_id, primary_ind, status_ind);
 
 -- User Roles
-CREATE INDEX idx_user_roles_link_role ON user_roles(link_id, chamber_role_id, end_date);
+CREATE INDEX idx_user_roles_link_role ON user_roles(link_id, role_id, end_date);
 
 -- Activity Log
 CREATE INDEX idx_activity_chamber_time ON activity_log(chamber_id, timestamp DESC);

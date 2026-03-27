@@ -31,33 +31,6 @@ MODEL_OUTPUT_DIR = os.path.join(os.getcwd(), "app", "database", "models")
 if not os.path.exists(MODEL_OUTPUT_DIR):
     os.makedirs(MODEL_OUTPUT_DIR)
 
-def get_triggers_for_table(engine, table_name: str):
-    query = f"""
-    SELECT ACTION_STATEMENT
-    FROM information_schema.TRIGGERS
-    WHERE EVENT_OBJECT_TABLE = '{table_name}'
-    AND EVENT_MANIPULATION = 'INSERT'
-    AND ACTION_TIMING = 'BEFORE'
-    """
-    with engine.connect() as conn:
-        result = conn.execute(query)
-        return [row[0] for row in result.fetchall()]
-
-
-def get_trigger_generated_columns(trigger_statements):
-    """
-    Extract columns set in trigger using pattern:
-    SET NEW.column_name = ...
-    """
-    cols = set()
-
-    for stmt in trigger_statements:
-        stmt = stmt.upper()
-        matches = re.findall(r"SET\s+NEW\.([A-Z0-9_]+)\s*=", stmt)
-        for col in matches:
-            cols.add(col.lower())
-
-    return cols
 
 def generate_class_name(table_name: str) -> str:
     return "".join(word.capitalize() for word in table_name.split("_"))
@@ -142,9 +115,6 @@ def get_sqlalchemy_type_info(column):
 
 def generate_model_class(table):
     class_name = generate_class_name(table.name)
-     # 🔥 Detect trigger-generated columns
-    trigger_statements = get_triggers_for_table(engine, table.name)
-    trigger_columns = get_trigger_generated_columns(trigger_statements)
 
     # Import tracking
     sa_types = set()  # String, Integer, Boolean, etc.
@@ -255,14 +225,8 @@ def generate_model_class(table):
 
         if primary_key:
             field += ", primary_key=True"
-
-            # Keep autoincrement for numeric PKs
             if type_name in ("Integer", "BigInteger"):
                 field += f", autoincrement={autoincrement}"
-
-            # ✅ Trigger-based PK → add server_default
-            if col_name in trigger_columns:
-                field += ', server_default=text("generate_uuid_v7()")'
 
         if fks:
             fk = list(fks)[0]
@@ -291,7 +255,7 @@ def generate_model_class(table):
         if type_name == "Boolean":
             if default is None:
                 field += ", default=False"
-            elif default is not None and col_name not in trigger_columns:
+            elif default is not None:
                 try:
                     field += f", default={bool(int(default))}"
                 except Exception:

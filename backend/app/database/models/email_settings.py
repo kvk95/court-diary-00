@@ -39,8 +39,8 @@ class EmailSettings(BaseModel, TimestampMixin):
     # auth_required_ind : TINYINT
     auth_required_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
 
-    # is_default : TINYINT
-    is_default: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # default_ind : TINYINT
+    default_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # status_ind : TINYINT
     status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

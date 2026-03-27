@@ -24,8 +24,8 @@ class CaseAors(BaseModel):
     # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
-    # is_primary : TINYINT
-    is_primary: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+    # primary_ind : TINYINT
+    primary_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
     # appointment_date : DATE
     appointment_date: Mapped[Optional[date]] = mapped_column(Date)

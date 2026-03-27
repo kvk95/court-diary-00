@@ -76,9 +76,9 @@ class UsersController(BaseController):
     )
     async def users_get_by_id(
         self,
-        user_id: str = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., min_length=36, max_length=36),
         service: UsersService = Depends(get_users_service),
-    ) -> BaseOutDto[UserOut]:  # ← CHANGED
+    ) -> BaseOutDto[UserOut]: 
         result = await service.users_get_by_id(
             user_id=user_id,
         )
@@ -108,7 +108,7 @@ class UsersController(BaseController):
     )
     async def users_edit(
         self,
-        user_id: str = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., min_length=36, max_length=36),
         payload: UserEdit = Body(..., description="Fields to update"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[UserOut]:
@@ -139,7 +139,7 @@ class UsersController(BaseController):
     )
     async def users_delete(
         self,
-        user_id: str = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., min_length=36, max_length=36),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[dict]:
         result = await service.users_delete(user_id=user_id)
@@ -191,7 +191,20 @@ class UsersController(BaseController):
         )
         return self.success(result=result)
 
-    # ── Remove from Chamber (soft-delete link) ────────────────────────────
+    # ── Add / Remove user from Chamber (soft-delete link) ────────────────────────────
+    
+    @BaseController.post(
+        "/{user_id}/add-to-chamber",
+        summary="Add user to this chamber",
+        response_model=BaseOutDto[dict],
+    )
+    async def users_add_to_chamber(
+        self,
+        user_id: str = Path(..., min_length=36, max_length=36),
+        service: UsersService = Depends(get_users_service),
+    ) -> BaseOutDto[dict]:
+        result = await service.users_add_to_chamber(user_id=user_id)
+        return self.success(result=result)
 
     @BaseController.delete(
         "/{user_id}/remove-from-chamber",
@@ -200,7 +213,7 @@ class UsersController(BaseController):
     )
     async def users_remove_from_chamber(
         self,
-        user_id: str = Path(..., gt=0, description="User ID"),
+        user_id: str = Path(..., min_length=36, max_length=36),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[dict]:
         result = await service.users_remove_from_chamber(user_id=user_id)

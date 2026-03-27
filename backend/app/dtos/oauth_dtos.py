@@ -80,7 +80,7 @@ class UserChamberContext(BaseModel):
     link_id: str
     chamber_id: str
     chamber_name: str
-    is_primary: bool
+    primary_ind: bool
     role_override: Optional[str] = None
     joined_date: str
     can_switch: bool = True

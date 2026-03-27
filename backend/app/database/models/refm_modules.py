@@ -34,10 +34,14 @@ class RefmModules(BaseModel):
 
 
 class RefmModulesConstants:
+    ADMIN = 'ADMN'
+    BILLING = 'BILL'
+    CALENDAR = 'CALD'
+    CASES = 'CASE'
+    CLIENTS = 'CLNT'
+    COLLABORATIONS = 'COLL'
     DASHBOARD = 'DASH'
-    CASES = 'CASES'
     HEARINGS = 'HEAR'
-    CALENDAR = 'CAL'
-    USER_MANAGEMENT = 'USERS'
-    REPORTS = 'RPT'
-    SETTINGS = 'SET'
+    REPORTS = 'RPRT'
+    SETTINGS = 'SETT'
+    USER_MANAGEMENT = 'USER'

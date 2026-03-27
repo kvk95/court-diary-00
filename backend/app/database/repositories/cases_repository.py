@@ -33,7 +33,7 @@ class CasesRepository(BaseRepository[Cases]):
         def _base():
             return select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
             )
 
         total = await session.scalar(_base()) or 0
@@ -62,7 +62,7 @@ class CasesRepository(BaseRepository[Cases]):
                 Cases.status_code,
                 func.count(Cases.case_id).label("cnt"),
             )
-            .where(Cases.chamber_id == chamber_id, Cases.is_deleted.is_(False))
+            .where(Cases.chamber_id == chamber_id, Cases.deleted_ind.is_(False))
             .group_by(Cases.status_code)
         )
         status_data = {r.status_code: r.cnt for r in rows}
@@ -93,7 +93,7 @@ class CasesRepository(BaseRepository[Cases]):
                 func.count(Cases.case_id).label("cnt"),
             )
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
-            .where(Cases.chamber_id == chamber_id, Cases.is_deleted.is_(False))
+            .where(Cases.chamber_id == chamber_id, Cases.deleted_ind.is_(False))
             .group_by(Cases.court_id, RefmCourts.court_name)
             .order_by(func.count(Cases.case_id).desc())
             .limit(limit)
@@ -112,7 +112,7 @@ class CasesRepository(BaseRepository[Cases]):
             .join(RefmCaseTypes, Cases.case_type_code == RefmCaseTypes.code)
             .where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.case_type_code.isnot(None),
             )
             .group_by(Cases.case_type_code, RefmCaseTypes.description)
@@ -130,7 +130,7 @@ class CasesRepository(BaseRepository[Cases]):
         return await session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.created_date >= month_start,
                 Cases.created_date < month_end,
             )
@@ -145,7 +145,7 @@ class CasesRepository(BaseRepository[Cases]):
         return await session.scalar(
             select(func.count(Cases.case_id)).where(
                 Cases.chamber_id == chamber_id,
-                Cases.is_deleted.is_(False),
+                Cases.deleted_ind.is_(False),
                 Cases.created_date >= since,
             )
         ) or 0

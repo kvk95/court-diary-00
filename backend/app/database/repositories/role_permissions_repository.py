@@ -42,7 +42,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 RefmModules.code.label("module_code"),
                 RefmModules.name.label("module_name"),
                 RolePermissions.permission_id,
-                UserRoles.chamber_role_id,
+                UserRoles.role_id,
                 RolePermissions.allow_all_ind,
                 RolePermissions.read_ind,
                 RolePermissions.write_ind,
@@ -72,10 +72,10 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 )
             )
             # === THIS IS THE MOST IMPORTANT JOIN ===
-            .join(
+            .outerjoin(
                 RolePermissions,
                 and_(
-                    RolePermissions.chamber_role_id == UserRoles.chamber_role_id,
+                    RolePermissions.role_id == UserRoles.role_id,
                     RolePermissions.chamber_module_id == ChamberModules.chamber_module_id   # ← Key condition
                 )
             )
@@ -85,7 +85,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .where(
                 ChamberModules.chamber_id == chamber_id,
-                ChamberModules.is_active.is_(True),
+                ChamberModules.active_ind.is_(True),
             )
         )
 
@@ -100,14 +100,14 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 "module_code": row.module_code,
                 "module_name": row.module_name,
                 "permission_id": row.permission_id,
-                "chamber_role_id": row.chamber_role_id,
-                "allow_all_ind": row.allow_all_ind,
-                "read_ind": row.read_ind,
-                "write_ind": row.write_ind,
-                "create_ind": row.create_ind,
-                "delete_ind": row.delete_ind,
-                "import_ind": row.import_ind,
-                "export_ind": row.export_ind,
+                "role_id": row.role_id,
+                "allow_all_ind": bool(row.allow_all_ind) if row.allow_all_ind is not None else False,
+                "read_ind": bool(row.read_ind) if row.read_ind is not None else False,
+                "write_ind": bool(row.write_ind) if row.write_ind is not None else False,
+                "create_ind": bool(row.create_ind) if row.create_ind is not None else False,
+                "delete_ind": bool(row.delete_ind) if row.delete_ind is not None else False,
+                "import_ind": bool(row.import_ind) if row.import_ind is not None else False,
+                "export_ind": bool(row.export_ind) if row.export_ind is not None else False,
             }
             for row in rows
         ]
@@ -151,12 +151,12 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 RolePermissions,
                 and_(
                     RolePermissions.chamber_module_id == ChamberModules.chamber_module_id,
-                    RolePermissions.chamber_role_id == role_id,        # ← Correct column
+                    RolePermissions.role_id == role_id,        # ← Correct column
                 )
             )
             .where(
                 ChamberModules.chamber_id == chamber_id,
-                ChamberModules.is_active.is_(True),
+                ChamberModules.active_ind.is_(True),
             )
             .order_by(RefmModules.sort_order.asc(), RefmModules.code.asc())
         )
@@ -207,11 +207,11 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .where(
                 and_(
-                    RolePermissions.chamber_role_id == role_id,
+                    RolePermissions.role_id == role_id,
                     ChamberModules.chamber_id == chamber_id,
                     ChamberModules.module_code == module_code,
-                    ChamberModules.is_active == True,
-                    RolePermissions.is_deleted.is_(False),
+                    ChamberModules.active_ind == True,
+                    RolePermissions.deleted_ind.is_(False),
                 )
             )
         )
@@ -265,18 +265,18 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             .outerjoin(
                 RolePermissions,
                 and_(
-                    ChamberRoles.role_id == RolePermissions.chamber_role_id,
+                    ChamberRoles.role_id == RolePermissions.role_id,
                     RolePermissions.chamber_module_id.in_(
                         select(ChamberModules.chamber_module_id).where(
                             ChamberModules.chamber_id == chamber_id,
-                            ChamberModules.is_active.is_(True),
+                            ChamberModules.active_ind.is_(True),
                         )
                     ),
                 ),
             )
             .where(
                 and_(
-                    ChamberRoles.is_deleted.is_(False),
+                    ChamberRoles.deleted_ind.is_(False),
                     ChamberRoles.chamber_id==chamber_id
                 )
             )
@@ -333,7 +333,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .join(
                 RolePermissions,
-                ChamberRoles.role_id == RolePermissions.chamber_role_id,
+                ChamberRoles.role_id == RolePermissions.role_id,
             )
             .join(
                 ChamberModules,
@@ -344,9 +344,9 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 ChamberModules.module_code == RefmModules.code,
             )
             .where(
-                ChamberRoles.is_deleted.is_(False),
+                ChamberRoles.deleted_ind.is_(False),
                 ChamberModules.chamber_id == chamber_id,
-                ChamberModules.is_active.is_(True),
+                ChamberModules.active_ind.is_(True),
             )
             .order_by(
                 ChamberRoles.role_name,

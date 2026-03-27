@@ -21,8 +21,8 @@ class ChamberModules(BaseModel, TimestampMixin):
     # module_code : CHAR(8) COLLATE "utf8mb4_unicode_ci"
     module_code: Mapped[str] = mapped_column(CHAR(8), ForeignKey("refm_modules.code", ondelete="RESTRICT"), nullable=False)
 
-    # is_active : TINYINT
-    is_active: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    # active_ind : TINYINT
+    active_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
 
     # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))

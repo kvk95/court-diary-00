@@ -78,7 +78,7 @@ class CasesController(BaseController):
     )
     async def cases_get_by_id(
         self,
-        case_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[CaseDetailOut]:
         return self.success(result=await service.cases_get_by_id(case_id=case_id))
@@ -134,7 +134,7 @@ class CasesController(BaseController):
     )
     async def cases_get_activity(
         self,
-        case_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
         limit: int = Query(10, ge=1, le=50),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[List[RecentActivityItem]]:
@@ -149,7 +149,7 @@ class CasesController(BaseController):
     )
     async def hearings_get_by_case(
         self,
-        case_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[List[HearingOut]]:
         return self.success(result=await service.hearings_get_by_case(case_id=case_id))
@@ -205,7 +205,7 @@ class CasesController(BaseController):
     )
     async def case_notes_get(
         self,
-        case_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[List[CaseNoteOut]]:
         return self.success(result=await service.case_notes_get_by_case(case_id=case_id))
@@ -261,7 +261,7 @@ class CasesController(BaseController):
     )
     async def case_clients_get(
         self,
-        case_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[List[CaseClientOut]]:
         return self.success(result=await service.case_clients_get(case_id=case_id))
@@ -275,7 +275,7 @@ class CasesController(BaseController):
     )
     async def case_clients_link(
         self,
-        case_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
         payload: CaseClientLinkPayload = Body(...),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[CaseClientOut]:
@@ -290,8 +290,8 @@ class CasesController(BaseController):
     )
     async def case_clients_unlink(
         self,
-        case_id: str = Path(..., gt=0),
-        case_client_id: str = Path(..., gt=0),
+        case_id: str = Path(..., min_length=36, max_length=36),
+        case_client_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[dict]:
         return self.success(result=await service.case_clients_unlink(case_id=case_id, case_client_id=case_client_id))

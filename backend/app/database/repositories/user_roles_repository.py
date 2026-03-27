@@ -34,7 +34,7 @@ class UserRolesRepository(BaseRepository[UserRoles]):
             session=session,
             filters={
                 UserRoles.link_id: link_id,
-                UserRoles.chamber_role_id: role_id,
+                UserRoles.role_id: role_id,
             },
             where=[UserRoles.end_date.is_(None)]
         )
@@ -156,11 +156,11 @@ class UserRolesRepository(BaseRepository[UserRoles]):
             .outerjoin(
                 UserRoles,
                 and_(
-                    ChamberRoles.role_id == UserRoles.chamber_role_id,
+                    ChamberRoles.role_id == UserRoles.role_id,
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .where(ChamberRoles.is_deleted.is_(False))
+            .where(ChamberRoles.deleted_ind.is_(False))
             .group_by(ChamberRoles.role_id)
         )
 
@@ -184,7 +184,7 @@ class UserRolesRepository(BaseRepository[UserRoles]):
 
         roles = [
             {
-                "role_id": row.chamber_role_id,
+                "role_id": row.role_id,
                 "role_name": row.role_name,
                 "description": row.description,
                 "status_ind": row.status_ind,
