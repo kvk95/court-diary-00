@@ -121,8 +121,8 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
     ) -> List[Dict[str, Any]]:
         """
         Returns ALL active modules in the chamber for a given role.
-        Shows current permission flags or default False if not set yet.
-        Used for Role Management / Permission Editor UI.
+        Shows current permission flags or default False if no permission row exists yet.
+        Used for Role Management / Permission Editor UI (toggle matrix).
         """
         stmt = (
             select(
@@ -131,6 +131,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 Chamber.chamber_name,
                 RefmModules.code.label("module_code"),
                 RefmModules.name.label("module_name"),
+                RefmModules.sort_order,
                 RolePermissions.permission_id,
                 RolePermissions.allow_all_ind,
                 RolePermissions.read_ind,
@@ -145,11 +146,12 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 Chamber,
                 Chamber.chamber_id == ChamberModules.chamber_id
             )
-            .join(
+            # Outer join so we get ALL modules even if no permission row exists for this role
+            .outerjoin(
                 RolePermissions,
                 and_(
                     RolePermissions.chamber_module_id == ChamberModules.chamber_module_id,
-                    RolePermissions.chamber_role_id == role_id,
+                    RolePermissions.chamber_role_id == role_id,        # ← Correct column
                 )
             )
             .where(
@@ -163,7 +165,27 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             stmt = stmt.where(RefmModules.name.ilike(f"%{module_name.strip()}%"))
 
         result = await self.execute(stmt, session=session)
-        return [dict(row._mapping) for row in result.all()]
+        rows = result.all()
+
+        return [
+            {
+                "chamber_module_id": row.chamber_module_id,
+                "chamber_id": row.chamber_id,
+                "chamber_name": row.chamber_name,
+                "module_code": row.module_code,
+                "module_name": row.module_name or row.module_code,
+                "sort_order": row.sort_order,
+                "permission_id": row.permission_id,
+                "allow_all_ind": bool(row.allow_all_ind) if row.allow_all_ind is not None else False,
+                "read_ind": bool(row.read_ind) if row.read_ind is not None else False,
+                "write_ind": bool(row.write_ind) if row.write_ind is not None else False,
+                "create_ind": bool(row.create_ind) if row.create_ind is not None else False,
+                "delete_ind": bool(row.delete_ind) if row.delete_ind is not None else False,
+                "import_ind": bool(row.import_ind) if row.import_ind is not None else False,
+                "export_ind": bool(row.export_ind) if row.export_ind is not None else False,
+            }
+            for row in rows
+        ]
 
     async def has_permission(
         self,

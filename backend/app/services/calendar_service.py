@@ -67,12 +67,14 @@ class CalendarService(BaseSecuredService):
         upcoming_count = sum(1 for e in events if e.status_code in ("UP", "SC"))
         completed_count = sum(1 for e in events if e.status_code == "CMP")
 
-        return CalendarMonthOut(
-            year=year, month=month, events=events,
-            total_hearings=len(events),
-            upcoming_count=upcoming_count,
-            completed_count=completed_count,
-        )
+        return CalendarMonthOut.model_validate({
+            "year": year,
+            "month": month,
+            "events": events,
+            "total_hearings": len(events),
+            "upcoming_count": upcoming_count,
+            "completed_count": completed_count,
+        })
 
     # ─────────────────────────────────────────────────────────────────────
     # UPCOMING WIDGET

@@ -1,7 +1,7 @@
 # app/services/role_permissions_service.py
 
 from typing import List, Optional
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_modules import ChamberModules
@@ -9,6 +9,7 @@ from app.database.models.role_permissions import RolePermissions
 from app.database.models.chamber_roles import ChamberRoles
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
+from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
 from app.dtos.role_permissions_dto import (
     RolePermissionEdit,
     RolePermissionMatrixOut,
@@ -26,10 +27,12 @@ class RolePermissionsService(BaseSecuredService):
         session: AsyncSession,
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
         chamber_roles_repo: Optional[ChamberRolesRepository] = None,
+        chamber_modules_repo: Optional[ChamberModulesRepository] = None,
     ):
         super().__init__(session)
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
+        self.chamber_modules_repo = chamber_modules_repo or ChamberModulesRepository()
 
     async def get_permission_matrix(
         self,
@@ -148,49 +151,50 @@ class RolePermissionsService(BaseSecuredService):
         payload: List[RolePermissionEdit],
     ) -> bool:
         """Bulk upsert permissions for a role from the toggle matrix."""
-        # Verify role exists and is not deleted
-        role_result = await self.session.execute(
-            select(ChamberRoles).where(
-                ChamberRoles.role_id == role_id,
-                ChamberRoles.is_deleted.is_(False),
-            )
+
+        # 1. Verify the chamber_role exists and belongs to current chamber
+        #    (Base repo will automatically apply chamber_id filter)
+        role = await self.chamber_roles_repo.get_by_id(
+            session=self.session, 
+            id_values=role_id
         )
-        role = role_result.scalars().first()
         if not role:
             raise ValidationErrorDetail(
-                code=ErrorCodes.NOT_FOUND, message=f"Role {role_id} not found"
+                code=ErrorCodes.NOT_FOUND, 
+                message=f"Role {role_id} not found"
             )
 
         for dto in payload:
-            # Verify module belongs to this chamber
-            module_result = await self.session.execute(
-                select(ChamberModules).where(
-                    and_(
-                        ChamberModules.chamber_module_id == dto.chamber_module_id,
-                        ChamberModules.chamber_id == self.chamber_id,
-                        ChamberModules.is_active.is_(True),
-                    )
-                )
+            # 2. Verify module exists and is active in current chamber
+            #    Using repository so chamber_id filter is applied automatically
+            module = await self.chamber_modules_repo.get_first(   # assuming you have ChamberModulesRepository
+                self.session,
+                filters={
+                    ChamberModules.chamber_module_id: dto.chamber_module_id
+                },
+                where=[ChamberModules.is_active.is_(True)]
             )
-            module = module_result.scalars().first()
+
             if not module:
                 raise ValidationErrorDetail(
                     code=ErrorCodes.VALIDATION_ERROR,
                     message=f"Module {dto.chamber_module_id} not found or inactive in your chamber",
                 )
 
+            # 3. Prepare data for upsert
             perm_data = {
-                "role_id": role_id,
+                "chamber_role_id": role_id,
                 "chamber_module_id": dto.chamber_module_id,
-                "allow_all_ind": dto.allow_all_ind,
-                "read_ind": dto.read_ind,
-                "write_ind": dto.write_ind,
-                "create_ind": dto.create_ind,
-                "delete_ind": dto.delete_ind,
-                "import_ind": dto.import_ind,  # ✅ NEW
-                "export_ind": dto.export_ind,  # ✅ NEW
+                "allow_all_ind": dto.allow_all_ind or False,
+                "read_ind": dto.read_ind or False,
+                "write_ind": dto.write_ind or False,
+                "create_ind": dto.create_ind or False,
+                "delete_ind": dto.delete_ind or False,
+                "import_ind": getattr(dto, 'import_ind', False),
+                "export_ind": getattr(dto, 'export_ind', False),
             }
 
+            # 4. Upsert using repository (recommended)
             await self.role_permissions_repo.upsert(
                 session=self.session,
                 filters={

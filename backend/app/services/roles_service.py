@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -119,65 +119,78 @@ class RolesService(BaseSecuredService):
         return RoleOut.model_validate(role)
 
     async def roles_update(self, role_id: int, payload: RoleUpdate) -> RoleOut:
+        """Update existing chamber role with proper duplicate name validation."""
+        
+        # 1. Fetch existing role
         existing = await self.chamber_roles_repo.get_by_id(
-            session=self.session, id_values=role_id
+            session=self.session, 
+            id_values=role_id
         )
         if not existing:
             raise ValidationErrorDetail(
-                code=ErrorCodes.NOT_FOUND, message=f"Role {role_id} not found"
+                code=ErrorCodes.NOT_FOUND, 
+                message=f"Role {role_id} not found"
             )
 
-        # ✅ Check role name (non-deleted only, excluding current role)
-        if payload.role_name:
+        update_data: Dict[str, Any] = {}
+
+        # 2. Handle role_name change with strict validation
+        if payload.role_name and payload.role_name.strip():
+            new_name = payload.role_name.strip()
+
+            # Check for duplicate ACTIVE role in the same chamber (excluding current role)
             duplicate = await self.chamber_roles_repo.get_first(
                 self.session,
-                filters={ChamberRoles.role_name: payload.role_name.strip()},
-                where=[
-                    ChamberRoles.role_id != role_id,
-                ],
+                filters={
+                    ChamberRoles.role_name: new_name,
+                    ChamberRoles.chamber_id: self.chamber_id
+                },
+                where=[ChamberRoles.role_id != role_id]
             )
+
             if duplicate:
                 raise ValidationErrorDetail(
                     code=ErrorCodes.VALIDATION_ERROR,
-                    message=f"Role name '{payload.role_name}' already exists",
+                    message=f"Role name '{new_name}' already exists in this chamber."
                 )
 
-        # ✅ Check role name (ALL roles, including deleted)
-        if payload.role_name:
+            # Check if name was previously used by a soft-deleted role in this chamber
             stmt = select(ChamberRoles).where(
-                ChamberRoles.role_name == payload.role_name.upper(),
+                ChamberRoles.chamber_id == self.chamber_id,
+                ChamberRoles.role_name == new_name,
                 ChamberRoles.role_id != role_id,
+                ChamberRoles.is_deleted.is_(True)
             )
-            result = await self.session.execute(stmt)
-            duplicate_code = result.scalars().first()
-            
-            if duplicate_code:
-                if duplicate_code.is_deleted:
-                    raise ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"Role name '{payload.role_name}' was previously used by a deleted role. "
-                            f"Please use a different code.",
-                    )
-                else:
-                    raise ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"Role name '{payload.role_name}' already exists",
-                    )
+            result = await self.chamber_roles_repo.execute(stmt, self.session)   # ← Use repo.execute
+            soft_deleted_duplicate = result.scalars().first()
 
-        update_data: dict = {}
-        if payload.role_name is not None:
-            update_data["role_name"] = payload.role_name.strip()
+            if soft_deleted_duplicate:
+                raise ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message=f"Role name '{new_name}' was previously used by a deleted role in this chamber. "
+                            f"Please choose a different name."
+                )
+
+            update_data["role_name"] = new_name
+
+        # 3. Other fields
         if payload.description is not None:
             update_data["description"] = payload.description
+
         if payload.status_ind is not None:
             update_data["status_ind"] = payload.status_ind
 
+        # 4. No changes → return as-is
         if not update_data:
             return RoleOut.model_validate(existing)
 
-        updated_role = await self.chamber_roles_repo.update(
-            session=self.session, id_values=role_id, data=update_data
+        # 5. Perform update using repository upsert (recommended)
+        updated_role = await self.chamber_roles_repo.upsert(
+            session=self.session,
+            id_values=role_id,
+            data=update_data
         )
+
         return RoleOut.model_validate(updated_role)
 
     async def roles_delete(self, role_id: int) -> bool:

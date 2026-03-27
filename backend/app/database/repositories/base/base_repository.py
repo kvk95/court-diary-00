@@ -663,6 +663,7 @@ class BaseRepository(Generic[ModelType]):
 
         # Create path
         create_data = self._set_audit_fields(data)
+
         self._log_stmt(insert(self.model).values(**create_data), session)
 
         obj = self.model(**create_data)
