@@ -1,6 +1,7 @@
 # app\database\models\base\base_model.py
 import json
 from typing import Any, Dict
+from uuid6 import uuid7
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -10,6 +11,11 @@ class BaseModel(Base):
 
     # Pylance-approved: subclasses assign a string
     __tablename__: str
+
+    @staticmethod
+    def generate_uuid() -> str:
+        """Application-level UUID v7 generator (consistent with DB)."""
+        return str(uuid7())
 
     def __repr__(self):
         cls = self.__class__.__name__
