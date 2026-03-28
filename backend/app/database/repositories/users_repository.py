@@ -12,6 +12,7 @@ from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.models.chamber import Chamber
 from app.database.models.user_invitations import UserInvitations
+from app.database.models.refm_invitation_status import RefmInvitationStatusConstants
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -52,7 +53,7 @@ class UsersRepository(BaseRepository[Users]):
                 Users.last_name,
                 Users.email,
                 Users.phone,
-                Users.status_ind,
+                UserChamberLink.status_ind,
                 Users.created_date,
                 # Profile fields
                 UserProfiles.profile_id,
@@ -76,7 +77,6 @@ class UsersRepository(BaseRepository[Users]):
                     Users.user_id == UserChamberLink.user_id,
                     UserChamberLink.chamber_id == chamber_id,
                     UserChamberLink.left_date.is_(None),
-                    UserChamberLink.status_ind.is_(True),
                 )
             )
             .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
@@ -151,6 +151,7 @@ class UsersRepository(BaseRepository[Users]):
         limit: int,
         chamber_id: str,
         search: Optional[str] = None,
+        status_ind: Optional[bool]=None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Paginated users for a chamber with role.
@@ -164,7 +165,7 @@ class UsersRepository(BaseRepository[Users]):
                 Users.last_name,
                 Users.email,
                 Users.phone,
-                Users.status_ind,
+                UserChamberLink.status_ind,
                 Users.created_date,
                 ChamberRoles.role_id,
                 ChamberRoles.role_name,
@@ -192,7 +193,6 @@ class UsersRepository(BaseRepository[Users]):
                 Users.deleted_ind.is_(False),
                 UserChamberLink.chamber_id == chamber_id,
                 UserChamberLink.left_date.is_(None),
-                UserChamberLink.status_ind.is_(True),
             )
         )
 
@@ -208,6 +208,9 @@ class UsersRepository(BaseRepository[Users]):
                 )
             )
 
+        if status_ind is not None:
+            stmt = stmt.where(UserChamberLink.status_ind.is_(status_ind))
+
         # Count before pagination
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
         count_result = await self.execute(session=session,stmt=count_stmt)
@@ -216,6 +219,7 @@ class UsersRepository(BaseRepository[Users]):
         stmt = stmt.order_by(Users.user_id.desc()).offset((page - 1) * limit).limit(limit)
 
         result = await self.execute(session=session,stmt=stmt)
+        
         rows = result.all()
 
         # Return raw dicts for service to transform
@@ -420,7 +424,7 @@ class UsersRepository(BaseRepository[Users]):
         pending_invites_stmt = select(func.count(UserInvitations.invitation_id)).where(
             and_(
                 UserInvitations.chamber_id == chamber_id,
-                UserInvitations.status_code == 'PN',
+                UserInvitations.status_code == RefmInvitationStatusConstants.PENDING,
             )
         )
         pending_invites_result = await session.execute(pending_invites_stmt)

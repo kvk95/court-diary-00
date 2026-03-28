@@ -197,7 +197,7 @@ class RequestContextMiddleware:
                     "error": error,
                 }
                 
-                add_to_queue(LogType.HTTP_LOG, payload)
+                await add_to_queue(LogType.HTTP_LOG, payload)
 
             # --------------------------------------------------
             # 3?? CLEAR CONTEXT (ALWAYS LAST)

@@ -48,9 +48,16 @@ async def get_current_user(
         raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 3")
 
     # Fetch user from DB
-    user = await UsersRepository().get_by_id(session=session, id_values=user_id_val)
+    user = await UsersRepository().get_by_id(
+        session=session,
+        id_values=user_id_val
+    )
+
     if not user or user.deleted_ind:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="User not found or deleted")
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="User not found or deleted"
+        )
 
     # ✅ Build context DTO (fixed field names)
     user_context = CurrentUserContext(

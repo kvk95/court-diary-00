@@ -63,4 +63,4 @@ async def log_exception(exc: Exception, request=None, error_code: str | None = N
         "meta": {},
     }
     
-    add_to_queue(log_type= LogType.EXCEPTION, payload =  payload)
+    await add_to_queue(log_type= LogType.EXCEPTION, payload =  payload)

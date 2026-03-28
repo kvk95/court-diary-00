@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from datetime import datetime
@@ -86,7 +87,7 @@ def attach_listeners(async_engine: AsyncEngine):
                 }
             )
             
-            add_to_queue(log_type= LogType.DB_CALL, payload =  payload)
+            call_queue(payload)
 
         except Exception:
             _log.exception("after_cursor_execute error")
@@ -112,7 +113,13 @@ def attach_listeners(async_engine: AsyncEngine):
                         "exception_context": str(exception_context)
                 },
             }
-            add_to_queue(log_type= LogType.DB_CALL, payload =  payload)
+            call_queue(payload)
 
         except Exception:
             _log.exception("handle_error log failed")
+
+    def call_queue(payload):        
+            loop = asyncio.get_event_loop()
+            loop.create_task(add_to_queue(log_type= LogType.DB_CALL, payload =  payload))
+
+        

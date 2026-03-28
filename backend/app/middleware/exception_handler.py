@@ -186,7 +186,7 @@ async def integrity_error_handler(request: Request, exc: Exception):
         request,
         code=ErrorCodes.INTEGRITY_ERROR,
         description=msg,
-        status_code=200,
+        status_code=500,
         exc=ie,
     )
 

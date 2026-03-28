@@ -2,9 +2,10 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from jose import JWTError, jwt
+from jose import jwt, ExpiredSignatureError, JWTError
 
 from app.core.config import settings
+from app.validators import ValidationErrorDetail, ErrorCodes
 
 ALGORITHM = settings.ALGORITHM
 
@@ -65,6 +66,15 @@ def decode_token(token: str) -> Optional[dict]:
     try:
         # PyJWT automatically handles timezone-aware datetimes
         return jwt.decode(token, settings.effective_secret, algorithms=[ALGORITHM])
-    except JWTError as e:
-        print("JWT Error:", e)  # ← temporarily add this to see real error
-        return None
+
+    except ExpiredSignatureError:
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="Token has expired"
+        )
+
+    except JWTError:
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="Invalid token"
+        )

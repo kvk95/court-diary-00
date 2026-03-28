@@ -1,6 +1,5 @@
 # app\utils\logging_framework\logging_util.py
 
-import asyncio
 import re
 
 from .log_types import LogType
@@ -8,7 +7,7 @@ from .queue_manager import get_queue_manager
 from app.core.context import get_request_context
 
 
-def add_to_queue(log_type: LogType, payload: dict):
+async def add_to_queue(log_type: LogType, payload: dict):
     ctx = get_request_context()
 
     payload["_ctx"] = {
@@ -20,7 +19,7 @@ def add_to_queue(log_type: LogType, payload: dict):
     payload["request_id"] = ctx.get("request_id")
     
     qm = get_queue_manager()
-    asyncio.create_task( qm.enqueue(log_type= log_type, payload =  payload) )
+    await qm.enqueue(log_type= log_type, payload =  payload)
     
 
 def mask_sensitive(params, sensitive_keys=None):

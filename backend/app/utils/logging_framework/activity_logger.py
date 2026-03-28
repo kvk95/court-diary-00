@@ -29,4 +29,4 @@ async def log_activity(
         "ip_address": ip_address or (ctx.get("ip") if ctx else None),
     }
     
-    add_to_queue(log_type= LogType.ACTIVITY, payload =  payload)
+    await add_to_queue(log_type= LogType.ACTIVITY, payload =  payload)

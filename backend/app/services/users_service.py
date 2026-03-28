@@ -200,9 +200,6 @@ class UsersService(BaseSecuredService):
                 )
             )
 
-
-        print(f"*********************\n{user_data.get("permissions", [])}\n*******************")
-
         permissions = [
             RolePermissionModuleOut(
                 chamber_module_id=p["chamber_module_id"],
@@ -245,7 +242,10 @@ class UsersService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_get_paged(
-        self, page: int, limit: int, search: Optional[str] = None
+        self, page: int, 
+        limit: int, 
+        search: Optional[str] = None, 
+        status_ind: Optional[bool]=None,
     ) -> PagingData[UserOut]:
         """Paginated users for a chamber with full nested structure."""
         users, total_records = await self.users_repo.list_users_paginated(
@@ -254,6 +254,7 @@ class UsersService(BaseSecuredService):
             limit=limit,
             chamber_id=self.chamber_id,
             search=search,
+            status_ind=status_ind,
         )
         
         full_users: List[UserOut] = []
@@ -349,7 +350,6 @@ class UsersService(BaseSecuredService):
                     "last_name": (payload.last_name or "").strip() or None,
                     "phone": payload.phone,
                     "password_hash": hash_password(payload.password),
-                    "status_ind": payload.status_ind,
                 },
             )
 
@@ -441,10 +441,9 @@ class UsersService(BaseSecuredService):
 
     async def users_edit(self, user_id: str, payload: UserEdit) -> UserOut:
         """Edit user details."""
-        link = await self.user_chamber_link_repo.get_active_link(
+        link = await self.user_chamber_link_repo.get_first(
             session=self.session,
-            user_id=user_id,
-            chamber_id=self.chamber_id,
+            filters={self.user_chamber_link_repo.model.user_id: user_id},
         )
         
         if not link:
@@ -462,8 +461,15 @@ class UsersService(BaseSecuredService):
             if payload.phone and (err := FieldValidator.validate_phone(payload.phone)):
                 raise err
             update_data["phone"] = payload.phone
-        if payload.status_ind is not None:
-            update_data["status_ind"] = payload.status_ind
+        
+        if payload.status_ind is not None:            
+            await self.user_chamber_link_repo.update(
+                session=self.session,
+                id_values=link.link_id,
+                data={"status_ind": payload.status_ind},
+            )
+            
+            
 
         if update_data:
             await self.users_repo.update(
@@ -508,11 +514,12 @@ class UsersService(BaseSecuredService):
                 message=f"User {payload.user_id} not found in this chamber",
             )
 
-        await self.users_repo.update(
-            session=self.session,
-            id_values=payload.user_id,
-            data={"status_ind": payload.status_ind},
-        )
+        if(link.status_ind != payload.status_ind):
+            await self.user_chamber_link_repo.update(
+                session=self.session,
+                id_values=link.link_id,
+                data={"status_ind": payload.status_ind},
+            )
         return await self.get_user_full_details(user_id=payload.user_id)
 
     # ─────────────────────────────────────────────────────────────────────────

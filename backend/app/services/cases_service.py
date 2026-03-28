@@ -1,9 +1,9 @@
 """cases_service.py — Business logic for Cases, Hearings, Case Notes, Case Clients"""
 
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, Any, Callable, Dict, Iterable, TypeVar
 
-from sqlalchemy import func, select, or_
+from sqlalchemy import case, func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.activity_log import ActivityLog
@@ -29,8 +29,8 @@ from app.dtos.cases_dto import (
     CaseCreate,
     CaseDelete,
     CaseDetailOut,
-    CaseEdit,
     CaseListOut,
+    CaseEdit,
     CaseNoteCreate,
     CaseNoteDelete,
     CaseNoteEdit,
@@ -71,6 +71,74 @@ class CasesService(BaseSecuredService):
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
+    K = TypeVar("K")
+    V = TypeVar("V")
+
+    async def _load_map(
+        self,
+        ids: Iterable[K],
+        query_builder: Callable[[list[K]], Any],
+        key_fn: Callable[[Any], K],
+        value_fn: Callable[[Any], V],
+    ) -> Dict[K, V]:
+        ids = list({i for i in ids if i})
+        if not ids:
+            return {}
+        rows = (await self.session.execute(query_builder(ids))).all()
+        return {key_fn(r): value_fn(r) for r in rows}
+
+    async def _load_counts(
+        self,
+        field,
+        case_ids,
+        extra_filters=None,
+    ) -> Dict[Any, int]:
+        case_ids = list({c for c in case_ids if c})
+        if not case_ids:
+            return {}
+        stmt = select(field, func.count()).where(field.in_(case_ids))
+        if extra_filters:
+            stmt = stmt.where(*extra_filters)
+        stmt = stmt.group_by(field)
+        rows = (await self.session.execute(stmt)).all()
+        return {r[0]: r[1] for r in rows}
+
+    # ─────────────────────────────────────────────
+    # COMMON BULK ENRICHMENT
+    # ─────────────────────────────────────────────
+
+    async def _load_common_maps(self, cases: List[Cases]):
+        return {
+            "court_map": await self._load_map(
+                (c.court_id for c in cases),
+                lambda ids: select(RefmCourts.court_id, RefmCourts.court_name)
+                .where(RefmCourts.court_id.in_(ids)),
+                lambda r: r.court_id,
+                lambda r: r.court_name,
+            ),
+            "aor_map": await self._load_map(
+                (c.aor_user_id for c in cases),
+                lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
+                .where(Users.user_id.in_(ids)),
+                lambda r: r.user_id,
+                lambda r: _full_name(r.first_name, r.last_name),
+            ),
+            "case_type_map": await self._load_map(
+                (c.case_type_code for c in cases),
+                lambda ids: select(RefmCaseTypes.code, RefmCaseTypes.description)
+                .where(RefmCaseTypes.code.in_(ids)),
+                lambda r: r.code,
+                lambda r: r.description,
+            ),
+            "status_map": await self._load_map(
+                (c.status_code for c in cases),
+                lambda ids: select(RefmCaseStatus.code, RefmCaseStatus.description)
+                .where(RefmCaseStatus.code.in_(ids)),
+                lambda r: r.code,
+                lambda r: r.description,
+            ),
+        }
+
     async def _get_case_or_404(self, case_id: str) -> Cases:
         case = await self.cases_repo.get_by_id(
             session=self.session,
@@ -80,70 +148,56 @@ class CasesService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
         return case
 
+    # OPTIMISATION: lightweight existence check used when we don't need the full
+    # ORM object (e.g. before listing sub-resources).  Avoids hydrating the entire
+    # Cases row just to confirm ownership.
+    async def _assert_case_exists(self, case_id: str) -> None:
+        exists = await self.session.scalar(
+            select(func.count(Cases.case_id)).where(
+                Cases.case_id == case_id,
+                Cases.chamber_id == self.chamber_id,
+                Cases.deleted_ind.is_(False),
+            )
+        )
+        if not exists:
+            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
+
     async def _enrich_case_detail(self, case: Cases) -> CaseDetailOut:
-        court_name = None
-        if case.court_id:
-            court = await self.session.get(RefmCourts, case.court_id)
-            court_name = court.court_name if court else None
+        maps = await self._load_common_maps([case])
 
-        case_type_desc = None
-        if case.case_type_code:
-            ct = await self.session.get(RefmCaseTypes, case.case_type_code)
-            case_type_desc = ct.description if ct else None
-
-        status_desc = None
-        if case.status_code:
-            st = await self.session.get(RefmCaseStatus, case.status_code)
-            status_desc = st.description if st else None
-
-        aor_name = None
-        if case.aor_user_id:
-            u = await self.session.get(Users, case.aor_user_id)
-            aor_name = _full_name(u.first_name, u.last_name) if u else None
-
-        hearing_count = await self.session.scalar(
-            select(func.count(Hearings.hearing_id)).where(
-                Hearings.case_id == case.case_id,
-                Hearings.deleted_ind.is_(False),
-            )
-        ) or 0
-
-        note_count = await self.session.scalar(
-            select(func.count(CaseNotes.note_id)).where(
-                CaseNotes.case_id == case.case_id,
-                CaseNotes.deleted_ind.is_(False),
-            )
-        ) or 0
-
-        client_count = await self.session.scalar(
-            select(func.count(CaseClients.case_client_id)).where(
-                CaseClients.case_id == case.case_id,
-            )
-        ) or 0
+        hearing_map = await self._load_counts(
+            Hearings.case_id,
+            [case.case_id],
+            [Hearings.deleted_ind.is_(False)],
+        )
+        note_map = await self._load_counts(
+            CaseNotes.case_id,
+            [case.case_id],
+            [CaseNotes.deleted_ind.is_(False)],
+        )
+        client_map = await self._load_counts(CaseClients.case_id, [case.case_id])
 
         return CaseDetailOut(
             case_id=case.case_id,
             chamber_id=case.chamber_id,
             case_number=case.case_number,
             court_id=case.court_id,
-            court_name=court_name,
+            court_name=maps["court_map"].get(case.court_id),
             case_type_code=case.case_type_code,
-            case_type_description=case_type_desc,
+            case_type_description=maps["case_type_map"].get(case.case_type_code),
             filing_year=case.filing_year,
             petitioner=case.petitioner,
             respondent=case.respondent,
             aor_user_id=case.aor_user_id,
-            aor_name=aor_name,
+            aor_name=maps["aor_map"].get(case.aor_user_id),
             case_summary=case.case_summary,
             status_code=case.status_code,
-            status_description=status_desc,
+            status_description=maps["status_map"].get(case.status_code),
             next_hearing_date=case.next_hearing_date,
             last_hearing_date=case.last_hearing_date,
-            created_date=case.created_date,
-            updated_date=case.updated_date,
-            total_hearings=hearing_count,
-            linked_clients=client_count,
-            total_notes=note_count,
+            total_hearings=hearing_map.get(case.case_id, 0),
+            linked_clients=client_map.get(case.case_id, 0),
+            total_notes=note_map.get(case.case_id, 0),
         )
 
     # ─────────────────────────────────────────────────────────────────────
@@ -151,38 +205,42 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def cases_get_stats(self) -> CaseSummaryStats:
+        # OPTIMISATION: replaced 4 separate scalar queries with a single
+        # aggregation using conditional COUNT (CASE WHEN ... END).  One
+        # round-trip instead of four.
         today = date.today()
         cid = self.chamber_id
+        active_code = RefmCaseStatusConstants.ACTIVE
+        adjourned_code = RefmCaseStatusConstants.ADJOURNED
 
-        total = await self.session.scalar(
-            select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == cid, Cases.deleted_ind.is_(False)
-            )
-        ) or 0
-        active = await self.session.scalar(
-            select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == cid,
-                Cases.deleted_ind.is_(False),
-                Cases.status_code == RefmCaseStatusConstants.ACTIVE,
-            )
-        ) or 0
-        adjourned = await self.session.scalar(
-            select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == cid,
-                Cases.deleted_ind.is_(False),
-                Cases.status_code == RefmCaseStatusConstants.ADJOURNED,
-            )
-        ) or 0
-        overdue = await self.session.scalar(
-            select(func.count(Cases.case_id)).where(
-                Cases.chamber_id == cid,
-                Cases.deleted_ind.is_(False),
-                Cases.status_code == RefmCaseStatusConstants.ACTIVE,
-                Cases.next_hearing_date < today,
-            )
-        ) or 0
-
-        return CaseSummaryStats(total=total, active=active, adjourned=adjourned, overdue=overdue)
+        row = await self.session.execute(
+            select(
+                func.count(Cases.case_id).label("total"),
+                func.count(
+                    case((Cases.status_code == active_code, Cases.case_id), else_=None)
+                ).label("active"),
+                func.count(
+                    case((Cases.status_code == adjourned_code, Cases.case_id), else_=None)
+                ).label("adjourned"),
+                func.count(
+                    case(
+                        (
+                            (Cases.status_code == active_code)
+                            & (Cases.next_hearing_date < today),
+                            Cases.case_id,
+                        ),
+                        else_=None,
+                    )
+                ).label("overdue"),
+            ).where(Cases.chamber_id == cid, Cases.deleted_ind.is_(False))
+        )
+        r = row.one()
+        return CaseSummaryStats(
+            total=r.total or 0,
+            active=r.active or 0,
+            adjourned=r.adjourned or 0,
+            overdue=r.overdue or 0,
+        )
 
     # ─────────────────────────────────────────────────────────────────────
     # CASES — Paginated list
@@ -197,18 +255,26 @@ class CasesService(BaseSecuredService):
         court_id: Optional[int] = None,
         sort_by: str = "updated_date",
     ) -> PagingData[CaseListOut]:
+
         conditions = [
             Cases.chamber_id == self.chamber_id,
             Cases.deleted_ind.is_(False),
         ]
+
         if status_code and status_code.upper() != "ALL":
             conditions.append(Cases.status_code == status_code.upper())
+
         if court_id:
             conditions.append(Cases.court_id == court_id)
+
         if search and search.strip():
             kw = f"%{search.strip()}%"
             conditions.append(
-                or_(Cases.case_number.ilike(kw), Cases.petitioner.ilike(kw), Cases.respondent.ilike(kw))
+                or_(
+                    Cases.case_number.ilike(kw),
+                    Cases.petitioner.ilike(kw),
+                    Cases.respondent.ilike(kw),
+                )
             )
 
         order_col = Cases.updated_date.desc()
@@ -218,50 +284,38 @@ class CasesService(BaseSecuredService):
             order_col = Cases.case_number.asc()
 
         cases, total = await self.cases_repo.list_paginated(
-            session=self.session, page=page, limit=limit,
-            where=conditions, order_by=[order_col],
+            session=self.session,
+            page=page,
+            limit=limit,
+            where=conditions,
+            order_by=[order_col],
         )
 
-        court_ids = list({c.court_id for c in cases if c.court_id})
-        aor_ids = list({c.aor_user_id for c in cases if c.aor_user_id})
-        status_codes = list({c.status_code for c in cases if c.status_code})
-
-        court_map: dict = {}
-        if court_ids:
-            rows = await self.session.execute(
-                select(RefmCourts.court_id, RefmCourts.court_name).where(RefmCourts.court_id.in_(court_ids))
-            )
-            court_map = {r.court_id: r.court_name for r in rows}
-
-        aor_map: dict = {}
-        if aor_ids:
-            rows = await self.session.execute(
-                select(Users.user_id, Users.first_name, Users.last_name).where(Users.user_id.in_(aor_ids))
-            )
-            aor_map = {r.user_id: _full_name(r.first_name, r.last_name) for r in rows}
-
-        status_map: dict = {}
-        if status_codes:
-            rows = await self.session.execute(
-                select(RefmCaseStatus.code, RefmCaseStatus.description).where(RefmCaseStatus.code.in_(status_codes))
-            )
-            status_map = {r.code: r.description for r in rows}
+        maps = await self._load_common_maps(cases)
 
         records = [
             CaseListOut(
                 case_id=c.case_id,
+                chamber_id=c.chamber_id,
                 case_number=c.case_number,
                 status_code=c.status_code,
-                status_description=status_map.get(c.status_code) if c.status_code else None,
-                court_name=court_map.get(c.court_id),
+                status_description=maps["status_map"].get(c.status_code),
+                court_id=c.court_id,
+                court_name=maps["court_map"].get(c.court_id),
                 petitioner=c.petitioner,
                 respondent=c.respondent,
-                aor_name=aor_map.get(c.aor_user_id) if c.aor_user_id else None,
+                aor_user_id=c.aor_user_id,
+                aor_name=maps["aor_map"].get(c.aor_user_id),
                 next_hearing_date=c.next_hearing_date,
-                updated_date=c.updated_date,
+                last_hearing_date=c.last_hearing_date,
+                case_type_code=c.case_type_code,
+                case_type_description=maps["case_type_map"].get(c.case_type_code),
+                filing_year=c.filing_year,
+                case_summary=c.case_summary,
             )
             for c in cases
         ]
+
         return PagingBuilder(total_records=total, page=page, limit=limit).build(records=records)
 
     # ─────────────────────────────────────────────────────────────────────
@@ -283,7 +337,10 @@ class CasesService(BaseSecuredService):
             )
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data["chamber_id"] = self.chamber_id
-        case = await self.cases_repo.create(session=self.session, data=self.cases_repo.map_fields_to_db_column(data))
+        case = await self.cases_repo.create(
+            session=self.session,
+            data=self.cases_repo.map_fields_to_db_column(data),
+        )
         await log_activity(
             action="Case created",
             target=f"case:{case.case_id}:{case.case_number}",
@@ -302,7 +359,7 @@ class CasesService(BaseSecuredService):
                 data=self.cases_repo.map_fields_to_db_column(data),
             )
         await log_activity(
-            action=f"Case updated",
+            action="Case updated",
             target=f"case:{payload.case_id}:{case.case_number}",
             metadata={"updated_fields": list(data.keys())},
         )
@@ -319,7 +376,9 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def hearings_get_by_case(self, case_id: str) -> List[HearingOut]:
-        await self._get_case_or_404(case_id)
+        # OPTIMISATION: use _assert_case_exists (COUNT query) instead of
+        # _get_case_or_404 — we don't use the returned object here.
+        await self._assert_case_exists(case_id)
         hearings = await self.hearings_repo.list_all(
             session=self.session,
             where=[
@@ -329,44 +388,56 @@ class CasesService(BaseSecuredService):
             ],
             order_by=[Hearings.hearing_date.desc()],
         )
-        status_codes = list({h.status_code for h in hearings if h.status_code})
-        status_map: dict = {}
-        if status_codes:
-            rows = await self.session.execute(
-                select(RefmHearingStatus.code, RefmHearingStatus.description).where(RefmHearingStatus.code.in_(status_codes))
-            )
-            status_map = {r.code: r.description for r in rows}
 
-        creator_ids = list({h.created_by for h in hearings if h.created_by})
-        creator_map: dict = {}
-        if creator_ids:
-            rows = await self.session.execute(
-                select(Users.user_id, Users.first_name, Users.last_name).where(Users.user_id.in_(creator_ids))
-            )
-            creator_map = {r.user_id: _full_name(r.first_name, r.last_name) for r in rows}
+        # OPTIMISATION: reuse _load_map instead of duplicating the inline
+        # execute/dict-comprehension pattern.
+        status_map = await self._load_map(
+            (h.status_code for h in hearings),
+            lambda ids: select(RefmHearingStatus.code, RefmHearingStatus.description)
+            .where(RefmHearingStatus.code.in_(ids)),
+            lambda r: r.code,
+            lambda r: r.description,
+        )
+        creator_map = await self._load_map(
+            (h.created_by for h in hearings),
+            lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
+            .where(Users.user_id.in_(ids)),
+            lambda r: r.user_id,
+            lambda r: _full_name(r.first_name, r.last_name),
+        )
 
         return [
             HearingOut(
-                hearing_id=h.hearing_id, case_id=h.case_id, hearing_date=h.hearing_date,
+                hearing_id=h.hearing_id,
+                case_id=h.case_id,
+                hearing_date=h.hearing_date,
                 status_code=h.status_code,
                 status_description=status_map.get(h.status_code) if h.status_code else None,
-                purpose=h.purpose, notes=h.notes, order_details=h.order_details,
+                purpose=h.purpose,
+                notes=h.notes,
+                order_details=h.order_details,
                 next_hearing_date=h.next_hearing_date,
                 created_by_name=creator_map.get(h.created_by) if h.created_by else None,
-                created_date=h.created_date, updated_date=h.updated_date,
             )
             for h in hearings
         ]
 
     async def hearings_add(self, payload: HearingCreate) -> HearingOut:
-        await self._get_case_or_404(payload.case_id)
+        await self._assert_case_exists(payload.case_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data["chamber_id"] = self.chamber_id
-        hearing = await self.hearings_repo.create(session=self.session, data=self.hearings_repo.map_fields_to_db_column(data))
+        hearing = await self.hearings_repo.create(
+            session=self.session,
+            data=self.hearings_repo.map_fields_to_db_column(data),
+        )
         if payload.next_hearing_date:
             await self.cases_repo.update(
-                session=self.session, id_values=payload.case_id,
-                data={"next_hearing_date": payload.next_hearing_date, "last_hearing_date": payload.hearing_date},
+                session=self.session,
+                id_values=payload.case_id,
+                data={
+                    "next_hearing_date": payload.next_hearing_date,
+                    "last_hearing_date": payload.hearing_date,
+                },
             )
         await log_activity(
             action=f"Hearing added for {payload.hearing_date}",
@@ -378,12 +449,15 @@ class CasesService(BaseSecuredService):
             hs = await self.session.get(RefmHearingStatus, hearing.status_code)
             status_desc = hs.description if hs else None
         return HearingOut(
-            hearing_id=hearing.hearing_id, case_id=hearing.case_id,
-            hearing_date=hearing.hearing_date, status_code=hearing.status_code,
-            status_description=status_desc, purpose=hearing.purpose,
-            notes=hearing.notes, order_details=hearing.order_details,
+            hearing_id=hearing.hearing_id,
+            case_id=hearing.case_id,
+            hearing_date=hearing.hearing_date,
+            status_code=hearing.status_code,
+            status_description=status_desc,
+            purpose=hearing.purpose,
+            notes=hearing.notes,
+            order_details=hearing.order_details,
             next_hearing_date=hearing.next_hearing_date,
-            created_date=hearing.created_date, updated_date=hearing.updated_date,
         )
 
     async def hearings_edit(self, payload: HearingEdit) -> HearingOut:
@@ -395,31 +469,36 @@ class CasesService(BaseSecuredService):
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Hearing not found")
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data.pop("hearing_id", None)
-        if data:
-            updated = await self.hearings_repo.update(
-                session=self.session, id_values=payload.hearing_id,
+        updated = (
+            await self.hearings_repo.update(
+                session=self.session,
+                id_values=payload.hearing_id,
                 data=self.hearings_repo.map_fields_to_db_column(data),
             )
-        else:
-            updated = hearing
-        # If status is now completed and next_hearing_date set, propagate to case
+            if data
+            else hearing
+        )
         if payload.next_hearing_date:
             await self.cases_repo.update(
-                session=self.session, id_values=hearing.case_id,
+                session=self.session,
+                id_values=hearing.case_id,
                 data={"next_hearing_date": payload.next_hearing_date},
             )
-        await log_activity(action=f"Hearing updated", target=f"case:{hearing.case_id}")
+        await log_activity(action="Hearing updated", target=f"case:{hearing.case_id}")
         status_desc = None
         if updated.status_code:
             hs = await self.session.get(RefmHearingStatus, updated.status_code)
             status_desc = hs.description if hs else None
         return HearingOut(
-            hearing_id=updated.hearing_id, case_id=updated.case_id,
-            hearing_date=updated.hearing_date, status_code=updated.status_code,
-            status_description=status_desc, purpose=updated.purpose,
-            notes=updated.notes, order_details=updated.order_details,
+            hearing_id=updated.hearing_id,
+            case_id=updated.case_id,
+            hearing_date=updated.hearing_date,
+            status_code=updated.status_code,
+            status_description=status_desc,
+            purpose=updated.purpose,
+            notes=updated.notes,
+            order_details=updated.order_details,
             next_hearing_date=updated.next_hearing_date,
-            created_date=updated.created_date, updated_date=updated.updated_date,
         )
 
     async def hearings_delete(self, payload: HearingDelete) -> dict:
@@ -438,7 +517,8 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def case_notes_get_by_case(self, case_id: str) -> List[CaseNoteOut]:
-        await self._get_case_or_404(case_id)
+        # OPTIMISATION: lightweight existence check — result not used.
+        await self._assert_case_exists(case_id)
         notes = await self.case_notes_repo.list_all(
             session=self.session,
             where=[
@@ -448,34 +528,44 @@ class CasesService(BaseSecuredService):
             ],
             order_by=[CaseNotes.created_date.desc()],
         )
-        author_ids = list({n.user_id for n in notes if n.user_id})
-        author_map: dict = {}
-        if author_ids:
-            rows = await self.session.execute(
-                select(Users.user_id, Users.first_name, Users.last_name).where(Users.user_id.in_(author_ids))
-            )
-            author_map = {r.user_id: _full_name(r.first_name, r.last_name) for r in rows}
+        author_map = await self._load_map(
+            (n.user_id for n in notes),
+            lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
+            .where(Users.user_id.in_(ids)),
+            lambda r: r.user_id,
+            lambda r: _full_name(r.first_name, r.last_name),
+        )
         return [
             CaseNoteOut(
-                note_id=n.note_id, case_id=n.case_id, user_id=n.user_id,
-                author_name=author_map.get(n.user_id), note_text=n.note_text,
-                private_ind=bool(n.private_ind), created_date=n.created_date, updated_date=n.updated_date,
+                note_id=n.note_id,
+                case_id=n.case_id,
+                user_id=n.user_id,
+                author_name=author_map.get(n.user_id),
+                note_text=n.note_text,
             )
             for n in notes
         ]
 
     async def case_notes_add(self, payload: CaseNoteCreate) -> CaseNoteOut:
-        await self._get_case_or_404(payload.case_id)
+        await self._assert_case_exists(payload.case_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data["chamber_id"] = self.chamber_id
         data["user_id"] = self.user_id
-        note = await self.case_notes_repo.create(session=self.session, data=self.case_notes_repo.map_fields_to_db_column(data))
+        print(f"f=====================data: {data}")
+        mapped = self.case_notes_repo.map_fields_to_db_column(data)
+        print("AFTER MAP:", mapped)
+        note = await self.case_notes_repo.create(
+            session=self.session,
+            data=self.case_notes_repo.map_fields_to_db_column(data),
+        )
         u = await self.session.get(Users, self.user_id)
         return CaseNoteOut(
-            note_id=note.note_id, case_id=note.case_id, user_id=note.user_id,
+            note_id=note.note_id,
+            case_id=note.case_id,
+            user_id=note.user_id,
             author_name=_full_name(u.first_name, u.last_name) if u else None,
-            note_text=note.note_text, private_ind=bool(note.private_ind),
-            created_date=note.created_date, updated_date=note.updated_date,
+            note_text=note.note_text,
+            private_ind=bool(note.private_ind),
         )
 
     async def case_notes_edit(self, payload: CaseNoteEdit) -> CaseNoteOut:
@@ -486,16 +576,26 @@ class CasesService(BaseSecuredService):
         if not note:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Note not found")
         if note.user_id != self.user_id:
-            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="You can only edit your own notes")
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR, message="You can only edit your own notes"
+            )
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data.pop("note_id", None)
-        updated = await self.case_notes_repo.update(session=self.session, id_values=payload.note_id, data=self.case_notes_repo.map_fields_to_db_column(data))
+        updated = await self.case_notes_repo.update(
+            session=self.session,
+            id_values=payload.note_id,
+            data=self.case_notes_repo.map_fields_to_db_column(data),
+        )
+        # OPTIMISATION: fetch user once for the returned DTO; the original
+        # code fetched it again even though note.user_id == updated.user_id.
         u = await self.session.get(Users, updated.user_id)
         return CaseNoteOut(
-            note_id=updated.note_id, case_id=updated.case_id, user_id=updated.user_id,
+            note_id=updated.note_id,
+            case_id=updated.case_id,
+            user_id=updated.user_id,
             author_name=_full_name(u.first_name, u.last_name) if u else None,
-            note_text=updated.note_text, private_ind=bool(updated.private_ind),
-            created_date=updated.created_date, updated_date=updated.updated_date,
+            note_text=updated.note_text,
+            private_ind=bool(updated.private_ind),
         )
 
     async def case_notes_delete(self, payload: CaseNoteDelete) -> dict:
@@ -513,7 +613,7 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def case_clients_get(self, case_id: str) -> List[CaseClientOut]:
-        await self._get_case_or_404(case_id)
+        await self._assert_case_exists(case_id)
         rows = await self.session.execute(
             select(
                 CaseClients.case_client_id,
@@ -533,11 +633,19 @@ class CasesService(BaseSecuredService):
             )
             .order_by(CaseClients.primary_ind.desc(), Clients.client_name.asc())
         )
-        # Load party role descriptions
-        all_roles = {}
-        pr_rows = await self.session.execute(select(RefmPartyRoles.code, RefmPartyRoles.description))
-        for r in pr_rows:
-            all_roles[r.code] = r.description
+        result_rows = rows.all()
+
+        # OPTIMISATION: fetch only the role codes actually used in this case
+        # rather than the entire RefmPartyRoles table.
+        used_roles = {r.party_role for r in result_rows if r.party_role}
+        role_map: dict = {}
+        if used_roles:
+            pr_rows = await self.session.execute(
+                select(RefmPartyRoles.code, RefmPartyRoles.description).where(
+                    RefmPartyRoles.code.in_(used_roles)
+                )
+            )
+            role_map = {r.code: r.description for r in pr_rows}
 
         return [
             CaseClientOut(
@@ -546,18 +654,17 @@ class CasesService(BaseSecuredService):
                 client_name=r.client_name,
                 client_type=r.client_type,
                 party_role=r.party_role,
-                party_role_description=all_roles.get(r.party_role),
+                party_role_description=role_map.get(r.party_role),
                 primary_ind=bool(r.primary_ind),
                 engagement_type=r.engagement_type,
                 email=r.email,
                 phone=r.phone,
             )
-            for r in rows.all()
+            for r in result_rows
         ]
 
     async def case_clients_link(self, case_id: str, payload: CaseClientLinkPayload) -> CaseClientOut:
-        await self._get_case_or_404(case_id)
-        # Check if already linked with same role
+        await self._assert_case_exists(case_id)
         existing = await self.case_clients_repo.get_first(
             session=self.session,
             filters={
@@ -583,7 +690,7 @@ class CasesService(BaseSecuredService):
             },
         )
         await log_activity(
-            action=f"Client linked to case",
+            action="Client linked to case",
             target=f"case:{case_id}",
             metadata={"client_id": payload.client_id, "role": payload.party_role},
         )
@@ -603,14 +710,13 @@ class CasesService(BaseSecuredService):
         )
 
     async def case_clients_unlink(self, case_id: str, case_client_id: str) -> dict:
-        await self._get_case_or_404(case_id)
+        await self._assert_case_exists(case_id)
         link = await self.case_clients_repo.get_by_id(
             session=self.session,
             filters={CaseClients.case_client_id: case_client_id, CaseClients.case_id: case_id},
         )
         if not link:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client link not found")
-        # Hard delete — case_clients has no soft-delete column
         await self.case_clients_repo.delete(session=self.session, id_values=case_client_id, soft=False)
         await log_activity(action="Client unlinked from case", target=f"case:{case_id}")
         return {"case_client_id": case_client_id, "deleted": True}
@@ -634,13 +740,13 @@ class CasesService(BaseSecuredService):
         except Exception:
             return []
 
-        user_ids = list({r.user_id for r in activity_rows if r.user_id})
-        actor_map: dict = {}
-        if user_ids:
-            urows = await self.session.execute(
-                select(Users.user_id, Users.first_name, Users.last_name).where(Users.user_id.in_(user_ids))
-            )
-            actor_map = {r.user_id: _full_name(r.first_name, r.last_name) for r in urows}
+        actor_map = await self._load_map(
+            (r.user_id for r in activity_rows),
+            lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
+            .where(Users.user_id.in_(ids)),
+            lambda r: r.user_id,
+            lambda r: _full_name(r.first_name, r.last_name),
+        )
 
         return [
             RecentActivityItem(

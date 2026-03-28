@@ -184,7 +184,6 @@ class BaseRepository(Generic[ModelType]):
         """
         ctx = get_request_context()
         chamber_id = cast(str, ctx.get("chamber_id"))
-        print(f"************chamber_id :::::::::::::{chamber_id}")
         if hasattr(self.model, "chamber_id"):
             stmt = stmt.where(self.model.chamber_id == chamber_id)
         return stmt
@@ -308,7 +307,7 @@ class BaseRepository(Generic[ModelType]):
         # 🔥 PRIMARY KEY HANDLING
         # ─────────────────────────────────────────────
         pk_columns = self.model.__table__.primary_key.columns
-
+        print("*********************** \n\n\n")
         for col in pk_columns:
             col_name = col.name
             col_type = col.type
@@ -321,13 +320,17 @@ class BaseRepository(Generic[ModelType]):
                 col_length == 36 and col_name.lower().endswith("id")
             )
 
+            print(f"*******************{col_name}::{val}")
+
             if is_uuid_pk:
                 if val is None or val == "":
                     result[col_name] = self.model.generate_uuid()
+                    print(f"*******************{col_name}::{result[col_name]}")
             else:
                 # Non-UUID PK → let DB handle
                 if col_name in result and result[col_name] is None:
                     del result[col_name]
+        print("*********************** \n\n\n")
 
         # ─────────────────────────────────────────────
         # 🔹 AUDIT FIELDS
@@ -338,6 +341,9 @@ class BaseRepository(Generic[ModelType]):
 
             if hasattr(self.model, "updated_by") and "updated_by" not in result:
                 result["updated_by"] = user_id
+
+            if hasattr(self.model, "user_id") and "user_id" not in result:
+                result["user_id"] = user_id
 
         if hasattr(self.model, "chamber_id") and "chamber_id" not in result:
             result["chamber_id"] = chamber_id

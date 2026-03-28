@@ -462,17 +462,204 @@ INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, n
 (@chamber_vk, @case4, '2026-03-19', 'HSAD', 'First hearing',         'Counsel not available',              '2026-03-26', @user_priya);
 
 
--- =============================================================================
--- 22-25. REMAINING SEED DATA (Notes, AORs, Email, Invitations, Logs)
--- =============================================================================
+-- ===============================================================================================================
+-- 22-25. REMAINING SEED DATA (Clients, Case Clients, Case Notes, AORs, Email, Invitations, Logs)
+-- ===============================================================================================================
 
-INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, private_ind, created_by) VALUES
-(@chamber_vk, @case1, @user_priya,   'Client mentioned new evidence – witness statement from neighbour.', FALSE, @user_priya),
-(@chamber_vk, @case1, @user_vijay,   'Internal: Consider settlement if opposing party approaches.',       TRUE,  @user_vijay),
-(@chamber_vk, @case1, @user_karthik, 'Court fee receipt collected. Original filed in case file.',         FALSE, @user_karthik),
-(@chamber_vk, @case2, @user_priya,   'Tahsildar office confirmed – patta cancellation was procedural error.', FALSE, @user_priya),
-(@chamber_vk, @case2, @user_vijay,   'Client wants expedited hearing. File urgency petition.',            TRUE,  @user_vijay),
-(@chamber_sundar, @case3, @user_lokesh, 'Builder agreed to mediation. Schedule for mid-March.',          FALSE, @user_lokesh);
+-- -----------------------------------------------------------------------------
+-- 22.1  Clients (Based on Case Petitioners/Respondents)
+-- -----------------------------------------------------------------------------
+
+INSERT INTO clients (chamber_id, client_type, client_name, display_name, 
+                     contact_person, email, phone, alternate_phone, 
+                     address_line1, city, state_code, postal_code, country_code,
+                     id_proof_type, id_proof_number, source_code, referral_source,
+                     client_since, notes, status_ind, created_by) VALUES
+-- VijayKrishnan & Associates Clients
+(@chamber_vk, 'I', 'Arjun Prasad', 'Mr. Arjun Prasad', 
+ 'Arjun Prasad', 'arjun.prasad@email.com', '9876501234', NULL,
+ 'No. 15, Gandhi Nagar', 'Chennai', 'TN  ', '600020', 'IN  ',
+ 'PAN', 'ABCDE1234F', 'REF', 'Existing client referral',
+ '2024-01-10', 'Accused in Crl.O.P.No.234/2025 - FIR quashing case', TRUE, @user_vijay),
+
+(@chamber_vk, 'I', 'Tmt. Saraswathi', 'Mrs. Saraswathi', 
+ 'Saraswathi', 'saraswathi@email.com', '9876502345', NULL,
+ 'No. 28, Temple Street', 'Chengalpattu', 'TN  ', '603001', 'IN  ',
+ 'Aadhaar', '1234-5678-9012', 'WALK', 'Direct walk-in',
+ '2024-02-15', 'Writ petition against patta cancellation', TRUE, @user_vijay),
+
+(@chamber_vk, 'I', 'Ramesh Kumar', 'Mr. Ramesh Kumar', 
+ 'Ramesh Kumar', 'ramesh.kumar@email.com', '9876503456', '9876503457',
+ 'No. 42, Anna Nagar', 'Chennai', 'TN  ', '600040', 'IN  ',
+ 'PAN', 'XYZAB5678C', 'REF', 'Senior Advocate referral',
+ '2025-12-20', 'Anticipatory bail petition - Crl.M.C.No.89/2026', TRUE, @user_priya),
+
+(@chamber_vk, 'O', 'Meenkshi Textiles', 'Meenkshi Textiles Pvt Ltd', 
+ 'Rajesh Mehta (Director)', 'contact@meenkshi.com', '9876504567', '9876504568',
+ 'Plot 156, Industrial Estate', 'Chennai', 'TN  ', '600032', 'IN  ',
+ 'GST', '33ABCDE1234F1Z5', 'WEB', 'Website inquiry',
+ '2025-06-10', 'Civil suit for specific performance - O.S.No.456/2025', TRUE, @user_vijay),
+
+(@chamber_vk, 'I', 'Lakshmi Devi', 'Mrs. Lakshmi Devi', 
+ 'Lakshmi Devi', 'lakshmi.devi@email.com', '9876505678', NULL,
+ 'No. 67, Residential Area', 'Chennai', 'TN  ', '600028', 'IN  ',
+ 'Aadhaar', '9876-5432-1098', 'REF', 'Family friend referral',
+ '2025-07-15', 'Divorce petition - F.C.No.123/2025', TRUE, @user_priya),
+
+(@chamber_vk, 'O', 'Workmen Union', 'Workmen Union - Local Chapter', 
+ 'Secretary (Name Redacted)', 'union@workmen.org', '9876506789', NULL,
+ 'Trade Union Office, Teynampet', 'Chennai', 'TN  ', '600018', 'IN  ',
+ 'Registration', 'TU/2020/1234', 'REF', 'Trade association referral',
+ '2025-03-20', 'Labour dispute - wrongful termination case', TRUE, @user_vijay),
+
+(@chamber_vk, 'I', 'Murugan', 'Mr. Murugan', 
+ 'Murugan', 'murugan@email.com', '9876507890', NULL,
+ 'No. 89, Village Road', 'Kanchipuram', 'TN  ', '631501', 'IN  ',
+ 'PAN', 'MURGA1234D', 'WALK', 'Direct approach',
+ '2026-01-05', 'Criminal proceedings quashing - Crl.O.P.No.567/2026', TRUE, @user_priya),
+
+(@chamber_vk, 'O', 'Chennai Developers', 'Chennai Developers Ltd', 
+ 'VP Legal (Name Redacted)', 'legal@chennaidev.com', '9876508901', '9876508902',
+ 'Corporate Office, OMR', 'Chennai', 'TN  ', '600096', 'IN  ',
+ 'GST', '33CHNDE1234F1Z9', 'REF', 'Corporate client',
+ '2026-01-20', 'Writ against DTCP planning permission denial', TRUE, @user_vijay),
+
+(@chamber_vk, 'I', 'Subramanian', 'Mr. Subramanian', 
+ 'Subramanian', 'subramanian@email.com', '9876509012', NULL,
+ 'No. 34, Heritage Colony', 'Chennai', 'TN  ', '600041', 'IN  ',
+ 'PAN', 'SUBRA5678E', 'REF', 'Long-time client',
+ '2024-05-10', 'Property partition suit - O.S.No.789/2024', TRUE, @user_vijay),
+
+(@chamber_vk, 'I', 'Anand', 'Mr. Anand', 
+ 'Anand', 'anand@email.com', '9876500123', NULL,
+ 'No. 12, Bail Road', 'Chennai', 'TN  ', '600034', 'IN  ',
+ 'Aadhaar', '1111-2222-3333', 'WALK', 'Court complex reference',
+ '2024-01-05', 'Bail application - disposed (Crl.M.C.No.45/2024)', TRUE, @user_priya),
+
+(@chamber_vk, 'I', 'Priya', 'Mrs. Priya', 
+ 'Priya', 'priya.custody@email.com', '9876500234', NULL,
+ 'No. 56, Family Court Area', 'Chennai', 'TN  ', '600014', 'IN  ',
+ 'Aadhaar', '4444-5555-6666', 'REF', 'Family court referral',
+ '2024-01-15', 'Custody matter - closed (F.C.No.56/2024)', TRUE, @user_vijay),
+
+-- Sundar Associates Clients
+(@chamber_sundar, 'O', 'M/s Blue Sky Builders', 'Blue Sky Builders Pvt Ltd', 
+ 'Managing Director', 'contact@bluesky.com', '9445101234', '9445101235',
+ 'Construction Site Office, Gandhipuram', 'Coimbatore', 'TN  ', '641012', 'IN  ',
+ 'GST', '33BLUSK1234F1Z2', 'WEB', 'Website contact',
+ '2024-08-01', 'Construction dispute - specific performance case', TRUE, @user_lokesh),
+
+(@chamber_sundar, 'I', 'Ganesh', 'Mr. Ganesh', 
+ 'Ganesh', 'ganesh.criminal@email.com', '9445102345', NULL,
+ 'No. 78, Court Road', 'Coimbatore', 'TN  ', '641018', 'IN  ',
+ 'PAN', 'GANES9012F', 'REF', 'Local advocate referral',
+ '2025-03-10', 'Criminal revision petition - Crl.O.P.No.88/2025', TRUE, @user_lokesh);
+
+-- Store client IDs for case linking
+SET @client_arjun        = (SELECT client_id FROM clients WHERE client_name = 'Arjun Prasad' AND chamber_id = @chamber_vk);
+SET @client_saraswathi   = (SELECT client_id FROM clients WHERE client_name = 'Tmt. Saraswathi' AND chamber_id = @chamber_vk);
+SET @client_ramesh       = (SELECT client_id FROM clients WHERE client_name = 'Ramesh Kumar' AND chamber_id = @chamber_vk);
+SET @client_meenkshi     = (SELECT client_id FROM clients WHERE client_name = 'Meenkshi Textiles' AND chamber_id = @chamber_vk);
+SET @client_lakshmi      = (SELECT client_id FROM clients WHERE client_name = 'Lakshmi Devi' AND chamber_id = @chamber_vk);
+SET @client_workmen      = (SELECT client_id FROM clients WHERE client_name = 'Workmen Union' AND chamber_id = @chamber_vk);
+SET @client_murugan      = (SELECT client_id FROM clients WHERE client_name = 'Murugan' AND chamber_id = @chamber_vk);
+SET @client_chennai_dev  = (SELECT client_id FROM clients WHERE client_name = 'Chennai Developers' AND chamber_id = @chamber_vk);
+SET @client_subramanian  = (SELECT client_id FROM clients WHERE client_name = 'Subramanian' AND chamber_id = @chamber_vk);
+SET @client_anand        = (SELECT client_id FROM clients WHERE client_name = 'Anand' AND chamber_id = @chamber_vk);
+SET @client_priya_cust   = (SELECT client_id FROM clients WHERE client_name = 'Priya' AND chamber_id = @chamber_vk);
+SET @client_bluesky      = (SELECT client_id FROM clients WHERE client_name = 'M/s Blue Sky Builders' AND chamber_id = @chamber_sundar);
+SET @client_ganesh       = (SELECT client_id FROM clients WHERE client_name = 'Ganesh' AND chamber_id = @chamber_sundar);
+
+-- -----------------------------------------------------------------------------
+-- 22.2  Case Clients (Link Clients to Cases with Party Roles)
+-- -----------------------------------------------------------------------------
+
+INSERT INTO case_clients (chamber_id, case_id, client_id, party_role, 
+                          primary_ind, engagement_type, created_by) VALUES
+-- VijayKrishnan & Associates Case-Client Links
+(@chamber_vk, @case1, @client_arjun, 'PET', TRUE, 'CASE', @user_vijay),
+(@chamber_vk, @case1, @client_saraswathi, 'RES', FALSE, 'CASE', @user_vijay),
+
+(@chamber_vk, @case2, @client_saraswathi, 'PET', TRUE, 'CASE', @user_vijay),
+(@chamber_vk, @case2, @client_ramesh, 'RES', FALSE, 'CASE', @user_vijay),
+
+(@chamber_vk, @case3, @client_ramesh, 'PET', TRUE, 'CASE', @user_priya),
+(@chamber_vk, @case3, @client_murugan, 'RES', FALSE, 'CASE', @user_priya),
+
+(@chamber_vk, @case4, @client_meenkshi, 'PET', TRUE, 'CASE', @user_vijay),
+(@chamber_vk, @case4, @client_lakshmi, 'RES', FALSE, 'CASE', @user_vijay),
+
+(@chamber_vk, @case5, @client_lakshmi, 'PET', TRUE, 'CASE', @user_priya),
+(@chamber_vk, @case5, @client_subramanian, 'RES', FALSE, 'CASE', @user_priya),
+
+(@chamber_vk, @case6, @client_workmen, 'PET', TRUE, 'CASE', @user_vijay),
+(@chamber_vk, @case6, @client_bluesky, 'RES', FALSE, 'CASE', @user_vijay),
+
+(@chamber_vk, @case7, @client_murugan, 'PET', TRUE, 'CASE', @user_priya),
+(@chamber_vk, @case7, @client_anand, 'RES', FALSE, 'CASE', @user_priya),
+
+(@chamber_vk, @case8, @client_chennai_dev, 'PET', TRUE, 'CASE', @user_vijay),
+(@chamber_vk, @case8, @client_ganesh, 'RES', FALSE, 'CASE', @user_vijay),
+
+(@chamber_vk, @case9, @client_subramanian, 'PET', TRUE, 'CASE', @user_vijay),
+(@chamber_vk, @case9, @client_priya_cust, 'RES', FALSE, 'CASE', @user_vijay);
+
+-- -----------------------------------------------------------------------------
+-- 22.3  Case Notes (Detailed Notes per Case)
+-- -----------------------------------------------------------------------------
+
+INSERT INTO case_notes (chamber_id, case_id, user_id, note_text, 
+                        private_ind, created_by) VALUES
+-- Case 1: Crl.O.P.No.234/2025 (Arjun Prasad - FIR Quashing)
+(@chamber_vk, @case1, @user_priya, 
+ 'Client mentioned new evidence – witness statement from neighbour confirming alibi. Need to file supplementary affidavit before next hearing.', 
+ FALSE, @user_priya),
+(@chamber_vk, @case1, @user_vijay, 
+ 'INTERNAL: Consider settlement if opposing party approaches. Max limit: 5 lakhs. Client has financial constraints.', 
+ TRUE, @user_vijay),
+(@chamber_vk, @case1, @user_karthik, 
+ 'Court fee receipt collected (Rs. 500). Original filed in case file. Copy with client.', 
+ FALSE, @user_karthik),
+
+-- Case 2: W.P.(MD)No.5678/2025 (Saraswathi - Patta Cancellation)
+(@chamber_vk, @case2, @user_priya, 
+ 'Tahsildar office confirmed – patta cancellation was procedural error. Strong case for quashing. Got verbal confirmation from clerk.', 
+ FALSE, @user_priya),
+(@chamber_vk, @case2, @user_vijay, 
+ 'Client wants expedited hearing. File urgency petition if not listed in March batch. Client is senior citizen.', 
+ TRUE, @user_vijay),
+
+-- Case 3: Crl.M.C.No.89/2026 (Ramesh Kumar - Anticipatory Bail)
+(@chamber_vk, @case3, @user_priya, 
+ 'Police inspector indicated willingness for compromise. Need to discuss with client before next date.', 
+ FALSE, @user_priya),
+(@chamber_vk, @case3, @user_karthik, 
+ 'Previous bail orders from similar cases collected. Ready for submission.', 
+ FALSE, @user_karthik),
+
+-- Case 4: O.S.No.456/2025 (Meenkshi Textiles - Specific Performance)
+(@chamber_vk, @case4, @user_vijay, 
+ 'Opposing party showed interest in settlement during last adjournment. Client open to 15% premium over agreement value.', 
+ TRUE, @user_vijay),
+(@chamber_vk, @case4, @user_priya, 
+ 'Sale deed draft reviewed. Minor corrections needed in clause 7(b). Will send revised copy by Friday.', 
+ FALSE, @user_priya),
+
+-- Case 5: F.C.No.123/2025 (Lakshmi Devi - Divorce)
+(@chamber_vk, @case5, @user_priya, 
+ 'Maintenance pendente lite amount agreed at Rs. 25,000/month. Respondent''s lawyer confirmed acceptance.', 
+ FALSE, @user_priya),
+(@chamber_vk, @case5, @user_vijay, 
+ 'Custody of minor child - client willing to give visitation rights on weekends. Document this in settlement.', 
+ TRUE, @user_vijay),
+
+-- Case 6: L.C.No.78/2025 (Workmen Union - Labour Dispute)
+(@chamber_vk, @case6, @user_vijay, 
+ 'Union leader wants reinstatement + back wages. Management offering only reinstatement. Gap needs negotiation.', 
+ TRUE, @user_vijay),
+(@chamber_vk, @case6, @user_karthik, 
+ 'Labour commissioner office confirmed - conciliation failed. Ready for adjudication.', 
+ FALSE, @user_karthik);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 22.2  Case AORs

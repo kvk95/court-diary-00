@@ -14,25 +14,12 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 class CaseListOut(BaseRecordData):
     case_id: str
-    case_number: str
-    status_code: Optional[str] = None
-    status_description: Optional[str] = None
-    court_name: Optional[str] = None
-    petitioner: str
-    respondent: str
-    aor_name: Optional[str] = None
-    next_hearing_date: Optional[date] = None
-    updated_date: Optional[datetime] = None
-
-
-class CaseDetailOut(BaseRecordData):
-    case_id: str
     chamber_id: str
-    case_number: str
+    case_number: str 
     court_id: int
-    court_name: Optional[str] = None
+    court_name: Optional[str] = None   
     case_type_code: Optional[str] = None
-    case_type_description: Optional[str] = None
+    case_type_description:Optional[str] = None
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
@@ -43,8 +30,9 @@ class CaseDetailOut(BaseRecordData):
     status_description: Optional[str] = None
     next_hearing_date: Optional[date] = None
     last_hearing_date: Optional[date] = None
-    created_date: Optional[datetime] = None
-    updated_date: Optional[datetime] = None
+
+
+class CaseDetailOut(CaseListOut):
     total_hearings: int = 0
     linked_clients: int = 0
     total_notes: int = 0
@@ -128,28 +116,20 @@ class HearingOut(BaseRecordData):
     order_details: Optional[str] = None
     next_hearing_date: Optional[date] = None
     created_by_name: Optional[str] = None
-    created_date: Optional[datetime] = None
-    updated_date: Optional[datetime] = None
 
 
 class HearingCreate(BaseInData):
     case_id: str
     hearing_date: date
-    status_code: str = "SC"
+    status_code: str
     purpose: Optional[str] = None
     notes: Optional[str] = None
     order_details: Optional[str] = None
     next_hearing_date: Optional[date] = None
 
 
-class HearingEdit(BaseInData):
+class HearingEdit(HearingCreate):
     hearing_id: str
-    hearing_date: Optional[date] = None
-    status_code: Optional[str] = None
-    purpose: Optional[str] = None
-    notes: Optional[str] = None
-    order_details: Optional[str] = None
-    next_hearing_date: Optional[date] = None
 
 
 class HearingDelete(BaseInData):
@@ -167,8 +147,6 @@ class CaseNoteOut(BaseRecordData):
     author_name: Optional[str] = None
     note_text: str
     private_ind: bool = False
-    created_date: Optional[datetime] = None
-    updated_date: Optional[datetime] = None
 
 
 class CaseNoteCreate(BaseInData):
@@ -184,10 +162,8 @@ class CaseNoteCreate(BaseInData):
         return v.strip()
 
 
-class CaseNoteEdit(BaseInData):
+class CaseNoteEdit(CaseNoteCreate):
     note_id: str
-    note_text: Optional[str] = None
-    private_ind: Optional[bool] = None
 
 
 class CaseNoteDelete(BaseInData):
