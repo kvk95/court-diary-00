@@ -100,7 +100,7 @@ class PendingInvitationItem(BaseRecordData):
 
 class RecentActivityItem(BaseRecordData):
     """One row in the Recent Activity feed."""
-    activity_id: int
+    activity_id: str
     action: str
     target: Optional[str] = None
     actor_name: Optional[str] = None

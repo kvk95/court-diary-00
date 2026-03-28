@@ -8,13 +8,23 @@ CREATE USER 'devuser'@'localhost' IDENTIFIED BY 'StrongPasswordHere';
 GRANT CREATE, ALTER, DROP, INDEX, REFERENCES, SELECT, INSERT, UPDATE, DELETE, CREATE TEMPORARY TABLES, LOCK TABLES
 ON *.* TO 'devuser'@'localhost';
 
+/etc/mysql/my.cnf
+[mysqld]
+log_bin_trust_function_creators=1
+sudo systemctl restart mysql
+
+mysql -u root -p
+GRANT CREATE ROUTINE, ALTER ROUTINE, EXECUTE, TRIGGER ON courtdiary.* TO 'devuser'@'localhost';
+FLUSH PRIVILEGES;
+GRANT TRIGGER ON courtdiary.* TO 'devuser'@'localhost';
+FLUSH PRIVILEGES;
+
+SHOW GRANTS FOR 'devuser'@'localhost';
+
+
 mysql -h 127.0.0.1 -u devuser -p
 
-~/working/court-diary-00/backend$ --> under this
-mysql -u devuser -p < data/1_cs_schema_create.sql
-mysql -u devuser -p < data/2_cs_data_inserts.sql
 
-mysql -u devuser -p courtdiary < courtdiary_full.sql
 
 sudo systemctl enable api.casdia.service
 sudo systemctl daemon-reload
@@ -61,7 +71,8 @@ journalctl -u api.casdia.service -n 50 --no-pager
 # run DB
 su - myuser
 cd working/court-diary-00/backend/
-mysql -u devuser -p < data/1_cs_schema_create.sql
-mysql -u devuser -p < data/001_create_uuid_v7_function.sql
-mysql -u devuser -p < data/002_create_uuid_triggers.sql
-mysql -u devuser -p < data/2_cs_data_inserts.sql
+mysql -u devuser -p < data/all.sql
+# mysql -u devuser -p < data/1_cs_schema_create.sql
+# mysql -u devuser -p < data/001_create_uuid_v7_function.sql
+# mysql -u devuser -p < data/002_create_uuid_triggers.sql
+# mysql -u devuser -p < data/2_cs_data_inserts.sql
