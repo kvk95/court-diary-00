@@ -192,16 +192,11 @@ class CasesRepository(BaseRepository[Cases]):
         stmt = (
             select(
                 Cases,
-                RefmCourts.court_name,
-                RefmCaseTypes.description.label("case_type_desc"),
-                RefmCaseStatus.description.label("case_status_desc"),
                 Users.first_name,
                 Users.last_name,
                 RefmHearingStatus.description.label("hearing_status_desc"),
             )
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
-            .outerjoin(RefmCaseTypes, Cases.case_type_code == RefmCaseTypes.code)
-            .outerjoin(RefmCaseStatus, Cases.status_code == RefmCaseStatus.code)
             .outerjoin(Users, Cases.aor_user_id == Users.user_id)
             .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)
             .outerjoin(
@@ -259,13 +254,9 @@ class CasesRepository(BaseRepository[Cases]):
         stmt = (
             select(
                 Cases,
-                RefmCourts.court_name,
-                RefmCaseTypes.description.label("case_type_desc"),
                 Users.first_name,
                 Users.last_name,
             )
-            .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
-            .outerjoin(RefmCaseTypes, Cases.case_type_code == RefmCaseTypes.code)
             .outerjoin(Users, Cases.aor_user_id == Users.user_id)
         )
 

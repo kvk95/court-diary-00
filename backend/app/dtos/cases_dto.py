@@ -12,7 +12,7 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 # CASES — List / Detail
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CaseBaicInfoOut(BaseRecordData):
+class CaseBasicInfoOut(BaseRecordData):
     case_id: str
     chamber_id: str
     case_number: str 
@@ -20,6 +20,8 @@ class CaseBaicInfoOut(BaseRecordData):
     court_name: Optional[str] = None   
     case_type_code: Optional[str] = None
     case_type_description:Optional[str] = None
+    status_code: Optional[str] = None
+    status_description: Optional[str] = None
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
@@ -27,7 +29,7 @@ class CaseBaicInfoOut(BaseRecordData):
     aor_name: Optional[str] = None
 
 
-class CaseListOut(CaseBaicInfoOut):
+class CaseListOut(CaseBasicInfoOut):
     case_summary: Optional[str] = None
     status_code: Optional[str] = None
     status_description: Optional[str] = None

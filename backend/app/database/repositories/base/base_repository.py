@@ -118,6 +118,25 @@ class BaseRepository(Generic[ModelType]):
         self._log_stmt(stmt, session)
         return await session.execute(stmt)
 
+    async def fetch_scalars(self, session: AsyncSession, stmt):
+        result = await self.execute(stmt=stmt, session=session)
+        return result.scalars().all()
+
+
+    async def fetch_first(self, session: AsyncSession, stmt):
+        result = await self.execute(stmt=stmt, session=session)
+        return result.scalars().first()
+
+
+    async def fetch_scalar(self, session: AsyncSession, stmt):
+        result = await self.execute(stmt=stmt, session=session)
+        return result.scalar()
+
+
+    async def fetch_scalar_one(self, session: AsyncSession, stmt):
+        result = await self.execute(stmt=stmt, session=session)
+        return result.scalar_one()
+
     # ────────────────────────────────────────────────
     # ──────── VALIDATION HELPERS ────────
     # ────────────────────────────────────────────────

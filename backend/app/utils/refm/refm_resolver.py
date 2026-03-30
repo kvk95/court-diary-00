@@ -11,8 +11,9 @@ from app.database.cache.refm_cache import RefmCache, RefmData
 
 class RefmResolver:
     """
-    Dedicated service for resolving REFM (reference master) values using ForeignKey metadata.
-    Fully dynamic — no table/column strings required in calling code.
+    Dedicated Service for resolving REFM (reference master) values using ForeignKey metadata.
+    This allows you to dynamically look up descriptive values (like names, symbols, etc.)
+    from reference tables without hardcoding table or column names.
     """
 
     def __init__(self, session: AsyncSession):
@@ -48,19 +49,54 @@ class RefmResolver:
         *,
         column_attr: InstrumentedAttribute,
         code: str | None,
-        value_column: str,
+        value_column: InstrumentedAttribute,
         default: Any = "",
     ) -> Any:
         """
-        Resolve a value from REFM table using dynamic FK introspection.
+        Resolve a descriptive value from a REFM (reference master) table.
 
-        Example:
-            symbol = await resolver.from_column(
-                column_attr=LocalizationSettings.currency,
-                code="INR",
-                value_key="symbol",
-                default="?"
-            )
+        Parameters
+        ----------
+        column_attr : InstrumentedAttribute
+            The SQLAlchemy model attribute that holds the foreign key reference.
+            Example: `RefmCaseStatus.code` (points to a currency code FK).
+
+        code : str | None
+            The code value you want to look up in the REFM table.
+            Example: `c.status_code`. If `None`, the `default` is returned.
+
+        value_column : InstrumentedAttribute
+            The target column in the REFM table whose value you want to retrieve.
+            Example: `RefmCaseStatus.description`.
+
+        default : Any, optional
+            Fallback value if the lookup fails or the code is missing.
+            Defaults to empty string `""`.
+
+        Returns
+        -------
+        Any
+            The resolved value from the REFM table, or the `default` if not found.
+
+        Examples
+        --------
+        # Example 1: Currency symbol lookup
+        symbol = await resolver.from_column(
+            column_attr=LocalizationSettings.currency,
+            code="INR",
+            value_column=RefmCurrency.symbol,
+            default="?"
+        )
+        # Returns: "₹"
+
+        # Example 2: Case status description lookup
+        status_description = await resolver.from_column(
+            column_attr=RefmCaseStatus.code,
+            code=c.status_code,
+            value_column=RefmCaseStatus.description,
+            default="Unknown"
+        )
+        # Returns: "Closed" or "Pending", depending on c.status_code
         """
         if not code:
             return default
@@ -73,6 +109,7 @@ class RefmResolver:
 
         try:
             table, code_key = RefmResolver._resolve_refm_target(model, column_key)
+            table=table.upper()
         except Exception as exc:
             # Graceful fallback during dev/startup if introspection fails
             import logging
@@ -84,4 +121,4 @@ class RefmResolver:
         rows = refm_data.get(table) or []
 
         lookup = {row.get(code_key): row for row in rows}
-        return lookup.get(code, {}).get(value_column, default)
+        return lookup.get(code, {}).get(value_column.key, default)

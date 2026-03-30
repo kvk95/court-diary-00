@@ -15,7 +15,7 @@ from app.dtos.cases_dto import (
     CaseDelete,
     CaseDetailOut,
     CaseEdit,
-    CaseBaicInfoOut,
+    CaseBasicInfoOut,
     CaseListOut,
     CaseNoteCreate,
     CaseNoteDelete,
@@ -55,7 +55,7 @@ class CasesController(BaseController):
     @BaseController.get(
         "/cases/lookup",
         summary="Get cases for quick hearing add (dropdown / search)",
-        response_model=BaseOutDto[list[CaseBaicInfoOut]],
+        response_model=BaseOutDto[list[CaseBasicInfoOut]],
     )
     async def get_cases_for_lookup(
         self,
@@ -65,7 +65,7 @@ class CasesController(BaseController):
             description="Search by case number, petitioner, or respondent",
         ),
         service: CasesService = Depends(get_cases_service),
-    ) -> BaseOutDto[list[CaseBaicInfoOut]]:
+    ) -> BaseOutDto[list[CaseBasicInfoOut]]:
         """
         Returns a lightweight list of cases for quick selection.
 

@@ -30,7 +30,7 @@ from app.dtos.cases_dto import (
     CaseCreate,
     CaseDelete,
     CaseDetailOut,
-    CaseBaicInfoOut,
+    CaseBasicInfoOut,
     CaseListOut,
     CaseEdit,
     CaseNoteCreate,
@@ -267,25 +267,40 @@ class CasesService(BaseSecuredService):
         self,
         search: Optional[str] = None,
         limit: int = 50,
-    )->list[CaseBaicInfoOut]:
+    )->list[CaseBasicInfoOut]:
         
         rows = await self.cases_repo.list_cases_for_quick_hearing(
             session=self.session,
             search=search,
             limit=limit
-        )
+        )       
 
         records = [
-            CaseBaicInfoOut(
+            CaseBasicInfoOut(
                 case_id=c.case_id,
                 chamber_id=c.chamber_id,
                 case_number=c.case_number,
-
                 court_id=c.court_id,
-                court_name=court_name,
-
+                court_name=await self.refm_resolver.from_column(
+                    column_attr=RefmCourts.court_id,
+                    code=c.court_id,
+                    value_column=RefmCourts.court_name,
+                    default=None
+                ),
+                status_code = c.status_code,
+                status_description = await self.refm_resolver.from_column(
+                    column_attr=RefmCaseStatus.code,
+                    code=c.status_code,
+                    value_column=RefmCaseStatus.description,
+                    default=None
+                ),
                 case_type_code=c.case_type_code,
-                case_type_description=case_type_desc,
+                case_type_description=await self.refm_resolver.from_column(
+                    column_attr=RefmCaseTypes.code,
+                    code=c.case_type_code,
+                    value_column=RefmCaseTypes.description,
+                    default=None
+                ),
 
                 filing_year=c.filing_year,
 
@@ -297,8 +312,6 @@ class CasesService(BaseSecuredService):
             )
             for (
                 c,
-                court_name,
-                case_type_desc,
                 first_name,
                 last_name,
             ) in rows
@@ -336,10 +349,21 @@ class CasesService(BaseSecuredService):
                 case_id=c.case_id,
                 chamber_id=c.chamber_id,
                 case_number=c.case_number,
-                status_code=c.status_code,
-                status_description=case_status_desc,
+                
+                status_code = c.status_code,
+                status_description = await self.refm_resolver.from_column(
+                    column_attr=Cases.status_code,
+                    code=c.status_code,
+                    value_column=RefmCaseStatus.description,
+                    default=None
+                ),
                 court_id=c.court_id,
-                court_name=court_name,
+                court_name=await self.refm_resolver.from_column(
+                    column_attr=Cases.court_id,
+                    code=c.court_id,
+                    value_column=RefmCourts.court_name,
+                    default=None
+                ),
                 petitioner=c.petitioner,
                 respondent=c.respondent,
                 aor_user_id=c.aor_user_id,
@@ -348,16 +372,18 @@ class CasesService(BaseSecuredService):
                 last_hearing_date=c.last_hearing_date,
                 updated_date=c.updated_date,
                 case_type_code=c.case_type_code,
-                case_type_description=case_type_desc,
+                case_type_description=await self.refm_resolver.from_column(
+                    column_attr=Cases.case_type_code,
+                    code=c.case_type_code,
+                    value_column=RefmCaseTypes.description,
+                    default=None
+                ),
                 filing_year=c.filing_year,
                 case_summary=c.case_summary,
                 next_hearing_status=hearing_status_desc,
             )
             for (
                 c,
-                court_name,
-                case_type_desc,
-                case_status_desc,
                 first_name,
                 last_name,
                 hearing_status_desc,
