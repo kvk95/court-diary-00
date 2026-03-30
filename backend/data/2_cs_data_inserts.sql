@@ -63,6 +63,28 @@ INSERT IGNORE INTO refm_hearing_status (code, description, color_code, sort_orde
 ('HSOR', 'Order Reserved', '#a855f7', 40),
 ('HSDI', 'Disposed',       '#64748b', 50);
 
+INSERT INTO refm_hearing_purpose (code, description, color_code, sort_order, status_ind) VALUES
+('HPAD', 'Admission', '#3b82f6', 1, TRUE),
+('HPAP', 'Appearance', '#6366f1', 2, TRUE),
+('HPAR', 'Arguments', '#8b5cf6', 3, TRUE),
+('HPBH', 'Bail Hearing', '#f59e0b', 4, TRUE),
+('HPCO', 'Compliance', '#10b981', 5, TRUE),
+('HPCE', 'Cross-Examination', '#ef4444', 6, TRUE),
+('HPEV', 'Evidence', '#14b8a6', 7, TRUE),
+('HPFC', 'Framing of Charges', '#f97316', 8, TRUE),
+('HPFI', 'Framing of Issues', '#84cc16', 9, TRUE),
+('HPIR', 'Interim Relief', '#22c55e', 10, TRUE),
+('HPME', 'Mediation', '#0ea5e9', 11, TRUE),
+('HPMN', 'Mention', '#64748b', 12, TRUE),
+('HPOP', 'Order Pronounced', '#1d4ed8', 13, TRUE),
+('HPPH', 'Part-Heard', '#9333ea', 14, TRUE),
+('HPPL', 'Pleadings', '#eab308', 15, TRUE),
+('HPSE', 'Sentencing', '#dc2626', 16, TRUE),
+('HPST', 'Steps', '#059669', 17, TRUE),
+('HPSN', 'Summons/Notice', '#0891b2', 18, TRUE),
+('HPWS', 'Written Statement', '#65a30d', 19, TRUE),
+('HPOT', 'Other', '#6b7280', 20, TRUE);
+
 INSERT IGNORE INTO refm_case_types (code, description, sort_order) VALUES
 ('CTCR', 'Criminal',      10),
 ('CTCV', 'Civil Suit',    20),
@@ -426,41 +448,71 @@ INSERT INTO cases (chamber_id, case_number, court_id, case_type_code, filing_yea
 -- 21.1  Hearings (Various Dates for Dashboard Widgets)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-SET @case1  = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.234/2025');
-SET @case2  = (SELECT case_id FROM cases WHERE case_number = 'W.P.(MD)No.5678/2025');
-SET @case3  = (SELECT case_id FROM cases WHERE case_number = 'O.S.No.145/2024');
-SET @case4  = (SELECT case_id FROM cases WHERE case_number = 'O.S.No.456/2025');
-SET @case5  = (SELECT case_id FROM cases WHERE case_number = 'F.C.No.123/2025');
-SET @case6  = (SELECT case_id FROM cases WHERE case_number = 'L.C.No.78/2025');
-SET @case7  = (SELECT case_id FROM cases WHERE case_number = 'Crl.M.C.No.89/2026');
-SET @case8  = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.567/2026');
-SET @case9  = (SELECT case_id FROM cases WHERE case_number = 'Crl.O.P.No.88/2025');
+-- =============================================================================
+-- FETCH CASE IDS (VK CHAMBER ONLY)
+-- =============================================================================
 
--- TODAY'S HEARINGS (for Today's Hearings widget) - Adjust date as needed
-INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
-(@chamber_vk, @case1, '2026-03-24', 'HSUP',  'Final arguments',       'Awaiting final disposal',            NULL,         @user_priya),
-(@chamber_vk, @case2, '2026-03-24', 'HSUP',  'Evidence stage',        'Witness examination',                NULL,         @user_priya),
-(@chamber_vk, @case7, '2026-03-24', 'HSUP',  'Admission hearing',     'Notice issued',                      NULL,         @user_karthik);
+SELECT case_id INTO @case1 FROM cases WHERE case_number = 'Crl.O.P.No.234/2025' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case2 FROM cases WHERE case_number = 'W.P.(MD)No.5678/2025' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case3 FROM cases WHERE case_number = 'Crl.M.C.No.89/2026' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case4 FROM cases WHERE case_number = 'O.S.No.456/2025' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case5 FROM cases WHERE case_number = 'F.C.No.123/2025' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case6 FROM cases WHERE case_number = 'L.C.No.78/2025' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case7 FROM cases WHERE case_number = 'Crl.O.P.No.567/2026' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case8 FROM cases WHERE case_number = 'W.P.No.9012/2026' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case9 FROM cases WHERE case_number = 'O.S.No.789/2024' AND chamber_id = @chamber_vk LIMIT 1;
 
--- THIS WEEK HEARINGS
-INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
-(@chamber_vk, @case4, '2026-03-26', 'HSUP',  'First hearing',         'For admission',                      NULL,         @user_priya),
-(@chamber_vk, @case5, '2026-03-27', 'HSUP',  'Interim application',   'Maintenance pendente lite',          NULL,         @user_priya),
-(@chamber_vk, @case6, '2026-03-28', 'HSUP',  'Evidence',              'Document production',                NULL,         @user_karthik),
-(@chamber_sundar, @case9, '2026-03-25', 'HSUP',  'Arguments',             'Final submissions',                  NULL,         @user_lokesh);
+-- =============================================================================
+-- HEARINGS (ALL 9 CASES)
+-- =============================================================================
 
--- COMPLETED HEARINGS
-INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
-(@chamber_vk, @case1, '2026-01-20', 'HSCP', 'Admission hearing',     'Notice issued to respondent',        '2026-03-15', @user_priya),
-(@chamber_vk, @case1, '2026-03-15', 'HSCP', 'Preliminary hearing',   'Issues framed',                      '2026-03-24', @user_priya),
-(@chamber_vk, @case2, '2026-02-10', 'HSAD', 'Counter affidavit',     'Adjourned due to non-filing',       '2026-03-18', @user_karthik),
-(@chamber_vk, @case2, '2026-03-18', 'HSCP', 'Filing stage',          'Counter filed',                      '2026-03-24', @user_priya),
-(@chamber_sundar, @case3, '2026-03-01', 'HSCP', 'Framing of issues',     'Issues framed',                      '2026-04-10', @user_lokesh);
+INSERT INTO hearings 
+(chamber_id, case_id, hearing_date, status_code, purpose_code, notes, next_hearing_date, created_by) VALUES
 
--- ADJOURNED HEARINGS
-INSERT INTO hearings (chamber_id, case_id, hearing_date, status_code, purpose, notes, next_hearing_date, created_by) VALUES
-(@chamber_vk, @case4, '2026-03-19', 'HSAD', 'First hearing',         'Counsel not available',              '2026-03-26', @user_priya);
+-- =========================
+-- OVERDUE CASES
+-- =========================
 
+(@chamber_vk, @case1, '2026-03-20', 'HSUP', 'HPAR', 'Final arguments pending', '2026-03-24', @user_priya),
+(@chamber_vk, @case2, '2026-03-22', 'HSUP', 'HPEV', 'Witness examination ongoing', '2026-03-24', @user_priya),
+(@chamber_vk, @case3, '2026-03-18', 'HSUP', 'HPAD', 'Anticipatory bail hearing', '2026-03-25', @user_priya),
+
+-- =========================
+-- TODAY'S HEARINGS
+-- =========================
+
+(@chamber_vk, @case1, '2026-03-24', 'HSUP', 'HPAR', 'Final arguments hearing', NULL, @user_priya),
+(@chamber_vk, @case2, '2026-03-24', 'HSUP', 'HPEV', 'Evidence stage hearing', NULL, @user_priya),
+(@chamber_vk, @case3, '2026-03-24', 'HSUP', 'HPAR', 'Arguments stage', NULL, @user_priya),
+
+-- =========================
+-- UPCOMING THIS WEEK
+-- =========================
+
+(@chamber_vk, @case4, '2026-03-26', 'HSUP', 'HPAD', 'First hearing (admission)', NULL, @user_priya),
+(@chamber_vk, @case5, '2026-03-27', 'HSUP', 'HPME', 'Mediation scheduled', NULL, @user_priya),
+(@chamber_vk, @case6, '2026-03-28', 'HSUP', 'HPEV', 'Document evidence submission', NULL, @user_priya),
+
+-- =========================
+-- FUTURE HEARINGS
+-- =========================
+
+(@chamber_vk, @case7, '2026-04-15', 'HSUP', 'HPAR', 'Arguments to be presented', NULL, @user_priya),
+(@chamber_vk, @case8, '2026-04-20', 'HSUP', 'HPPL', 'Pleadings stage', NULL, @user_priya),
+
+-- =========================
+-- ADJOURNED CASE
+-- =========================
+
+(@chamber_vk, @case9, '2026-03-21', 'HSAD', 'HPAD', 'Adjourned due to counsel absence', '2026-04-05', @user_priya),
+
+-- =========================
+-- COMPLETED HISTORY (for richness)
+-- =========================
+
+(@chamber_vk, @case1, '2026-03-15', 'HSCP', 'HPAD', 'Preliminary hearing completed', '2026-03-24', @user_priya),
+(@chamber_vk, @case2, '2026-03-18', 'HSCP', 'HPPL', 'Pleadings completed', '2026-03-24', @user_priya),
+(@chamber_vk, @case3, '2026-03-10', 'HSCP', 'HPAD', 'Initial hearing completed', '2026-03-24', @user_priya);
 
 -- ===============================================================================================================
 -- 22-25. REMAINING SEED DATA (Clients, Case Clients, Case Notes, AORs, Email, Invitations, Logs)

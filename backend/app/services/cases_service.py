@@ -3,7 +3,7 @@
 from datetime import date
 from typing import List, Optional, Any, Callable, Dict, Iterable, TypeVar
 
-from sqlalchemy import case, func, select, or_
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.activity_log import ActivityLog
@@ -16,6 +16,7 @@ from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusC
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatus
+from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.refm_party_roles import RefmPartyRoles
 from app.database.models.users import Users
 from app.database.repositories.case_clients_repository import CaseClientsRepository
@@ -29,6 +30,7 @@ from app.dtos.cases_dto import (
     CaseCreate,
     CaseDelete,
     CaseDetailOut,
+    CaseBaicInfoOut,
     CaseListOut,
     CaseEdit,
     CaseNoteCreate,
@@ -177,6 +179,19 @@ class CasesService(BaseSecuredService):
         )
         client_map = await self._load_counts(CaseClients.case_id, [case.case_id])
 
+        latest_hearing = await self.session.execute(
+            select(Hearings.status_code)
+            .where(
+                Hearings.case_id == case.case_id,
+                Hearings.deleted_ind.is_(False),
+            )
+            .order_by(Hearings.hearing_date.desc())
+            .limit(1)
+        )
+
+        row = latest_hearing.first()
+        latest_status = row[0] if row else None
+
         return CaseDetailOut(
             case_id=case.case_id,
             chamber_id=case.chamber_id,
@@ -195,6 +210,8 @@ class CasesService(BaseSecuredService):
             status_description=maps["status_map"].get(case.status_code),
             next_hearing_date=case.next_hearing_date,
             last_hearing_date=case.last_hearing_date,
+            next_hearing_status=latest_status,
+            updated_date=case.updated_date,
             total_hearings=hearing_map.get(case.case_id, 0),
             linked_clients=client_map.get(case.case_id, 0),
             total_notes=note_map.get(case.case_id, 0),
@@ -243,6 +260,53 @@ class CasesService(BaseSecuredService):
         )
 
     # ─────────────────────────────────────────────────────────────────────
+    # CASES — Chamberwise
+    # ─────────────────────────────────────────────────────────────────────
+
+    async def list_cases_for_quick_hearing(
+        self,
+        search: Optional[str] = None,
+        limit: int = 50,
+    )->list[CaseBaicInfoOut]:
+        
+        rows = await self.cases_repo.list_cases_for_quick_hearing(
+            session=self.session,
+            search=search,
+            limit=limit
+        )
+
+        records = [
+            CaseBaicInfoOut(
+                case_id=c.case_id,
+                chamber_id=c.chamber_id,
+                case_number=c.case_number,
+
+                court_id=c.court_id,
+                court_name=court_name,
+
+                case_type_code=c.case_type_code,
+                case_type_description=case_type_desc,
+
+                filing_year=c.filing_year,
+
+                petitioner=c.petitioner,
+                respondent=c.respondent,
+
+                aor_user_id=c.aor_user_id,
+                aor_name=_full_name(first_name, last_name),
+            )
+            for (
+                c,
+                court_name,
+                case_type_desc,
+                first_name,
+                last_name,
+            ) in rows
+        ]
+
+        return records
+
+    # ─────────────────────────────────────────────────────────────────────
     # CASES — Paginated list
     # ─────────────────────────────────────────────────────────────────────
 
@@ -256,42 +320,16 @@ class CasesService(BaseSecuredService):
         sort_by: str = "updated_date",
     ) -> PagingData[CaseListOut]:
 
-        conditions = [
-            Cases.chamber_id == self.chamber_id,
-            Cases.deleted_ind.is_(False),
-        ]
-
-        if status_code and status_code.upper() != "ALL":
-            conditions.append(Cases.status_code == status_code.upper())
-
-        if court_id:
-            conditions.append(Cases.court_id == court_id)
-
-        if search and search.strip():
-            kw = f"%{search.strip()}%"
-            conditions.append(
-                or_(
-                    Cases.case_number.ilike(kw),
-                    Cases.petitioner.ilike(kw),
-                    Cases.respondent.ilike(kw),
-                )
-            )
-
-        order_col = Cases.updated_date.desc()
-        if sort_by == "hearing_date":
-            order_col = Cases.next_hearing_date.asc()
-        elif sort_by == "case_number":
-            order_col = Cases.case_number.asc()
-
-        cases, total = await self.cases_repo.list_paginated(
+        rows, total = await self.cases_repo.list_cases_with_details(
             session=self.session,
             page=page,
             limit=limit,
-            where=conditions,
-            order_by=[order_col],
+            chamber_id=self.chamber_id,
+            search=search,
+            status_code=status_code,
+            court_id=court_id,
+            sort_by=sort_by,
         )
-
-        maps = await self._load_common_maps(cases)
 
         records = [
             CaseListOut(
@@ -299,21 +337,31 @@ class CasesService(BaseSecuredService):
                 chamber_id=c.chamber_id,
                 case_number=c.case_number,
                 status_code=c.status_code,
-                status_description=maps["status_map"].get(c.status_code),
+                status_description=case_status_desc,
                 court_id=c.court_id,
-                court_name=maps["court_map"].get(c.court_id),
+                court_name=court_name,
                 petitioner=c.petitioner,
                 respondent=c.respondent,
                 aor_user_id=c.aor_user_id,
-                aor_name=maps["aor_map"].get(c.aor_user_id),
+                aor_name=_full_name(first_name, last_name),
                 next_hearing_date=c.next_hearing_date,
                 last_hearing_date=c.last_hearing_date,
+                updated_date=c.updated_date,
                 case_type_code=c.case_type_code,
-                case_type_description=maps["case_type_map"].get(c.case_type_code),
+                case_type_description=case_type_desc,
                 filing_year=c.filing_year,
                 case_summary=c.case_summary,
+                next_hearing_status=hearing_status_desc,
             )
-            for c in cases
+            for (
+                c,
+                court_name,
+                case_type_desc,
+                case_status_desc,
+                first_name,
+                last_name,
+                hearing_status_desc,
+            ) in rows
         ]
 
         return PagingBuilder(total_records=total, page=page, limit=limit).build(records=records)
@@ -406,18 +454,29 @@ class CasesService(BaseSecuredService):
             lambda r: _full_name(r.first_name, r.last_name),
         )
 
+        purpose_map = await self._load_map(
+            (h.purpose_code for h in hearings),
+            lambda ids: select(RefmHearingPurpose.code, RefmHearingPurpose.description)
+                .where(RefmHearingPurpose.code.in_(ids)),
+            lambda r: r.code,
+            lambda r: r.description,
+        )
+
         return [
             HearingOut(
                 hearing_id=h.hearing_id,
                 case_id=h.case_id,
                 hearing_date=h.hearing_date,
                 status_code=h.status_code,
-                status_description=status_map.get(h.status_code) if h.status_code else None,
-                purpose=h.purpose,
+                status_description=status_map.get(h.status_code),
+
+                purpose_code=h.purpose_code,                              # ✅
+                purpose_description=purpose_map.get(h.purpose_code),      # ✅
+
                 notes=h.notes,
                 order_details=h.order_details,
                 next_hearing_date=h.next_hearing_date,
-                created_by_name=creator_map.get(h.created_by) if h.created_by else None,
+                created_by_name=creator_map.get(h.created_by),
             )
             for h in hearings
         ]
@@ -448,13 +507,20 @@ class CasesService(BaseSecuredService):
         if hearing.status_code:
             hs = await self.session.get(RefmHearingStatus, hearing.status_code)
             status_desc = hs.description if hs else None
+
+        purpose_desc = None
+        if hearing.purpose_code:
+            p = await self.session.get(RefmHearingPurpose, hearing.purpose_code)
+            purpose_desc = p.description if p else None
+
         return HearingOut(
             hearing_id=hearing.hearing_id,
             case_id=hearing.case_id,
             hearing_date=hearing.hearing_date,
             status_code=hearing.status_code,
             status_description=status_desc,
-            purpose=hearing.purpose,
+            purpose_code=hearing.purpose_code,
+            purpose_description=purpose_desc,
             notes=hearing.notes,
             order_details=hearing.order_details,
             next_hearing_date=hearing.next_hearing_date,
@@ -488,14 +554,21 @@ class CasesService(BaseSecuredService):
         status_desc = None
         if updated.status_code:
             hs = await self.session.get(RefmHearingStatus, updated.status_code)
-            status_desc = hs.description if hs else None
+            status_desc = hs.description if hs else None        
+
+        purpose_desc = None
+        if hearing.purpose_code:
+            p = await self.session.get(RefmHearingPurpose, hearing.purpose_code)
+            purpose_desc = p.description if p else None
+
         return HearingOut(
             hearing_id=updated.hearing_id,
             case_id=updated.case_id,
             hearing_date=updated.hearing_date,
             status_code=updated.status_code,
             status_description=status_desc,
-            purpose=updated.purpose,
+            purpose_code=hearing.purpose_code,
+            purpose_description=purpose_desc,
             notes=updated.notes,
             order_details=updated.order_details,
             next_hearing_date=updated.next_hearing_date,

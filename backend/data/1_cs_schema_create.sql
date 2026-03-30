@@ -81,6 +81,16 @@ CREATE TABLE refm_hearing_status (
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Hearing status';
 
+DROP TABLE IF EXISTS refm_hearing_purpose;
+
+CREATE TABLE refm_hearing_purpose (
+    code          CHAR(4)     PRIMARY KEY,
+    description   VARCHAR(60) NOT NULL,
+    color_code    CHAR(7)     DEFAULT '#64748b',
+    sort_order    INT         NOT NULL,
+    status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Hearing purpose';
+
 DROP TABLE IF EXISTS refm_case_types;
 CREATE TABLE refm_case_types (
     code          CHAR(4)      PRIMARY KEY,
@@ -566,29 +576,49 @@ CREATE TABLE cases (
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS hearings;
+
 CREATE TABLE hearings (
-    hearing_id        CHAR(36)     PRIMARY KEY,  
-    chamber_id        CHAR(36)     NOT NULL,  
-    case_id           CHAR(36)     NOT NULL,  
-    hearing_date      DATE         NOT NULL,
-    status_code       CHAR(4)      DEFAULT 'UP',
-    purpose           VARCHAR(255) NULL,
-    notes             TEXT         NULL,
-    order_details     TEXT         NULL,
-    next_hearing_date DATE         NULL,
+    hearing_id         CHAR(36)     PRIMARY KEY,  
+    chamber_id         CHAR(36)     NOT NULL,  
+    case_id            CHAR(36)     NOT NULL,  
+
+    hearing_date       DATE         NOT NULL,
+
+    status_code        CHAR(4)      DEFAULT 'HSUP',
+    purpose_code       CHAR(4)      NULL,   -- 🔥 REPLACED purpose TEXT
+
+    notes              TEXT         NULL,
+    order_details      TEXT         NULL,
+
+    next_hearing_date  DATE         NULL,
+
     deleted_ind        BOOLEAN      DEFAULT FALSE,
-    deleted_date      TIMESTAMP    NULL,
-    deleted_by        CHAR(36)     NULL,  
-    created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        CHAR(36)     NULL,  
-    updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        CHAR(36)     NULL,  
+    deleted_date       TIMESTAMP    NULL,
+    deleted_by         CHAR(36)     NULL,  
+
+    created_date       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by         CHAR(36)     NULL,  
+
+    updated_date       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by         CHAR(36)     NULL,  
+
+    -- 🔗 Foreign Keys
     CONSTRAINT fk_hearings_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)        ON DELETE CASCADE,
+        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)
+        ON DELETE CASCADE,
+
     CONSTRAINT fk_hearings_case
-        FOREIGN KEY (case_id)    REFERENCES cases(case_id)             ON DELETE CASCADE,
+        FOREIGN KEY (case_id) REFERENCES cases(case_id)
+        ON DELETE CASCADE,
+
     CONSTRAINT fk_hearings_status
-        FOREIGN KEY (status_code) REFERENCES refm_hearing_status(code) ON DELETE RESTRICT
+        FOREIGN KEY (status_code) REFERENCES refm_hearing_status(code)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_hearings_purpose   -- 🔥 NEW FK
+        FOREIGN KEY (purpose_code) REFERENCES refm_hearing_purpose(code)
+        ON DELETE RESTRICT
+
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Court hearings';
 
 -- ─────────────────────────────────────────────────────────────────────────────

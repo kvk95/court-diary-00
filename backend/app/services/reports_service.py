@@ -71,7 +71,6 @@ class ReportsService(BaseSecuredService):
 
         stats = await self.cases_repo.get_case_summary_stats(
             session=self.session,
-            chamber_id=cid,
             active_code=RefmCaseStatusConstants.ACTIVE,
             adjourned_code=RefmCaseStatusConstants.ADJOURNED,
             disposed_code=RefmCaseStatusConstants.DISPOSED,
@@ -83,10 +82,10 @@ class ReportsService(BaseSecuredService):
         year_start = date(today.year, 1, 1)
 
         this_month = await self.cases_repo.count_cases_since(
-            session=self.session, chamber_id=cid, since=month_start
+            session=self.session, since=month_start
         )
         this_year = await self.cases_repo.count_cases_since(
-            session=self.session, chamber_id=cid, since=year_start
+            session=self.session, since=year_start
         )
 
         return CaseSummaryReport(
@@ -102,7 +101,7 @@ class ReportsService(BaseSecuredService):
 
     async def _cases_by_status(self) -> List[CasesByStatusRow]:
         rows = await self.cases_repo.get_cases_by_status(
-            session=self.session, chamber_id=self.chamber_id
+            session=self.session, 
         )
         result = [
             CasesByStatusRow(
@@ -117,7 +116,7 @@ class ReportsService(BaseSecuredService):
 
     async def _cases_by_court(self) -> List[CasesByCourtRow]:
         rows = await self.cases_repo.get_cases_by_court(
-            session=self.session, chamber_id=self.chamber_id
+            session=self.session, 
         )
         return [
             CasesByCourtRow(court_id=r["court_id"], court_name=r["court_name"], count=r["count"])
@@ -126,7 +125,7 @@ class ReportsService(BaseSecuredService):
 
     async def _cases_by_type(self) -> List[CasesByTypeRow]:
         rows = await self.cases_repo.get_cases_by_type(
-            session=self.session, chamber_id=self.chamber_id
+            session=self.session, 
         )
         return [
             CasesByTypeRow(case_type_code=r["case_type_code"], description=r["description"], count=r["count"])
@@ -139,7 +138,6 @@ class ReportsService(BaseSecuredService):
             month_start = date(year, month, 1)
             cnt = await self.cases_repo.count_cases_in_month(
                 session=self.session,
-                chamber_id=self.chamber_id,
                 month_start=month_start,
                 month_end=_next_month(year, month),
             )

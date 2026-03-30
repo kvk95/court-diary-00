@@ -33,7 +33,7 @@ from sqlalchemy.sql.schema import Column
 
 from app.core.context import get_request_context
 from app.database.models.base.base_model import BaseModel
-from app.database.repositories.base.model_helpers import get_writable_columns
+from .model_helpers import get_writable_columns
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 FilterKey = Union[InstrumentedAttribute[Any], ColumnElement[Any], Any]

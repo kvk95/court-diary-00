@@ -12,7 +12,7 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 # CASES — List / Detail
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CaseListOut(BaseRecordData):
+class CaseBaicInfoOut(BaseRecordData):
     case_id: str
     chamber_id: str
     case_number: str 
@@ -25,11 +25,16 @@ class CaseListOut(BaseRecordData):
     respondent: str
     aor_user_id: Optional[str] = None
     aor_name: Optional[str] = None
+
+
+class CaseListOut(CaseBaicInfoOut):
     case_summary: Optional[str] = None
     status_code: Optional[str] = None
     status_description: Optional[str] = None
     next_hearing_date: Optional[date] = None
     last_hearing_date: Optional[date] = None
+    next_hearing_status: Optional[str] = None
+    updated_date: datetime
 
 
 class CaseDetailOut(CaseListOut):
@@ -109,9 +114,11 @@ class HearingOut(BaseRecordData):
     hearing_id: str
     case_id: str
     hearing_date: date
+
     status_code: Optional[str] = None
     status_description: Optional[str] = None
-    purpose: Optional[str] = None
+    purpose_code: Optional[str] = None  
+    purpose_description: Optional[str] = None
     notes: Optional[str] = None
     order_details: Optional[str] = None
     next_hearing_date: Optional[date] = None
@@ -122,7 +129,7 @@ class HearingCreate(BaseInData):
     case_id: str
     hearing_date: date
     status_code: str
-    purpose: Optional[str] = None
+    purpose_code: Optional[str] = None
     notes: Optional[str] = None
     order_details: Optional[str] = None
     next_hearing_date: Optional[date] = None

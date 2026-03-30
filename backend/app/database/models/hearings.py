@@ -1,6 +1,6 @@
 """hearings"""
 
-from sqlalchemy import ForeignKey, Boolean, CHAR, Date, DateTime, String, Text
+from sqlalchemy import ForeignKey, Boolean, CHAR, Date, DateTime, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -26,10 +26,10 @@ class Hearings(BaseModel, TimestampMixin):
     hearing_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_hearing_status.code", ondelete="RESTRICT"), default='UP')
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_hearing_status.code", ondelete="RESTRICT"), default='HSUP')
 
-    # purpose : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
-    purpose: Mapped[Optional[str]] = mapped_column(String(255))
+    # purpose_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    purpose_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_hearing_purpose.code", ondelete="RESTRICT"))
 
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)
@@ -77,6 +77,13 @@ class Hearings(BaseModel, TimestampMixin):
         "RefmHearingStatus",
         foreign_keys=[status_code], 
         backref=backref("hearings_status_code_refm_hearing_statuss", cascade="all, delete-orphan")
+    )
+
+    # hearings.purpose_code -> refm_hearing_purpose.code
+    hearings_purpose_code_refm_hearing_purpose = relationship(
+        "RefmHearingPurpose",
+        foreign_keys=[purpose_code], 
+        backref=backref("hearings_purpose_code_refm_hearing_purposes", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

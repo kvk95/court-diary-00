@@ -15,6 +15,7 @@ from app.dtos.cases_dto import (
     CaseDelete,
     CaseDetailOut,
     CaseEdit,
+    CaseBaicInfoOut,
     CaseListOut,
     CaseNoteCreate,
     CaseNoteDelete,
@@ -28,7 +29,7 @@ from app.dtos.cases_dto import (
     RecentActivityItem,
 )
 from app.services.cases_service import CasesService
-from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
+from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE, RECORDS_DEFAULT_LIMIT
 
 
 class CasesController(BaseController):
@@ -48,6 +49,40 @@ class CasesController(BaseController):
         return self.success(result=await service.cases_get_stats())
 
     # ── List ──────────────────────────────────────────────────────────────
+
+    # ── Stats ─────────────────────────────────────────────────────────────
+
+    @BaseController.get(
+        "/cases/lookup",
+        summary="Get cases for quick hearing add (dropdown / search)",
+        response_model=BaseOutDto[list[CaseBaicInfoOut]],
+    )
+    async def get_cases_for_lookup(
+        self,
+        limit: int = Query(RECORDS_DEFAULT_LIMIT, ge=1, le=500),
+        search: Optional[str] = Query(
+            None,
+            description="Search by case number, petitioner, or respondent",
+        ),
+        service: CasesService = Depends(get_cases_service),
+    ) -> BaseOutDto[list[CaseBaicInfoOut]]:
+        """
+        Returns a lightweight list of cases for quick selection.
+
+        Used in:
+        - Quick Hearing Add
+        - Case dropdowns / autocomplete
+
+        Supports:
+        - Search by case number, petitioner, respondent
+        - Limited result set for fast UI response
+        """
+        return self.success(
+            result=await service.list_cases_for_quick_hearing(
+                search=search,
+                limit=limit,
+            )
+        )
 
     @BaseController.get(
         "/paged",
