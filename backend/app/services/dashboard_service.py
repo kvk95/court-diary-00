@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database.models.refm_hearing_status import RefmHearingStatus
+from app.database.models.refm_hearing_purpose import RefmHearingPurpose
+from app.database.models.hearings import Hearings
 from app.database.repositories.dashboard_repository import DashboardRepository
 from app.dtos.dashboard_dto import (
     AdminDashboardOut,
@@ -67,7 +69,7 @@ class DashboardService(BaseSecuredService):
             {r.code: r.color_code for r in color_rows},
         )
 
-    def _to_hearing_item(self, r: dict, desc_map: dict, color_map: dict) -> DashboardHearingItem:
+    async def _to_hearing_item(self, r: dict, desc_map: dict, color_map: dict) -> DashboardHearingItem:
         """Convert dict row to DashboardHearingItem DTO."""
         return DashboardHearingItem(
             hearing_id=r["hearing_id"],
@@ -77,7 +79,13 @@ class DashboardService(BaseSecuredService):
             petitioner=r["petitioner"],
             respondent=r["respondent"],
             hearing_date=r["hearing_date"],
-            purpose=r["purpose"],
+            purpose_code=r["purpose_code"],            
+            purpose_description=await self.refm_resolver.from_column(
+                column_attr=Hearings.purpose_code,
+                code=r["purpose_code"],
+                value_column=RefmHearingPurpose.description,
+                default=None
+            ),
             status_code=r["status_code"],
             status_description=desc_map.get(r["status_code"]),
             color=color_map.get(r["status_code"]),
@@ -122,12 +130,17 @@ class DashboardService(BaseSecuredService):
                 respondent=r["respondent"],
                 next_hearing_date=r["next_hearing_date"],
                 days_overdue=(today - r["next_hearing_date"]).days if r.get("next_hearing_date") else 0,
-                last_hearing_purpose=r.get("last_hearing_purpose"),
+                last_hearing_purpose=await self.refm_resolver.from_column(
+                    column_attr=Hearings.case_type_code,
+                    code=r["last_hearing_purpose"],
+                    value_column=RefmHearingPurpose.description,
+                    default=None
+                ),
             )
             for r in overdue_rows
         ]
 
-        return MainDashboardOut(
+        mainDashboardOut:MainDashboardOut= MainDashboardOut(
             greeting=_greeting(hour),
             user_first_name=user_first_name,
             active_cases_count=overview["active_cases"],
@@ -149,9 +162,11 @@ class DashboardService(BaseSecuredService):
                 active_users_trend_pct=chamber_stats.get("active_users_trend_pct",0),
             ),
             overdue_cases=overdue_cases,
-            todays_hearings=[self._to_hearing_item(r, desc_map, color_map) for r in today_rows],
-            tomorrows_hearings=[self._to_hearing_item(r, desc_map, color_map) for r in tomorrow_rows],
+            todays_hearings=[await self._to_hearing_item(r, desc_map, color_map) for r in today_rows],
+            tomorrows_hearings=[await self._to_hearing_item(r, desc_map, color_map) for r in tomorrow_rows],
         )
+
+        return mainDashboardOut
 
     # ===================================================================
     # ADMIN DASHBOARD

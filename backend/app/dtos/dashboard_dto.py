@@ -50,7 +50,8 @@ class DashboardHearingItem(BaseRecordData):
     petitioner: str
     respondent: str
     hearing_date: date
-    purpose: Optional[str] = None
+    purpose_code: Optional[str] = None
+    purpose_description: Optional[str] = None
     status_code: Optional[str] = None
     status_description: Optional[str] = None
     color: Optional[str] = None

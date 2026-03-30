@@ -127,7 +127,7 @@ class DashboardRepository(BaseRepository[Cases]):
         purpose_rows = await session.execute(
             select(
                 Hearings.case_id,
-                Hearings.purpose,
+                Hearings.purpose_code,
             )
             .where(
                 Hearings.case_id.in_(case_ids),
@@ -160,7 +160,7 @@ class DashboardRepository(BaseRepository[Cases]):
                 Hearings.case_id,
                 Hearings.hearing_date,
                 Hearings.status_code,
-                Hearings.purpose,
+                Hearings.purpose_code,
                 Cases.case_number,
                 Cases.petitioner,
                 Cases.respondent,

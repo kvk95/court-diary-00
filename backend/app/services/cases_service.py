@@ -282,21 +282,21 @@ class CasesService(BaseSecuredService):
                 case_number=c.case_number,
                 court_id=c.court_id,
                 court_name=await self.refm_resolver.from_column(
-                    column_attr=RefmCourts.court_id,
+                    column_attr=Cases.court_id,
                     code=c.court_id,
                     value_column=RefmCourts.court_name,
                     default=None
                 ),
                 status_code = c.status_code,
                 status_description = await self.refm_resolver.from_column(
-                    column_attr=RefmCaseStatus.code,
+                    column_attr=Cases.status_code,
                     code=c.status_code,
                     value_column=RefmCaseStatus.description,
                     default=None
                 ),
                 case_type_code=c.case_type_code,
                 case_type_description=await self.refm_resolver.from_column(
-                    column_attr=RefmCaseTypes.code,
+                    column_attr=Cases.case_type_code,
                     code=c.case_type_code,
                     value_column=RefmCaseTypes.description,
                     default=None
@@ -453,6 +453,7 @@ class CasesService(BaseSecuredService):
         # OPTIMISATION: use _assert_case_exists (COUNT query) instead of
         # _get_case_or_404 — we don't use the returned object here.
         await self._assert_case_exists(case_id)
+        
         hearings = await self.hearings_repo.list_all(
             session=self.session,
             where=[
@@ -465,13 +466,6 @@ class CasesService(BaseSecuredService):
 
         # OPTIMISATION: reuse _load_map instead of duplicating the inline
         # execute/dict-comprehension pattern.
-        status_map = await self._load_map(
-            (h.status_code for h in hearings),
-            lambda ids: select(RefmHearingStatus.code, RefmHearingStatus.description)
-            .where(RefmHearingStatus.code.in_(ids)),
-            lambda r: r.code,
-            lambda r: r.description,
-        )
         creator_map = await self._load_map(
             (h.created_by for h in hearings),
             lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
@@ -480,24 +474,26 @@ class CasesService(BaseSecuredService):
             lambda r: _full_name(r.first_name, r.last_name),
         )
 
-        purpose_map = await self._load_map(
-            (h.purpose_code for h in hearings),
-            lambda ids: select(RefmHearingPurpose.code, RefmHearingPurpose.description)
-                .where(RefmHearingPurpose.code.in_(ids)),
-            lambda r: r.code,
-            lambda r: r.description,
-        )
-
         return [
             HearingOut(
                 hearing_id=h.hearing_id,
                 case_id=h.case_id,
                 hearing_date=h.hearing_date,
                 status_code=h.status_code,
-                status_description=status_map.get(h.status_code),
+                status_description=await self.refm_resolver.from_column(
+                    column_attr=Cases.status_code,
+                    code=h.status_code,
+                    value_column=RefmCaseStatus.description,
+                    default=None
+                ),
 
-                purpose_code=h.purpose_code,                              # ✅
-                purpose_description=purpose_map.get(h.purpose_code),      # ✅
+                purpose_code=h.purpose_code, 
+                purpose_description=await self.refm_resolver.from_column(
+                    column_attr=Hearings.purpose_code,
+                    code=h.purpose_code,
+                    value_column=RefmHearingPurpose.description,
+                    default=None
+                ),
 
                 notes=h.notes,
                 order_details=h.order_details,
@@ -536,8 +532,12 @@ class CasesService(BaseSecuredService):
 
         purpose_desc = None
         if hearing.purpose_code:
-            p = await self.session.get(RefmHearingPurpose, hearing.purpose_code)
-            purpose_desc = p.description if p else None
+            purpose_desc=await self.refm_resolver.from_column(
+                    column_attr=Hearings.purpose_code,
+                    code=hearing.purpose_code,
+                    value_column=RefmHearingPurpose.description,
+                    default=None
+                )
 
         return HearingOut(
             hearing_id=hearing.hearing_id,

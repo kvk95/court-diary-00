@@ -15,37 +15,12 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 class ClientSearchOut(BaseRecordData):
     """Slim DTO for Link Client modal search results."""
     client_id: str
-    client_name: str
-    display_name: Optional[str] = None
-    client_type: str
-    phone: Optional[str] = None
-    email: Optional[str] = None
-
-
-class ClientListOut(BaseRecordData):
-    client_id: str
     client_type: str
     client_name: str
-    display_name: Optional[str] = None
     contact_person: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    city: Optional[str] = None
-    state_code: Optional[str] = None
-    status_ind: bool = True
-    linked_cases: int = 0
-    created_date: Optional[datetime] = None
-
-
-class ClientDetailOut(BaseRecordData):
-    client_id: str
-    chamber_id: str
-    client_type: str
-    client_name: str
     display_name: Optional[str] = None
-    contact_person: Optional[str] = None
-    email: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
     alternate_phone: Optional[str] = None
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
@@ -62,6 +37,17 @@ class ClientDetailOut(BaseRecordData):
     status_ind: bool = True
     created_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
+
+
+class ClientListOut(ClientSearchOut):
+    linked_cases: int = 0
+    created_date: Optional[datetime] = None
+
+
+class ClientDetailOut(ClientListOut):
+    chamber_id: str
+    city: Optional[str] = None
+    state_code: Optional[str] = None
     linked_cases: int = 0
 
 
@@ -70,7 +56,7 @@ class ClientDetailOut(BaseRecordData):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ClientCreate(BaseInData):
-    client_type: str = "I"  # I=Individual, O=Organization
+    client_type: str
     client_name: str
     display_name: Optional[str] = None
     contact_person: Optional[str] = None
