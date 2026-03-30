@@ -52,8 +52,7 @@ INSERT IGNORE INTO refm_case_status (code, description, color_code, sort_order) 
 ('CSAC', 'Active',    '#3b82f6', 10),
 ('CSAD', 'Adjourned', '#f97316', 20),
 ('CSDI', 'Disposed',  '#64748b', 30),
-('CSCL', 'Closed',    '#64748b', 40),
-('CSOV', 'Overdue',   '#ef4444', 50);
+('CSCL', 'Closed',    '#64748b', 40);
 
 INSERT IGNORE INTO refm_hearing_status (code, description, color_code, sort_order) VALUES
 ('HSUP', 'Upcoming',       '#3b82f6', 10),
