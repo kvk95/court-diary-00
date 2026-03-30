@@ -2,6 +2,7 @@
 -- DYNAMIC DATE CONFIGURATION
 -- =============================================================================
 -- Set the reference date to the current system date
+USE courtdiary;
 SET @today = CURDATE();
 
 -- =============================================================================
