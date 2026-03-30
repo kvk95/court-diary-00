@@ -14,7 +14,7 @@ class PracticeOverviewStats(BaseRecordData):
     """4 stat cards at the top of the main dashboard."""
     active_cases: int = 0
     today_hearings: int = 0
-    today_overdue_hearings: int = 0   # shown as "3 overdue" sub-label
+    today_pending_hearings: int = 0 
     this_week_hearings: int = 0
     overdue_cases: int = 0
 
@@ -113,3 +113,7 @@ class AdminDashboardOut(BaseRecordData):
     stat_cards: AdminStatCards
     pending_invitations: List[PendingInvitationItem] = []
     recent_activity: List[RecentActivityItem] = []
+
+class SummaryCountsOut(BaseRecordData):
+    total_cases: int
+    total_clients: int

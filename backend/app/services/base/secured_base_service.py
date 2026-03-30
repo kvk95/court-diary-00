@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import get_request_context
 from app.dtos.oauth_dtos import CurrentUserContext
+from app.dtos.users_dto import UserOut
 from app.services.base.base_service import BaseService
 
 
@@ -29,3 +30,8 @@ class BaseSecuredService(BaseService):
     def chamber_id(self) -> str:
         ctx = get_request_context()
         return cast(str, ctx.get("chamber_id"))
+    
+    @property
+    def userDetails(self) -> UserOut:
+        ctx = get_request_context()
+        return cast(UserOut, ctx.get("user_details"))

@@ -1,7 +1,7 @@
 # app/services/dashboard_service.py
 
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.hearings import Hearings
+from app.database.models.refm_modules import RefmModulesConstants
 from app.database.repositories.dashboard_repository import DashboardRepository
 from app.dtos.dashboard_dto import (
     AdminDashboardOut,
@@ -20,7 +21,11 @@ from app.dtos.dashboard_dto import (
     PendingInvitationItem,
     PracticeOverviewStats,
     RecentActivityItem,
+    SummaryCountsOut,
 )
+from app.dtos.role_permissions_dto import RolePermissionModuleOut
+from app.dtos.roles_dto import RoleOut
+from app.dtos.users_dto import UserOut
 from app.services.base.secured_base_service import BaseSecuredService
 
 
@@ -120,7 +125,15 @@ class DashboardService(BaseSecuredService):
 
         desc_map, color_map = await self._get_hearing_status_maps()
 
-        # Convert overdue cases (dict rows)
+        # =========================
+        # EXTRACT NEW STRUCTURE
+        # =========================
+        cases_overview = overview["cases_overview"]
+        hearings_overview = overview["hearings_overview"]
+
+        # =========================
+        # Convert overdue cases
+        # =========================
         overdue_cases = [
             OverdueCaseItem(
                 case_id=r["case_id"],
@@ -128,42 +141,63 @@ class DashboardService(BaseSecuredService):
                 court_name=r["court_name"],
                 petitioner=r["petitioner"],
                 respondent=r["respondent"],
-                next_hearing_date=r["next_hearing_date"],
-                days_overdue=(today - r["next_hearing_date"]).days if r.get("next_hearing_date") else 0,
+                next_hearing_date=r.get("case_next_hearing_date") or r.get("next_hearing_date"),
+                days_overdue=(
+                    (today - (r.get("case_next_hearing_date") or r.get("next_hearing_date"))).days
+                    if (r.get("case_next_hearing_date") or r.get("next_hearing_date"))
+                    else 0
+                ),
                 last_hearing_purpose=await self.refm_resolver.from_column(
-                    column_attr=Hearings.case_type_code,
-                    code=r["last_hearing_purpose"],
+                    column_attr=Hearings.purpose_code,
+                    code=r.get("purpose_code"),
                     value_column=RefmHearingPurpose.description,
-                    default=None
+                    default=None,
                 ),
             )
             for r in overdue_rows
         ]
 
-        mainDashboardOut:MainDashboardOut= MainDashboardOut(
+        # =========================
+        # BUILD RESPONSE
+        # =========================
+        mainDashboardOut: MainDashboardOut = MainDashboardOut(
             greeting=_greeting(hour),
             user_first_name=user_first_name,
-            active_cases_count=overview["active_cases"],
-            today_hearings_count=overview["today_hearings"],
+
+            # ✅ FIXED
+            active_cases_count=cases_overview["total_active_cases"],
+            today_hearings_count=hearings_overview["today"]["total"],
+
             today=today,
+
             practice_overview=PracticeOverviewStats(
-                active_cases=overview["active_cases"],
-                today_hearings=overview["today_hearings"],
-                today_overdue_hearings=overview["today_overdue_hearings"],
-                this_week_hearings=overview["this_week_hearings"],
-                overdue_cases=overview["overdue_cases"],
+                active_cases=cases_overview["total_active_cases"],
+                today_hearings=hearings_overview["today"]["total"],
+                today_pending_hearings=hearings_overview["today"]["pending"],
+                this_week_hearings=hearings_overview["this_week"]["total"],
+                overdue_cases=cases_overview["overdue_cases"],
             ),
+
             chamber_management=ChamberManagementStats(
                 total_users=chamber_stats["total_users"],
                 active_users=chamber_stats["active_users"],
                 roles_count=chamber_stats["roles_count"],
                 pending_invites=chamber_stats["pending_invites"],
-                users_trend_pct=chamber_stats.get("users_trend_pct",0),
-                active_users_trend_pct=chamber_stats.get("active_users_trend_pct",0),
+                users_trend_pct=chamber_stats.get("users_trend_pct", 0),
+                active_users_trend_pct=chamber_stats.get("active_users_trend_pct", 0),
             ),
+
             overdue_cases=overdue_cases,
-            todays_hearings=[await self._to_hearing_item(r, desc_map, color_map) for r in today_rows],
-            tomorrows_hearings=[await self._to_hearing_item(r, desc_map, color_map) for r in tomorrow_rows],
+
+            todays_hearings=[
+                await self._to_hearing_item(r, desc_map, color_map)
+                for r in today_rows
+            ],
+
+            tomorrows_hearings=[
+                await self._to_hearing_item(r, desc_map, color_map)
+                for r in tomorrow_rows
+            ],
         )
 
         return mainDashboardOut
@@ -224,4 +258,48 @@ class DashboardService(BaseSecuredService):
             ),
             pending_invitations=pending_invitations,
             recent_activity=recent_activity,
+        )
+
+    async def get_cases_client_counts(self) -> SummaryCountsOut:
+        user: UserOut = self.userDetails
+
+        chamber_id = self.chamber_id
+        user_id = user.user_id
+
+        role: Optional[RoleOut] = user.role
+        is_admin = bool(role.admin_ind) if role else False
+
+        permissions: List[RolePermissionModuleOut] = user.permissions or []
+
+        has_case_access = any(
+            p.module_code == RefmModulesConstants.CASES and p.read_ind
+            for p in permissions
+        )
+
+        has_client_access = any(
+            p.module_code == RefmModulesConstants.CLIENTS and p.read_ind
+            for p in permissions
+        )
+
+        total_cases = 0
+        if has_case_access or is_admin:
+            total_cases = await self.repo.get_case_count(
+                session=self.session,
+                chamber_id=chamber_id,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+
+        total_clients = 0
+        if has_client_access or is_admin:
+            total_clients = await self.repo.get_client_count(
+                session=self.session,
+                chamber_id=chamber_id,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
+
+        return SummaryCountsOut(
+            total_cases=total_cases,
+            total_clients=total_clients,
         )

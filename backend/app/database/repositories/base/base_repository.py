@@ -21,7 +21,7 @@ from typing import (
 )
 
 from fastapi import HTTPException
-from sqlalchemy import MetaData, Table, func, insert, select, update
+from sqlalchemy import Exists, MetaData, Table, and_, func, insert, select, update
 from sqlalchemy import Boolean
 from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,10 @@ from sqlalchemy.sql.schema import Column
 
 from app.core.context import get_request_context
 from app.database.models.base.base_model import BaseModel
+from app.database.models.case_aors import CaseAors
+from app.database.models.cases import Cases
+from app.dtos.roles_dto import RoleOut
+from app.dtos.users_dto import UserOut
 from .model_helpers import get_writable_columns
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
@@ -77,6 +81,16 @@ class BaseRepository(Generic[ModelType]):
     def __init__(self, model: Type[ModelType]):
         self.model = model
         self.WRITABLE_FIELDS = get_writable_columns(model)
+        ctx = get_request_context()
+        
+        user: UserOut = cast(UserOut, ctx.get("user_details"))
+
+        if user:
+            self.chamber_id = user.chamber_id
+            self.user_id = user.user_id
+
+            role: Optional[RoleOut] = user.role
+            self.is_admin = bool(role.admin_ind) if role else False
 
     # ────────────────────────────────────────────────
     # ──────── FIELD / LOGGING HELPERS ────────
@@ -90,6 +104,27 @@ class BaseRepository(Generic[ModelType]):
         return {
             k: v for k, v in data.items() if k in self.WRITABLE_FIELDS and v is not None
         }
+
+    def apply_case_visibility(
+        self,stmt):
+        stmt = stmt.where(
+            Cases.chamber_id == self.chamber_id,
+            Cases.deleted_ind.is_(False),
+        )
+
+        if not self.is_admin:
+            stmt = stmt.where(
+                Exists().where(
+                    and_(
+                        CaseAors.case_id == Cases.case_id,
+                        CaseAors.user_id == self.user_id,
+                        CaseAors.chamber_id == self.chamber_id,
+                        CaseAors.withdrawal_date.is_(None),
+                    )
+                )
+            )
+
+        return stmt
 
     def _log_stmt(self, stmt, session: AsyncSession):
         """
@@ -117,25 +152,6 @@ class BaseRepository(Generic[ModelType]):
         stmt = self._apply_chamber_id_filter(stmt)
         self._log_stmt(stmt, session)
         return await session.execute(stmt)
-
-    async def fetch_scalars(self, session: AsyncSession, stmt):
-        result = await self.execute(stmt=stmt, session=session)
-        return result.scalars().all()
-
-
-    async def fetch_first(self, session: AsyncSession, stmt):
-        result = await self.execute(stmt=stmt, session=session)
-        return result.scalars().first()
-
-
-    async def fetch_scalar(self, session: AsyncSession, stmt):
-        result = await self.execute(stmt=stmt, session=session)
-        return result.scalar()
-
-
-    async def fetch_scalar_one(self, session: AsyncSession, stmt):
-        result = await self.execute(stmt=stmt, session=session)
-        return result.scalar_one()
 
     # ────────────────────────────────────────────────
     # ──────── VALIDATION HELPERS ────────
@@ -201,10 +217,9 @@ class BaseRepository(Generic[ModelType]):
         - deleted_ind: bool flag
         - deleted_date: nullable datetime when deleted
         """
-        ctx = get_request_context()
-        chamber_id = cast(str, ctx.get("chamber_id"))
+        
         if hasattr(self.model, "chamber_id"):
-            stmt = stmt.where(self.model.chamber_id == chamber_id)
+            stmt = stmt.where(self.model.chamber_id == self.chamber_id)
         return stmt
 
     def _apply_soft_delete_filter(self, stmt: Select) -> Select:
@@ -316,9 +331,6 @@ class BaseRepository(Generic[ModelType]):
         return stmt
 
     def _set_audit_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        ctx = get_request_context()
-        user_id = ctx.get("user_id")
-        chamber_id = cast(str, ctx.get("chamber_id"))
 
         result = data.copy()
 
@@ -354,18 +366,18 @@ class BaseRepository(Generic[ModelType]):
         # ─────────────────────────────────────────────
         # 🔹 AUDIT FIELDS
         # ─────────────────────────────────────────────
-        if user_id:
+        if self.user_id:
             if hasattr(self.model, "created_by") and "created_by" not in result:
-                result["created_by"] = user_id
+                result["created_by"] = self.user_id
 
             if hasattr(self.model, "updated_by") and "updated_by" not in result:
-                result["updated_by"] = user_id
+                result["updated_by"] = self.user_id
 
             if hasattr(self.model, "user_id") and "user_id" not in result:
-                result["user_id"] = user_id
+                result["user_id"] = self.user_id
 
         if hasattr(self.model, "chamber_id") and "chamber_id" not in result:
-            result["chamber_id"] = chamber_id
+            result["chamber_id"] = self.chamber_id
 
         return result
 

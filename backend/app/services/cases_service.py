@@ -102,7 +102,8 @@ class CasesService(BaseSecuredService):
         if extra_filters:
             stmt = stmt.where(*extra_filters)
         stmt = stmt.group_by(field)
-        rows = (await self.session.execute(stmt)).all()
+        stmt = self.cases_repo.apply_case_visibility( stmt )
+        rows = (await self.session.execute(stmt)).all()        
         return {r[0]: r[1] for r in rows}
 
     # ─────────────────────────────────────────────
@@ -141,7 +142,7 @@ class CasesService(BaseSecuredService):
             ),
         }
 
-    async def _get_case_or_404(self, case_id: str) -> Cases:
+    async def _get_case_details(self, case_id: str) -> Cases:
         case = await self.cases_repo.get_by_id(
             session=self.session,
             filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
@@ -397,7 +398,7 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def cases_get_by_id(self, case_id: str) -> CaseDetailOut:
-        return await self._enrich_case_detail(await self._get_case_or_404(case_id))
+        return await self._enrich_case_detail(await self._get_case_details(case_id))
 
     async def cases_add(self, payload: CaseCreate) -> CaseDetailOut:
         existing = await self.cases_repo.get_first(
@@ -423,7 +424,7 @@ class CasesService(BaseSecuredService):
         return await self._enrich_case_detail(case)
 
     async def cases_edit(self, payload: CaseEdit) -> CaseDetailOut:
-        case = await self._get_case_or_404(payload.case_id)
+        case = await self._get_case_details(payload.case_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data.pop("case_id", None)
         if data:
@@ -440,7 +441,7 @@ class CasesService(BaseSecuredService):
         return await self.cases_get_by_id(payload.case_id)
 
     async def cases_delete(self, payload: CaseDelete) -> dict:
-        case = await self._get_case_or_404(payload.case_id)
+        case = await self._get_case_details(payload.case_id)
         await self.cases_repo.delete(session=self.session, id_values=payload.case_id, soft=True)
         await log_activity(action="Case deleted", target=f"case:{payload.case_id}:{case.case_number}")
         return {"case_id": payload.case_id, "deleted": True}
@@ -449,11 +450,39 @@ class CasesService(BaseSecuredService):
     # HEARINGS
     # ─────────────────────────────────────────────────────────────────────
 
+    async def _sync_case_hearing_dates(self, case_id: str, today: date):
+        # next hearing
+        next_hearing = await self.session.scalar(
+            select(func.min(Hearings.hearing_date)).where(
+                Hearings.case_id == case_id,
+                Hearings.deleted_ind.is_(False),
+                Hearings.hearing_date >= today,
+            )
+        )
+
+        # last hearing
+        last_hearing = await self.session.scalar(
+            select(func.max(Hearings.hearing_date)).where(
+                Hearings.case_id == case_id,
+                Hearings.deleted_ind.is_(False),
+                Hearings.hearing_date < today,
+            )
+        )
+
+        await self.cases_repo.update(
+            session=self.session,
+            id_values=case_id,
+            data={
+                "next_hearing_date": next_hearing,
+                "last_hearing_date": last_hearing,
+            },
+        )
+
     async def hearings_get_by_case(self, case_id: str) -> List[HearingOut]:
         # OPTIMISATION: use _assert_case_exists (COUNT query) instead of
         # _get_case_or_404 — we don't use the returned object here.
         await self._assert_case_exists(case_id)
-        
+
         hearings = await self.hearings_repo.list_all(
             session=self.session,
             where=[
@@ -511,15 +540,7 @@ class CasesService(BaseSecuredService):
             session=self.session,
             data=self.hearings_repo.map_fields_to_db_column(data),
         )
-        if payload.next_hearing_date:
-            await self.cases_repo.update(
-                session=self.session,
-                id_values=payload.case_id,
-                data={
-                    "next_hearing_date": payload.next_hearing_date,
-                    "last_hearing_date": payload.hearing_date,
-                },
-            )
+        await self._sync_case_hearing_dates(payload.case_id, payload.hearing_date)
         await log_activity(
             action=f"Hearing added for {payload.hearing_date}",
             target=f"case:{payload.case_id}",
@@ -570,12 +591,7 @@ class CasesService(BaseSecuredService):
             if data
             else hearing
         )
-        if payload.next_hearing_date:
-            await self.cases_repo.update(
-                session=self.session,
-                id_values=hearing.case_id,
-                data={"next_hearing_date": payload.next_hearing_date},
-            )
+        await self._sync_case_hearing_dates(updated.case_id, updated.hearing_date)
         await log_activity(action="Hearing updated", target=f"case:{hearing.case_id}")
         status_desc = None
         if updated.status_code:
@@ -583,7 +599,7 @@ class CasesService(BaseSecuredService):
             status_desc = hs.description if hs else None        
 
         purpose_desc = None
-        if hearing.purpose_code:
+        if updated.purpose_code:
             p = await self.session.get(RefmHearingPurpose, hearing.purpose_code)
             purpose_desc = p.description if p else None
 
@@ -593,7 +609,7 @@ class CasesService(BaseSecuredService):
             hearing_date=updated.hearing_date,
             status_code=updated.status_code,
             status_description=status_desc,
-            purpose_code=hearing.purpose_code,
+            purpose_code=updated.purpose_code,
             purpose_description=purpose_desc,
             notes=updated.notes,
             order_details=updated.order_details,
@@ -608,6 +624,7 @@ class CasesService(BaseSecuredService):
         if not hearing:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Hearing not found")
         await self.hearings_repo.delete(session=self.session, id_values=payload.hearing_id, soft=True)
+        await self._sync_case_hearing_dates(hearing.case_id, date.today())
         await log_activity(action="Hearing deleted", target=f"case:{hearing.case_id}")
         return {"hearing_id": payload.hearing_id, "deleted": True}
 

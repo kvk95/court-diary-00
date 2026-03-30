@@ -7,6 +7,7 @@ from app.auth.jwt import decode_token
 from app.core.context import get_request_context, set_request_context
 from app.database.models.base.session import get_session
 from app.database.repositories.users_repository import UsersRepository
+from app.services.users_service import UsersService
 from app.dtos.oauth_dtos import CurrentUserContext
 from app.validators import ValidationErrorDetail, ErrorCodes
 
@@ -68,7 +69,7 @@ async def get_current_user(
         last_name=user.last_name,
         status_ind=user.status_ind,
         is_email_verified=bool(user.email_verified_ind),  # ✅ Fixed field name
-    )
+    )    
 
     # CACHE in context for future calls in same request
     set_request_context(
@@ -76,5 +77,19 @@ async def get_current_user(
         chamber_id=user_context.chamber_id,  # ✅ Changed from company_id
         current_user=user_context,
     )
+
+    user_service = UsersService(session=session)
+    user_details = await user_service.get_user_full_details(user_id=user_context.user_id,
+                                                                 chamber_id=user_context.chamber_id)
+        
+
+    # reset CACHE in context with user_details for future calls in same request
+    set_request_context(
+        user_id=user_context.user_id,
+        chamber_id=user_context.chamber_id,
+        current_user=user_context,
+        user_details=user_details,
+    )
+    
 
     return user_context

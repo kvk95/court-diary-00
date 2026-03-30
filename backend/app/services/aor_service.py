@@ -3,11 +3,12 @@
 from datetime import date
 from typing import List, Optional
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
+from app.database.models.refm_aor_status import RefmAorStatus, RefmAorStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.users import Users
 from app.database.repositories.case_aors_repository import CaseAorsRepository
@@ -15,8 +16,6 @@ from app.database.repositories.cases_repository import CasesRepository
 from app.dtos.aor_dto import AorCreate, AorEdit, AorOut, AorWithdraw
 from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import ErrorCodes, ValidationErrorDetail
-
-_STATUS_LABELS = {"AC": "Active", "WD": "Withdrawn", "SU": "Substituted"}
 
 
 def _full_name(first: Optional[str], last: Optional[str]) -> str:
@@ -38,13 +37,19 @@ class AorService(BaseSecuredService):
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
 
-    async def _get_case_or_404(self, case_id: str) -> Cases:
-        case = await self.cases_repo.get_by_id(
-            session=self.session,
-            filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
-        )
+    async def _get_case_details(self, case_id: str) -> Cases:
+        stmt = select(Cases).where(Cases.case_id == case_id)
+
+        stmt = self.cases_repo.apply_case_visibility(stmt)
+
+        case = await self.session.scalar(stmt)
+
         if not case:
-            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Case not found or access denied",
+            )
+
         return case
 
     async def _get_aor_or_404(self, case_aor_id: str) -> CaseAors:
@@ -60,27 +65,48 @@ class AorService(BaseSecuredService):
         u = await self.session.get(Users, user_id)
         return _full_name(u.first_name, u.last_name) if u else ""
 
-    def _to_out(self, aor: CaseAors, advocate_name: str) -> AorOut:
+    async def _to_out(self, aor: CaseAors, advocate_name: str) -> AorOut:
         return AorOut(
             case_aor_id=aor.case_aor_id,
             case_id=aor.case_id,
             user_id=aor.user_id,
             advocate_name=advocate_name,
             primary_ind=bool(aor.primary_ind),
-            status_code=aor.status_code or "AC",
-            status_description=_STATUS_LABELS.get(aor.status_code or "AC"),
+            status_code=aor.status_code or RefmAorStatusConstants.ACTIVE,
+            status_description= await self.refm_resolver.from_column(
+                column_attr=CaseAors.status_code,
+                value_column=RefmAorStatus.description,
+                code=aor.status_code,
+                default=None
+            ),
             appointment_date=aor.appointment_date,
             withdrawal_date=aor.withdrawal_date,
             notes=aor.notes,
             created_date=aor.created_date,
         )
+    
+    async def _assign_new_primary(self, case_id: str):
+        next_aor = await self.session.scalar(
+            select(CaseAors)
+            .where(
+                CaseAors.case_id == case_id,
+                CaseAors.chamber_id == self.chamber_id,
+                CaseAors.status_code == RefmAorStatusConstants.ACTIVE,
+            )
+            .order_by(CaseAors.appointment_date.asc())
+            .limit(1)
+        )
+
+        if next_aor:
+            next_aor.primary_ind = True
+            await self.session.flush()
 
     # ─────────────────────────────────────────────────────────────────────
     # LIST
     # ─────────────────────────────────────────────────────────────────────
 
     async def aors_get_by_case(self, case_id: str) -> List[AorOut]:
-        await self._get_case_or_404(case_id)
+        await self._get_case_details(case_id)
         aors = await self.aors_repo.list_all(
             session=self.session,
             where=[
@@ -99,14 +125,14 @@ class AorService(BaseSecuredService):
             )
             name_map = {r.user_id: _full_name(r.first_name, r.last_name) for r in rows}
 
-        return [self._to_out(a, name_map.get(a.user_id, "")) for a in aors]
+        return [await self._to_out(a, name_map.get(a.user_id, "")) for a in aors]
 
     # ─────────────────────────────────────────────────────────────────────
     # ADD
     # ─────────────────────────────────────────────────────────────────────
 
     async def aors_add(self, payload: AorCreate) -> AorOut:
-        await self._get_case_or_404(payload.case_id)
+        await self._get_case_details(payload.case_id)
 
         # Verify user is an active member of this chamber
         link = await self.session.execute(
@@ -131,7 +157,7 @@ class AorService(BaseSecuredService):
             filters={
                 CaseAors.case_id: payload.case_id,
                 CaseAors.user_id: payload.user_id,
-                CaseAors.status_code: "AC",
+                CaseAors.status_code: RefmAorStatusConstants.ACTIVE,
             },
         )
         if existing:
@@ -158,7 +184,7 @@ class AorService(BaseSecuredService):
             session=self.session,
             data=self.aors_repo.map_fields_to_db_column(data),
         )
-        return self._to_out(aor, await self._user_name(aor.user_id))
+        return await self._to_out(aor, await self._user_name(aor.user_id))
 
     # ─────────────────────────────────────────────────────────────────────
     # EDIT (set primary, change status)
@@ -171,14 +197,18 @@ class AorService(BaseSecuredService):
             await self._demote_existing_primary(aor.case_id)
 
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
+
         data.pop("case_aor_id", None)
+        data.pop("status_code", None)
+        data.pop("withdrawal_date", None)
+
         if data:
             aor = await self.aors_repo.update(
                 session=self.session,
                 id_values=payload.case_aor_id,
                 data=self.aors_repo.map_fields_to_db_column(data),
             )
-        return self._to_out(aor, await self._user_name(aor.user_id))
+        return await self._to_out(aor, await self._user_name(aor.user_id))
 
     # ─────────────────────────────────────────────────────────────────────
     # WITHDRAW
@@ -186,22 +216,26 @@ class AorService(BaseSecuredService):
 
     async def aors_withdraw(self, payload: AorWithdraw) -> AorOut:
         aor = await self._get_aor_or_404(payload.case_aor_id)
-        if aor.status_code != "AC":
+        if aor.status_code != RefmAorStatusConstants.ACTIVE:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
                 message=f"AOR is already '{aor.status_code}', cannot withdraw",
             )
+        
+        if aor.primary_ind:
+            await self._assign_new_primary(aor.case_id)
+
         updated = await self.aors_repo.update(
             session=self.session,
             id_values=payload.case_aor_id,
             data={
-                "status_code": "WD",
+                "status_code": RefmAorStatusConstants.WITHDRAWN,
                 "withdrawal_date": payload.withdrawal_date or date.today(),
                 "primary_ind": False,
                 "notes": payload.notes or aor.notes,
             },
         )
-        return self._to_out(updated, await self._user_name(updated.user_id))
+        return await self._to_out(updated, await self._user_name(updated.user_id))
 
     # ─────────────────────────────────────────────────────────────────────
     # REMOVE
@@ -223,9 +257,17 @@ class AorService(BaseSecuredService):
                 CaseAors.case_id == case_id,
                 CaseAors.chamber_id == self.chamber_id,
                 CaseAors.primary_ind.is_(True),
-                CaseAors.status_code == "AC",
+                CaseAors.status_code == RefmAorStatusConstants.ACTIVE,
             )
         )
-        for old in existing_primary.scalars().all():
-            old.primary_ind = False
+        await self.session.execute(
+            update(CaseAors)
+            .where(
+                CaseAors.case_id == case_id,
+                CaseAors.chamber_id == self.chamber_id,
+                CaseAors.primary_ind.is_(True),
+                CaseAors.status_code == RefmAorStatusConstants.ACTIVE,
+            )
+            .values(primary_ind=False)
+        )
         await self.session.flush()

@@ -7,7 +7,6 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.refm_billing_status import RefmBillingStatusConstants
-from app.database.models.refm_case_status import RefmCaseStatusConstants
 from app.database.repositories.cases_repository import CasesRepository
 from app.database.repositories.client_bills_repository import ClientBillsRepository
 from app.database.repositories.hearings_repository import HearingsRepository
@@ -67,14 +66,9 @@ class ReportsService(BaseSecuredService):
 
     async def _case_summary(self) -> CaseSummaryReport:
         today = date.today()
-        cid = self.chamber_id
 
         stats = await self.cases_repo.get_case_summary_stats(
             session=self.session,
-            active_code=RefmCaseStatusConstants.ACTIVE,
-            adjourned_code=RefmCaseStatusConstants.ADJOURNED,
-            disposed_code=RefmCaseStatusConstants.DISPOSED,
-            closed_code=RefmCaseStatusConstants.CLOSED,
             today=today,
         )
 

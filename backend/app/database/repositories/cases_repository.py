@@ -7,7 +7,7 @@ from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.cases import Cases
-from app.database.models.refm_case_status import RefmCaseStatus
+from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_courts import RefmCourts
@@ -25,22 +25,20 @@ class CasesRepository(BaseRepository[Cases]):
     async def get_case_summary_stats(
         self,
         session: AsyncSession,
-        active_code: str,
-        adjourned_code: str,
-        disposed_code: str,
-        closed_code: str,
         today: date,
     ) -> dict:
         """All four stat-card counts in minimal DB round trips."""
         def _base():
-            return select(func.count(Cases.case_id))
-
+            stmt = select(func.count(Cases.case_id))
+            stmt = self.apply_case_visibility( stmt )
+            return stmt
+        
         total = await session.scalar(_base()) or 0
-        active = await session.scalar(_base().where(Cases.status_code == active_code)) or 0
-        adjourned = await session.scalar(_base().where(Cases.status_code == adjourned_code)) or 0
+        active = await session.scalar(_base().where(Cases.status_code == RefmCaseStatusConstants.ACTIVE)) or 0
+        adjourned = await session.scalar(_base().where(Cases.status_code == RefmCaseStatusConstants.ADJOURNED)) or 0
         overdue = await session.scalar(
             _base().where(
-                Cases.status_code == active_code,
+                Cases.status_code == RefmCaseStatusConstants.ACTIVE,
                 Cases.next_hearing_date < today,
             )
         ) or 0
@@ -56,13 +54,13 @@ class CasesRepository(BaseRepository[Cases]):
         self, session: AsyncSession
     ) -> List[dict]:
         """Cases grouped by status with descriptions and colors."""
-        rows = await session.execute(
-            select(
+        stmt = (select(
                 Cases.status_code,
                 func.count(Cases.case_id).label("cnt"),
             )
-            .group_by(Cases.status_code)
-        )
+            .group_by(Cases.status_code))
+        stmt = self.apply_case_visibility( stmt )
+        rows = await session.execute(stmt)
         status_data = {r.status_code: r.cnt for r in rows}
         if not status_data:
             return []
@@ -84,8 +82,7 @@ class CasesRepository(BaseRepository[Cases]):
     async def get_cases_by_court(
         self, session: AsyncSession, limit: int = 10
     ) -> List[dict]:
-        rows = await session.execute(
-            select(
+        stmt = (select(
                 Cases.court_id,
                 RefmCourts.court_name,
                 func.count(Cases.case_id).label("cnt"),
@@ -93,26 +90,31 @@ class CasesRepository(BaseRepository[Cases]):
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
             .group_by(Cases.court_id, RefmCourts.court_name)
             .order_by(func.count(Cases.case_id).desc())
-            .limit(limit)
-        )
+            .limit(limit))
+        
+        stmt = self.apply_case_visibility( stmt )
+        rows = await session.execute(stmt)
         return [{"court_id": r.court_id, "court_name": r.court_name, "count": r.cnt} for r in rows]
 
     async def get_cases_by_type(
         self, session: AsyncSession
     ) -> List[dict]:
-        rows = await session.execute(
-            select(
-                Cases.case_type_code,
-                RefmCaseTypes.description,
-                func.count(Cases.case_id).label("cnt"),
-            )
-            .join(RefmCaseTypes, Cases.case_type_code == RefmCaseTypes.code)
-            .where(
-                Cases.case_type_code.isnot(None),
-            )
-            .group_by(Cases.case_type_code, RefmCaseTypes.description)
-            .order_by(func.count(Cases.case_id).desc())
+        stmt = (select(
+            Cases.case_type_code,
+            RefmCaseTypes.description,
+            func.count(Cases.case_id).label("cnt"),
         )
+        .join(RefmCaseTypes, Cases.case_type_code == RefmCaseTypes.code)
+        .where(
+            Cases.case_type_code.isnot(None),
+        )
+        .group_by(Cases.case_type_code, RefmCaseTypes.description)
+        .order_by(func.count(Cases.case_id).desc()))
+
+        stmt = self.apply_case_visibility( stmt )
+
+        rows = await session.execute(stmt)
+
         return [{"case_type_code": r.case_type_code, "description": r.description, "count": r.cnt} for r in rows]
 
     async def count_cases_in_month(
@@ -121,24 +123,24 @@ class CasesRepository(BaseRepository[Cases]):
         month_start: date,
         month_end: date,
     ) -> int:
-        return await session.scalar(
-            select(func.count(Cases.case_id)).where(
+        stmt = select(func.count(Cases.case_id)).where(
                 Cases.created_date >= month_start,
                 Cases.created_date < month_end,
             )
-        ) or 0
+        stmt = self.apply_case_visibility( stmt )
+        return await session.scalar(stmt) or 0
 
     async def count_cases_since(
         self,
         session: AsyncSession,
         since: date,
     ) -> int:
-        return await session.scalar(
-            select(func.count(Cases.case_id)).where(
+        stmt = select(func.count(Cases.case_id)).where(
                 Cases.deleted_ind.is_(False),
                 Cases.created_date >= since,
             )
-        ) or 0
+        stmt = self.apply_case_visibility( stmt )
+        return await session.scalar(stmt) or 0
     
     async def list_cases_with_details(
         self,
@@ -231,6 +233,8 @@ class CasesRepository(BaseRepository[Cases]):
         else:
             stmt = stmt.order_by(Cases.updated_date.desc())
 
+        stmt = self.apply_case_visibility( stmt )
+
         stmt = stmt.limit(limit).offset((page - 1) * limit)
 
         rows = (await self.execute(stmt=stmt, session=session)).all()
@@ -239,6 +243,7 @@ class CasesRepository(BaseRepository[Cases]):
         count_stmt = select(func.count()).select_from(Cases).where(
             Cases.deleted_ind.is_(False),
         )
+        count_stmt = self.apply_case_visibility( count_stmt )
         
         total_users_result = await session.execute(count_stmt)
         total = total_users_result.scalar_one() or 0
@@ -273,6 +278,7 @@ class CasesRepository(BaseRepository[Cases]):
 
         # ⚡ Fast ordering for UI
         stmt = stmt.order_by(Cases.updated_date.desc()).limit(limit)
+        stmt = self.apply_case_visibility( stmt )
 
         rows = (await self.execute(stmt=stmt, session=session)).all()
         return rows
