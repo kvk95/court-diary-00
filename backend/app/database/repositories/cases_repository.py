@@ -6,6 +6,7 @@ from typing import List, Optional
 from sqlalchemy import func, select, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.case_clients import CaseClients
 from app.database.models.cases import Cases
 from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
 from app.database.models.refm_case_types import RefmCaseTypes
@@ -193,8 +194,10 @@ class CasesRepository(BaseRepository[Cases]):
         subq = (
             select(
                 Hearings.case_id,
-                func.max(Hearings.hearing_date).label("max_date")
-            )
+                func.max(Hearings.hearing_date).label("max_date"),
+                CaseClients.engagement_type_code,
+            )            
+            .outerjoin(CaseClients, Cases.case_id == CaseClients.case_id)
             .where(
                 Hearings.deleted_ind.is_(False),
                 Hearings.chamber_id == chamber_id,   # ✅ ADD THIS
@@ -236,7 +239,8 @@ class CasesRepository(BaseRepository[Cases]):
                 latest_hearing.c.status_code.label("hearing_status_code"),
             )
             .outerjoin(Users, Cases.aor_user_id == Users.user_id)
-            .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)
+            .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)            
+            .outerjoin(CaseClients, Cases.case_id == CaseClients.case_id)
             .where(
                 Cases.deleted_ind.is_(False),
             )
@@ -278,6 +282,25 @@ class CasesRepository(BaseRepository[Cases]):
 
         return rows, total
     
+    
+    
+    async def get_case_details(
+        self,
+        session: AsyncSession,
+        case_id: str
+    ):
+        stmt = (
+            select(
+                Cases,
+                CaseClients.engagement_type_code,
+            )
+            .outerjoin(CaseClients, Cases.case_id == CaseClients.case_id)
+            .where(Cases.case_id == case_id)
+        )
+        
+        rows = (await self.execute(session=session, stmt=stmt)).all()
+        return rows[0]
+    
     async def list_cases_for_quick_hearing(
         self,
         session: AsyncSession,
@@ -289,8 +312,10 @@ class CasesRepository(BaseRepository[Cases]):
                 Cases,
                 Users.first_name,
                 Users.last_name,
+                CaseClients.engagement_type_code,
             )
             .outerjoin(Users, Cases.aor_user_id == Users.user_id)
+            .outerjoin(CaseClients, Cases.case_id == CaseClients.case_id)
         )
 
         # 🔍 Search (optional)

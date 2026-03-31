@@ -138,14 +138,13 @@ class CasesService(BaseSecuredService):
             ),
         }
 
-    async def _get_case_details(self, case_id: str) -> Cases:
-        case = await self.cases_repo.get_by_id(
+    async def _get_case_details(self, case_id: str) -> tuple[Cases,str]:
+        case,engagement_type_code = await self.cases_repo.get_case_details(
             session=self.session,
-            filters={Cases.case_id: case_id, Cases.chamber_id: self.chamber_id},
-        )
+            case_id = case_id)
         if not case:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
-        return case
+        return case,engagement_type_code
 
     # OPTIMISATION: lightweight existence check used when we don't need the full
     # ORM object (e.g. before listing sub-resources).  Avoids hydrating the entire
@@ -161,7 +160,7 @@ class CasesService(BaseSecuredService):
         if not exists:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
 
-    async def _enrich_case_detail(self, case: Cases) -> CaseDetailOut:
+    async def _enrich_case_detail(self, case: Cases, engagement_type_code ) -> CaseDetailOut:
         maps = await self._load_common_maps([case])
 
         hearing_map = await self._load_counts(
@@ -196,7 +195,14 @@ class CasesService(BaseSecuredService):
             court_id=case.court_id,
             court_name=maps["court_map"].get(case.court_id),
             case_type_code=case.case_type_code,
-            case_type_description=maps["case_type_map"].get(case.case_type_code),
+            case_type_description=maps["case_type_map"].get(case.case_type_code), 
+            engagement_type_code=engagement_type_code,
+            engagement_type_description=await self.refm_resolver.from_column(
+                column_attr=CaseClients.engagement_type_code,
+                code=engagement_type_code,
+                value_column=RefmEngagementType.description,
+                default=None
+            ),
             filing_year=case.filing_year,
             petitioner=case.petitioner,
             respondent=case.respondent,
@@ -274,7 +280,13 @@ class CasesService(BaseSecuredService):
                     value_column=RefmCaseTypes.description,
                     default=None
                 ),
-
+                engagement_type_code=engagement_type_code,
+                engagement_type_description=await self.refm_resolver.from_column(
+                    column_attr=CaseClients.engagement_type_code,
+                    code=engagement_type_code,
+                    value_column=RefmEngagementType.description,
+                    default=None
+                ),
                 filing_year=c.filing_year,
 
                 petitioner=c.petitioner,
@@ -287,6 +299,7 @@ class CasesService(BaseSecuredService):
                 c,
                 first_name,
                 last_name,
+                engagement_type_code,
             ) in rows
         ]
 
@@ -375,7 +388,8 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def cases_get_by_id(self, case_id: str) -> CaseDetailOut:
-        return await self._enrich_case_detail(await self._get_case_details(case_id))
+        row, engagement_type_code = await self._get_case_details(case_id)
+        return await self._enrich_case_detail(row, engagement_type_code)
 
     async def cases_add(self, payload: CaseCreate) -> CaseDetailOut:
         existing = await self.cases_repo.get_first(
@@ -393,15 +407,20 @@ class CasesService(BaseSecuredService):
             session=self.session,
             data=self.cases_repo.map_fields_to_db_column(data),
         )
+        caseClients = await self.case_clients_repo.get_by_id(
+            session=self.session,
+            filters={CaseClients.case_id: case.case_id},
+        )
         await log_activity(
             action="Case created",
             target=f"case:{case.case_id}:{case.case_number}",
             metadata={"case_id": case.case_id},
         )
-        return await self._enrich_case_detail(case)
+        engagement_type_code = caseClients.engagement_type_code if caseClients and caseClients.engagement_type_code else ''
+        return await self._enrich_case_detail(case,engagement_type_code)
 
     async def cases_edit(self, payload: CaseEdit) -> CaseDetailOut:
-        case = await self._get_case_details(payload.case_id)
+        case,_ = await self._get_case_details(payload.case_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data.pop("case_id", None)
         if data:
@@ -418,7 +437,7 @@ class CasesService(BaseSecuredService):
         return await self.cases_get_by_id(payload.case_id)
 
     async def cases_delete(self, payload: CaseDelete) -> dict:
-        case = await self._get_case_details(payload.case_id)
+        case,_ = await self._get_case_details(payload.case_id)
         await self.cases_repo.delete(session=self.session, id_values=payload.case_id, soft=True)
         await log_activity(action="Case deleted", target=f"case:{payload.case_id}:{case.case_number}")
         return {"case_id": payload.case_id, "deleted": True}

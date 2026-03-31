@@ -13,6 +13,7 @@ from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_courts import RefmCourts
+from app.database.models.refm_engagement_type import RefmEngagementType
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.repositories.case_clients_repository import CaseClientsRepository
 from app.database.repositories.clients_repository import ClientsRepository
@@ -103,6 +104,13 @@ class ClientsService(BaseSecuredService):
                     value_column=RefmCaseTypes.description,
                     default=None
                 ),
+                engagement_type_code=engagement_type_code,
+                engagement_type_description=await self.refm_resolver.from_column(
+                    column_attr=CaseClients.engagement_type_code,
+                    code=engagement_type_code,
+                    value_column=RefmEngagementType.description,
+                    default=None
+                ),
                 filing_year=c.filing_year,
                 case_summary=c.case_summary,
                 next_hearing_status=await self.refm_resolver.from_column(
@@ -117,6 +125,7 @@ class ClientsService(BaseSecuredService):
                 first_name,
                 last_name,
                 hearing_status_code,
+                engagement_type_code
             ) in rows
         ]
 

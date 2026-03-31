@@ -20,6 +20,8 @@ class CaseBasicInfoOut(BaseRecordData):
     court_name: Optional[str] = None   
     case_type_code: Optional[str] = None
     case_type_description:Optional[str] = None
+    engagement_type_code:Optional[str] = None
+    engagement_type_description:Optional[str] = None
     status_code: Optional[str] = None
     status_description: Optional[str] = None
     filing_year: Optional[int] = None

@@ -62,6 +62,7 @@ class CaseClientsRepository(BaseRepository[CaseClients]):
                 Users.first_name,
                 Users.last_name,
                 latest_hearing.c.status_code.label("hearing_status_code"),
+                CaseClients.engagement_type_code,
             )
             .select_from(CaseClients)
             .join(
