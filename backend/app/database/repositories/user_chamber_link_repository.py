@@ -2,7 +2,6 @@
 
 from typing import Optional, List
 from datetime import date
-from sqlalchemy import and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.user_chamber_link import UserChamberLink
@@ -54,32 +53,6 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
             },
         )
 
-    async def reactivate_chamber_link(
-        self,
-        session: AsyncSession,
-        link_id: str,
-        current_user_id: str,
-    ) -> None:
-        """
-        Reactivate a previously deleted chamber link.
-        ✅ Sets left_date=NULL, status_ind=TRUE (bypasses soft-delete filtering).
-        """
-        from sqlalchemy import update
-        
-        stmt = (
-            update(UserChamberLink)
-            .where(UserChamberLink.link_id == link_id)
-            .values(
-                left_date=None,
-                status_ind=True,
-                updated_by=current_user_id,
-                updated_date=date.today(),
-            )
-        )
-        
-        await session.execute(stmt)
-        await session.flush()
-
     async def get_all_active_links_for_user(
         self,
         session: AsyncSession,
@@ -100,60 +73,37 @@ class UserChamberLinkRepository(BaseRepository[UserChamberLink]):
         session: AsyncSession,
         user_id: str,
         chamber_id: str,
-        current_user_id: str,
     ) -> None:
-        """
-        Unlink user from a specific chamber (set left_date and status_ind=False).
-        ✅ Uses direct SQL to bypass soft-delete filtering in BaseRepository.update().
-        """
-        from sqlalchemy import update
-        
-        stmt = (
-            update(UserChamberLink)
-            .where(
-                and_(
-                    UserChamberLink.user_id == user_id,
-                    UserChamberLink.chamber_id == chamber_id,
-                    UserChamberLink.left_date.is_(None),
-                )
-            )
-            .values(
-                left_date=date.today(),
-                status_ind=False,
-                updated_by=current_user_id,
-                updated_date=date.today(),
-            )
+        await self.update(
+            session=session,
+            where=[
+                UserChamberLink.user_id == user_id,
+                UserChamberLink.chamber_id == chamber_id,
+                UserChamberLink.left_date.is_(None),
+            ],
+            data={
+                "left_date": date.today(),
+                "status_ind": False,
+            },
         )
-        
-        await session.execute(stmt)
-        await session.flush()
 
     async def unlink_user_from_all_chambers(
         self,
         session: AsyncSession,
         user_id: str,
-        current_user_id: str,
     ) -> None:
-        """Unlink user from all chambers."""
-        stmt = (
-            update(UserChamberLink)
-            .where(
-                and_(
-                    UserChamberLink.user_id == user_id,
-                    UserChamberLink.left_date.is_(None),
-                    UserChamberLink.status_ind.is_(True),
-                )
-            )
-            .values(
-                left_date=date.today(),
-                status_ind=False,
-                updated_by=current_user_id,
-                updated_date=date.today(),
-            )
+        await self.update(
+            session=session,
+            where=[
+                UserChamberLink.user_id == user_id,
+                UserChamberLink.left_date.is_(None),
+                UserChamberLink.status_ind.is_(True),
+            ],
+            data={
+                "left_date": date.today(),
+                "status_ind": False,
+            },
         )
-        
-        await session.execute(stmt)
-        await session.flush()
 
     async def create_chamber_link(
         self,

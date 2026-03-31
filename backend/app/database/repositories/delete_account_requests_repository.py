@@ -21,14 +21,14 @@ class DeleteAccountRequestsRepository(BaseRepository[DeleteAccountRequests]):
         stmt = select(self.model).where(
             self.model.status_code == RefmUserDeletionStatusConstants.PENDING
         )
-        res = await session.execute(stmt)
+        res = await self.execute( session=session, stmt=stmt)
         return list(res.scalars().all())
 
     async def get_by_request_no(
         self, session: AsyncSession, request_no: str
     ) -> Optional[DeleteAccountRequests]:
         stmt = select(self.model).where(self.model.request_no == request_no)
-        res = await session.execute(stmt)
+        res = await self.execute( session=session, stmt=stmt)
         return res.scalars().first()
     
     async def get_deletion_requests_paginated(
@@ -67,14 +67,13 @@ class DeleteAccountRequestsRepository(BaseRepository[DeleteAccountRequests]):
 
         # Count total (before pagination)
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
-        count_result = await session.execute(count_stmt)
-        total = count_result.scalar_one() or 0
+        total = await self.execute_scalar( session=session, stmt=count_stmt)
 
         # Apply ordering and pagination
         stmt = stmt.order_by(DeleteAccountRequests.request_date.desc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
 
-        result = await session.execute(stmt)
+        result = await self.execute( session=session, stmt=stmt)
         rows = result.all()
 
         # Return as list of dicts

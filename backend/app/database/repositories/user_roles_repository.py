@@ -3,7 +3,7 @@
 from typing import Optional, Tuple,List,Any, Dict
 
 from datetime import date
-from sqlalchemy import and_, update, select,func
+from sqlalchemy import and_, select,func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.user_roles import UserRoles
@@ -39,56 +39,6 @@ class UserRolesRepository(BaseRepository[UserRoles]):
             where=[UserRoles.end_date.is_(None)]
         )
 
-    async def end_all_active_roles_for_link(
-        self,
-        session: AsyncSession,
-        link_id: str,
-        end_date: date,
-        updated_by: str,
-    ) -> None:
-        """
-        End all active role assignments for a link (set end_date).
-        Used when assigning a new role to replace existing ones.
-        """
-        stmt = (
-            update(UserRoles)
-            .where(
-                and_(
-                    UserRoles.link_id == link_id,
-                    UserRoles.end_date.is_(None),
-                )
-            )
-            .values(
-                end_date=end_date,
-                updated_by=updated_by,
-                updated_date=date.today(),
-            )
-        )
-        
-        await session.execute(stmt)
-        await session.flush()
-
-    async def assign_role_to_link(
-        self,
-        session: AsyncSession,
-        link_id: str,
-        role_id: int,
-        start_date: date,
-        created_by: str,
-    ) -> UserRoles:
-        """
-        Create a new role assignment for a link.
-        """
-        return await self.create(
-            session=session,
-            data={
-                "link_id": link_id,
-                "role_id": role_id,
-                "start_date": start_date,
-                "created_by": created_by,
-            },
-        )
-
     async def set_user_role(
         self,
         session: AsyncSession,
@@ -120,20 +70,24 @@ class UserRolesRepository(BaseRepository[UserRoles]):
             return
         
         # End all current active roles for this link
-        await self.end_all_active_roles_for_link(
+        await self.bulk_update(
             session=session,
-            link_id=link_id,
-            end_date=date.today(),
-            updated_by=current_user_id,
+            where=[
+                UserRoles.link_id == link_id,
+                UserRoles.end_date.is_(None),
+            ],
+            data={
+                "end_date": date.today(),
+            },
         )
-        
-        # Create new role assignment
-        await self.assign_role_to_link(
+
+        await self.create(
             session=session,
-            link_id=link_id,
-            role_id=role_id,
-            start_date=date.today(),
-            created_by=current_user_id,
+            data={
+                "link_id": link_id,
+                "role_id": role_id,
+                "start_date": date.today(),
+            },
         )
     
     async def get_roles_paged(
@@ -172,14 +126,13 @@ class UserRolesRepository(BaseRepository[UserRoles]):
 
         # Count
         count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
-        count_result = await session.execute(count_stmt)
-        total = count_result.scalar_one() or 0
+        total = await self.execute_scalar( session=session, stmt=count_stmt)
 
         # Pagination
         stmt = stmt.order_by(ChamberRoles.role_name.asc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
 
-        result = await session.execute(stmt)
+        result = await self.execute( session=session, stmt=stmt)
         rows = result.all()
 
         roles = [

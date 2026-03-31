@@ -61,9 +61,7 @@ class DashboardRepository(BaseRepository[Cases]):
             ).label("overdue_cases"),
         )
 
-        case_stmt = self.apply_case_visibility(case_stmt)
-
-        case_result = (await session.execute(case_stmt)).one()
+        case_result = (await self.execute( session=session, stmt=case_stmt)).one()
 
         # =========================
         # HEARING METRICS (FIXED 🔥)
@@ -117,9 +115,7 @@ class DashboardRepository(BaseRepository[Cases]):
             .where(Hearings.deleted_ind.is_(False))
         )
 
-        hearing_stmt = self.apply_case_visibility(hearing_stmt)
-
-        hearing_result = (await session.execute(hearing_stmt)).one()
+        hearing_result = (await self.execute( session=session, stmt=hearing_stmt)).one()
 
         # =========================
         # CASES WITH HEARING TODAY (FIXED 🔥)
@@ -134,9 +130,7 @@ class DashboardRepository(BaseRepository[Cases]):
             )
         )
 
-        cases_today_stmt = self.apply_case_visibility(cases_today_stmt)
-
-        cases_today = (await session.execute(cases_today_stmt)).scalar() or 0
+        cases_today = await self.execute_scalar( session=session, stmt=cases_today_stmt)
 
         return {
             "cases_overview": {
@@ -265,8 +259,7 @@ class DashboardRepository(BaseRepository[Cases]):
             .order_by(Cases.next_hearing_date.asc())
             .limit(limit)
         )
-        stmt = self.apply_case_visibility(stmt)
-        rows = await session.execute(stmt)
+        rows = await self.execute( session=session, stmt=stmt)
 
         return [dict(row._mapping) for row in rows.all()]
 
@@ -301,9 +294,8 @@ class DashboardRepository(BaseRepository[Cases]):
             )
             .order_by(Cases.case_number.asc())
         )
-        stmt = self.apply_case_visibility(stmt)
 
-        rows = await session.execute(stmt)
+        rows = await self.execute( session=session, stmt=stmt)
         return [dict(row._mapping) for row in rows.all()]
 
     # ===================================================================
@@ -315,15 +307,15 @@ class DashboardRepository(BaseRepository[Cases]):
     ) -> Dict[str, Any]:
         """Returns stats + MoM trends."""
 
-        total_users = await session.scalar(
+        total_users = await self.execute_scalar( session=session, stmt=
             select(func.count(UserChamberLink.link_id)).where(
                 UserChamberLink.chamber_id == chamber_id,
                 UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind.is_(True),
             )
-        ) or 0
+        ) 
 
-        active_users = await session.scalar(
+        active_users = await self.execute_scalar( session=session, stmt=
             select(func.count(UserChamberLink.link_id))
             .join(Users, UserChamberLink.user_id == Users.user_id)
             .where(
@@ -333,9 +325,9 @@ class DashboardRepository(BaseRepository[Cases]):
                 Users.status_ind.is_(True),
                 Users.deleted_ind.is_(False),
             )
-        ) or 0
+        )
 
-        roles_count = await session.scalar(
+        roles_count = await self.execute_scalar( session=session, stmt=
             select(func.count(func.distinct(UserRoles.role_id)))
             .join(UserChamberLink, UserChamberLink.link_id == UserRoles.link_id)
             .where(
@@ -344,19 +336,19 @@ class DashboardRepository(BaseRepository[Cases]):
                 UserChamberLink.status_ind.is_(True),
                 UserRoles.end_date.is_(None),
             )
-        ) or 0
+        )
 
-        pending_invites = await session.scalar(
+        pending_invites = await self.execute_scalar( session=session, stmt=
             select(func.count(UserInvitations.invitation_id)).where(
                 UserInvitations.chamber_id == chamber_id,
                 UserInvitations.status_code == RefmInvitationStatusConstants.PENDING,
             )
-        ) or 0
+        )
 
         # --- MoM Trend Calculation ---
         month_start = date(today.year, today.month, 1)
 
-        prev_total_users = await session.scalar(
+        prev_total_users = await self.execute_scalar( session=session, stmt=
             select(func.count(UserChamberLink.link_id)).where(
                 UserChamberLink.chamber_id == chamber_id,
                 UserChamberLink.status_ind.is_(True),
@@ -370,9 +362,9 @@ class DashboardRepository(BaseRepository[Cases]):
                     (UserChamberLink.left_date >= month_start)
                 ),
             )
-        ) or 0
+        )
 
-        prev_active_users = await session.scalar(
+        prev_active_users = await self.execute_scalar( session=session, stmt=
             select(func.count(UserChamberLink.link_id))
             .join(Users, UserChamberLink.user_id == Users.user_id)
             .where(
@@ -388,7 +380,7 @@ class DashboardRepository(BaseRepository[Cases]):
                     (UserChamberLink.left_date >= month_start)
                 ),
             )
-        ) or 0
+        )
 
         users_trend = round(((total_users - prev_total_users) / prev_total_users * 100), 1) if prev_total_users > 0 else 0
         active_trend = round( ((active_users - prev_active_users) / prev_active_users * 100), 1 ) if prev_active_users > 0 else 0
@@ -409,7 +401,7 @@ class DashboardRepository(BaseRepository[Cases]):
     async def get_pending_invitations(
         self, session: AsyncSession, chamber_id: str, limit: int = 10
     ) -> list:
-        rows = await session.execute(
+        rows = await self.execute( session=session, stmt=
             select(
                 UserInvitations.invitation_id,
                 UserInvitations.email,
@@ -431,7 +423,7 @@ class DashboardRepository(BaseRepository[Cases]):
     async def get_recent_activity(
         self, session: AsyncSession, chamber_id: str, limit: int = 10
     ) -> list:
-        rows = await session.execute(
+        rows = await self.execute( session=session, stmt=
             select(
                 ActivityLog.id.label("activity_id"),
                 ActivityLog.action,
@@ -446,8 +438,6 @@ class DashboardRepository(BaseRepository[Cases]):
             .limit(limit)
         )
         return [dict(row._mapping) for row in rows.all()]
-    
-    from sqlalchemy import select, func, exists, and_
 
     async def get_case_count(
         self,
@@ -474,7 +464,8 @@ class DashboardRepository(BaseRepository[Cases]):
                 )
             )
 
-        return (await session.scalar(stmt)) or 0
+        case_count = await self.execute_scalar( session=session, stmt=stmt, default=0)
+        return case_count
     
     async def get_client_count(self, 
                                session: AsyncSession, 
@@ -489,4 +480,4 @@ class DashboardRepository(BaseRepository[Cases]):
         if not is_admin:
             stmt = stmt.where(Clients.created_by == user_id)
 
-        return (await session.scalar(stmt)) or 0
+        return (await self.execute_scalar( session=session, stmt=stmt))

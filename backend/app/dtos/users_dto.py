@@ -38,11 +38,14 @@ class UserOut(BaseRecordData):
     full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    image_id: str
+    image_data: str
     email: EmailStr
     phone: Optional[str] = None
     role: Optional[RoleOut] = None
-    active_ind: bool = True
-    image: Optional[str] = None
+    active_ind: bool = True    
+    image_id: str
+    image_data: str
     created_date: Optional[datetime] = None
     chamber_name: Optional[str] = None
     profile: Optional[UserProfileOut] = None

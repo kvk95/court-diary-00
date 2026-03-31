@@ -1,11 +1,12 @@
 """clients_dto.py — DTOs for Clients module"""
 
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import field_validator
 
 from app.dtos.base.base_data import BaseInData, BaseRecordData
+from app.dtos.cases_dto import CaseListOut
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -15,7 +16,8 @@ from app.dtos.base.base_data import BaseInData, BaseRecordData
 class ClientSearchOut(BaseRecordData):
     """Slim DTO for Link Client modal search results."""
     client_id: str
-    client_type: str
+    client_type_code: str
+    client_type_description: str
     client_name: str
     contact_person: Optional[str] = None
     display_name: Optional[str] = None
@@ -30,6 +32,8 @@ class ClientSearchOut(BaseRecordData):
     country_code: Optional[str] = None
     id_proof_type: Optional[str] = None
     id_proof_number: Optional[str] = None
+    image_id: Optional[str] = None
+    image_data: Optional[str] = None
     source_code: Optional[str] = None
     referral_source: Optional[str] = None
     client_since: Optional[date] = None
@@ -40,15 +44,22 @@ class ClientSearchOut(BaseRecordData):
 
 
 class ClientListOut(ClientSearchOut):
-    linked_cases: int = 0
+    linked_cases_count: int = 0
     created_date: Optional[datetime] = None
 
 
 class ClientDetailOut(ClientListOut):
     chamber_id: str
     city: Optional[str] = None
-    state_code: Optional[str] = None
-    linked_cases: int = 0
+    state_code: Optional[str] = None    
+    linked_cases: List[CaseListOut] = []
+
+class ClientSummaryStats(BaseRecordData):
+    total: int
+    active: int
+    individual: int
+    corporate: int
+    case_associations: int
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -56,7 +67,7 @@ class ClientDetailOut(ClientListOut):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ClientCreate(BaseInData):
-    client_type: str
+    client_type_code: str
     client_name: str
     display_name: Optional[str] = None
     contact_person: Optional[str] = None
@@ -82,13 +93,6 @@ class ClientCreate(BaseInData):
         if not v or not v.strip():
             raise ValueError("Client name is required")
         return v.strip()
-
-    @field_validator("client_type")
-    @classmethod
-    def client_type_valid(cls, v: str) -> str:
-        if v not in ("I", "O"):
-            raise ValueError("client_type must be 'I' (Individual) or 'O' (Organization)")
-        return v
 
 
 class ClientEdit(BaseInData):

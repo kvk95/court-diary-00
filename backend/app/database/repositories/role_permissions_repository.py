@@ -217,7 +217,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         )
 
         self._log_stmt(stmt, session)
-        result = await session.execute(stmt)
+        result = await self.execute( session=session, stmt=stmt)
         perm = result.scalars().first()
 
         if not perm:
@@ -289,7 +289,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             .order_by(ChamberRoles.role_name)
         )
 
-        result = await session.execute(stmt)
+        result = await self.execute( session=session, stmt=stmt)
         rows = result.all()
 
         return [
@@ -354,7 +354,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
         )
 
-        result = await session.execute(stmt)
+        result = await self.execute( session=session, stmt=stmt)
         rows = result.all()
 
         return [

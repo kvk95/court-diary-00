@@ -34,25 +34,32 @@ class HearingsRepository(BaseRepository[Hearings]):
                 Hearings.chamber_id == chamber_id,
                 Hearings.deleted_ind.is_(False),
             )
+        
+        stmt = _base()
+        total = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
-        total = await session.scalar(_base()) or 0
-        upcoming = await session.scalar(_base().where(Hearings.status_code.in_(["UP", "SC"]))) or 0
-        completed = await session.scalar(_base().where(Hearings.status_code == "CMP")) or 0
-        adjourned = await session.scalar(_base().where(Hearings.status_code == "ADJ")) or 0
-        this_week = await session.scalar(
-            _base().where(
+        stmt = stmt.where(Hearings.status_code.in_(["UP", "SC"]))
+        upcoming = await self.execute_scalar(session=session, stmt=stmt, default=0)
+
+        stmt = stmt.where(Hearings.status_code == "CMP")
+        completed = await self.execute_scalar(session=session, stmt=stmt, default=0)
+
+        stmt = stmt.where(Hearings.status_code == "ADJ")
+        adjourned = await self.execute_scalar(session=session, stmt=stmt, default=0)
+
+        stmt =  stmt.where(
                 Hearings.status_code.in_(["UP", "SC"]),
                 Hearings.hearing_date >= today,
                 Hearings.hearing_date <= week_end,
             )
-        ) or 0
-        this_month = await session.scalar(
-            _base().where(
+        this_week = await self.execute_scalar(session=session, stmt=stmt, default=0)
+
+        stmt =  stmt.where(
                 Hearings.status_code.in_(["UP", "SC"]),
                 Hearings.hearing_date >= today,
                 Hearings.hearing_date <= month_end,
             )
-        ) or 0
+        this_month = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
         return {
             "total": total,
@@ -79,9 +86,9 @@ class HearingsRepository(BaseRepository[Hearings]):
         ]
         if status_code:
             conditions.append(Hearings.status_code == status_code)
-        return await session.scalar(
+        return await self.execute_scalar( session=session, stmt=
             select(func.count(Hearings.hearing_id)).where(*conditions)
-        ) or 0
+        )
 
     async def get_calendar_events(
         self,
@@ -94,7 +101,7 @@ class HearingsRepository(BaseRepository[Hearings]):
         All hearings in a date range with case + status info.
         Returns list of row objects with named attributes.
         """
-        result = await session.execute(
+        result = await self.execute( session=session, stmt=
             select(
                 Hearings.hearing_id,
                 Hearings.case_id,
@@ -127,7 +134,7 @@ class HearingsRepository(BaseRepository[Hearings]):
         limit: int = 20,
     ) -> list:
         """Upcoming (UP/SC status) hearings up to date_to for sidebar widget."""
-        result = await session.execute(
+        result = await self.execute( session=session, stmt=
             select(
                 Hearings.hearing_id,
                 Hearings.case_id,
@@ -154,7 +161,7 @@ class HearingsRepository(BaseRepository[Hearings]):
 
     async def get_status_map(self, session: AsyncSession) -> Tuple[dict, dict]:
         """Returns (description_map, color_map) keyed by status_code."""
-        rows = await session.execute(
+        rows = await self.execute( session=session, stmt=
             select(
                 RefmHearingStatus.code,
                 RefmHearingStatus.description,
@@ -171,7 +178,7 @@ class HearingsRepository(BaseRepository[Hearings]):
     async def get_court_map(self, session: AsyncSession, court_ids: list) -> dict:
         if not court_ids:
             return {}
-        rows = await session.execute(
+        rows = await self.execute( session=session, stmt=
             select(RefmCourts.court_id, RefmCourts.court_name)
             .where(RefmCourts.court_id.in_(court_ids))
         )

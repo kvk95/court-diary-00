@@ -22,20 +22,15 @@ async def get_current_user(
     Returns authenticated user, caches in request context to avoid repeated DB hits.
     Returns None if no valid token.
     """
-    ctx = get_request_context()
-
-    # If already resolved and cached → return it
-    if "current_user" in ctx:
-        return cast(CurrentUserContext, ctx["current_user"])
 
     # No token → anonymous
     if not token:
-        return None
+        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 0")
 
     payload = decode_token(token)
     
     if not payload or payload.get("type") != "access":
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload q")
+        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 1")
 
     user_id = payload.get("sub")
     chamber_id = payload.get("chamber_id") 
@@ -46,7 +41,13 @@ async def get_current_user(
     try:
         user_id_val = user_id
     except ValueError:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 3")
+        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 3")    
+    
+    ctx = get_request_context()
+
+    # If already resolved and cached → return it
+    if "current_user" in ctx:
+        return cast(CurrentUserContext, ctx["current_user"])
 
     # Fetch user from DB
     user = await UsersRepository().get_by_id(

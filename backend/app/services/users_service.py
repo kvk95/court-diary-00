@@ -12,6 +12,7 @@ from app.database.models.refm_user_deletion_status import RefmUserDeletionStatus
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.users import Users
 from app.database.repositories.delete_account_requests_repository import DeleteAccountRequestsRepository
+from app.database.repositories.profile_images_repository import ProfileImagesRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
@@ -52,6 +53,7 @@ class UsersService(BaseSecuredService):
         user_roles_repo: Optional[UserRolesRepository] = None,
         delete_account_repo: Optional[DeleteAccountRequestsRepository] = None,
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
+        profile_images_repo: Optional[ProfileImagesRepository] = None,
     ):
         super().__init__(session)
         self.security_roles_repo = security_roles_repo or SecurityRolesRepository()
@@ -60,6 +62,7 @@ class UsersService(BaseSecuredService):
         self.user_roles_repo = user_roles_repo or UserRolesRepository()
         self.delete_account_repo = delete_account_repo or DeleteAccountRequestsRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
+        self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
 
     async def get_user_stats(self) -> UserStatsOut:
         """
@@ -101,15 +104,22 @@ class UsersService(BaseSecuredService):
             current_user_id=self.user_id,
         )
 
-    async def _unlink_user_from_all_chambers(self, user_id: str) -> None:
-        """
-        Unlink user from all chambers.
-        ✅ FIXED: Now delegates to repository method (no query logic in service).
-        """
-        await self.user_chamber_link_repo.unlink_user_from_all_chambers(
-            session=self.session,
-            user_id=user_id,
-            current_user_id=self.user_id,
+    async def unlink_user_from_all_chambers(
+        self,
+        session: AsyncSession,
+        user_id: str,
+    ) -> None:
+        await self.user_chamber_link_repo.bulk_update(
+            session=session,
+            where=[
+                UserChamberLink.user_id == user_id,
+                UserChamberLink.left_date.is_(None),
+                UserChamberLink.status_ind.is_(True),
+            ],
+            data={
+                "left_date": date.today(),
+                "status_ind": False,
+            },
         )
 
     async def _check_user_chamber_membership(self, email: str) -> dict:
@@ -146,7 +156,6 @@ class UsersService(BaseSecuredService):
         await self.users_repo.reactivate_deleted_user(
             session=self.session,
             user_id=user_id,
-            current_user_id=self.user_id,
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -229,7 +238,8 @@ class UsersService(BaseSecuredService):
             phone=user_data["phone"],
             role=role,
             active_ind=user_data["status_ind"],
-            image="/assets/images/avatar/none.png",
+            image_id=user_data["image_id"],
+            image_data=user_data["image_data"],
             created_date=user_data["created_date"],
             chamber_name=user_data.get("chamber", {}).get("chamber_name"),
             profile=profile,
@@ -292,16 +302,11 @@ class UsersService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_add(self, payload: UserCreate) -> UserOut:
-        """
-        Create new user or reactivate existing deleted user.
-        ✅ FIXED: Reactivate existing link instead of creating duplicate.
-        """
         errors = []
 
-        # ─────────────────────────────────────────────────────────────────────
+        # ─────────────────────────────────────────────
         # 1. VALIDATION
-        # ─────────────────────────────────────────────────────────────────────
-
+        # ─────────────────────────────────────────────
         if err := FieldValidator.validate_email(payload.email):
             errors.append(err)
 
@@ -320,28 +325,25 @@ class UsersService(BaseSecuredService):
             if not role:
                 errors.append(
                     ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR, message="Role not found"
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message="Role not found",
                     )
                 )
 
         if errors:
             aggregate_errors(errors=errors)
 
-        # ─────────────────────────────────────────────────────────────────────
-        # 2. CHECK USER MEMBERSHIP STATUS
-        # ─────────────────────────────────────────────────────────────────────
-
+        # ─────────────────────────────────────────────
+        # 2. CHECK USER
+        # ─────────────────────────────────────────────
         membership = await self._check_user_chamber_membership(payload.email)
 
-        # ─────────────────────────────────────────────────────────────────────
-        # 3. HANDLE SCENARIOS
-        # ─────────────────────────────────────────────────────────────────────
+        # ─────────────────────────────────────────────
+        # 3. CREATE OR REACTIVATE USER
+        # ─────────────────────────────────────────────
 
         if not membership["exists"]:
-            # ─────────────────────────────────────────────────────────────────
-            # SCENARIO 1: New User - Create and Link
-            # ─────────────────────────────────────────────────────────────────
-            
+            # New user
             user = await self.users_repo.create(
                 session=self.session,
                 data={
@@ -353,86 +355,38 @@ class UsersService(BaseSecuredService):
                 },
             )
 
-            link = await self.user_chamber_link_repo.create_chamber_link(
-                session=self.session,
-                user_id=user.user_id,
-                chamber_id=self.chamber_id,
-                primary_ind=True,
-                created_by=self.user_id,
-            )
-
-            if payload.role_id and link:
-                await self._set_user_role(link.link_id, payload.role_id)
-
-        elif membership["deleted_ind"]:
-            # ─────────────────────────────────────────────────────────────────
-            # SCENARIO 2 & 3: Deleted User - Reactivate and Link
-            # ─────────────────────────────────────────────────────────────────
-            
-            user = membership["user"]
-            
-            # ✅ If user has active links to OTHER chambers, check first
-            if membership["active_chambers_count"] > 0:
-                other_chamber_links = [
-                    link for link in membership["active_links"]
-                    if link.chamber_id != self.chamber_id
-                ]
-                if other_chamber_links:
-                    raise ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message=f"User already belongs to another chamber. "
-                            f"Please remove them from their current chamber first.",
-                    )
-            
-            # ✅ Undelete user
-            await self._reactivate_user(user.user_id)
-            
-            # ✅ FIXED: Check for EXISTING link (including ones with left_date set)
-            existing_link = await self.user_chamber_link_repo.get_link_for_user_chamber(
-                session=self.session,
-                user_id=user.user_id,
-                chamber_id=self.chamber_id,
-            )
-            
-            if existing_link:
-                # ✅ REACTIVATE existing link (don't create new one)
-                await self.user_chamber_link_repo.reactivate_chamber_link(
-                    session=self.session,
-                    link_id=existing_link.link_id,
-                    current_user_id=self.user_id,
-                )
-                
-                # Assign role if provided
-                if payload.role_id:
-                    await self._set_user_role(existing_link.link_id, payload.role_id)
-            else:
-                # ✅ No existing link - create new one
-                link = await self.user_chamber_link_repo.create_chamber_link(
-                    session=self.session,
-                    user_id=user.user_id,
-                    chamber_id=self.chamber_id,
-                    primary_ind=True,
-                    created_by=self.user_id,
-                )
-
-                if payload.role_id and link:
-                    await self._set_user_role(link.link_id, payload.role_id)
-
         else:
-            # ─────────────────────────────────────────────────────────────────
-            # SCENARIO 4: Active User in Another Chamber - Raise Error
-            # ─────────────────────────────────────────────────────────────────
-            
-            raise ValidationErrorDetail(
-                code=ErrorCodes.VALIDATION_ERROR,
-                message=f"User already belongs to another chamber. "
-                    f"Please remove them from their current chamber first.",
-            )
+            user = membership["user"]
 
-        # ─────────────────────────────────────────────────────────────────────
-        # 4. RETURN FULL USER DETAILS
-        # ─────────────────────────────────────────────────────────────────────
+            # Reactivate if deleted
+            if membership["deleted_ind"]:
+                await self._reactivate_user(user.user_id)
 
+        # ─────────────────────────────────────────────
+        # 4. UPSERT CHAMBER LINK (CORE CHANGE)
+        # ─────────────────────────────────────────────
+        link = await self.user_chamber_link_repo.upsert(
+            session=self.session,
+            filters={
+                UserChamberLink.user_id: user.user_id,
+                UserChamberLink.chamber_id: self.chamber_id,
+            },
+            data={
+                "left_date": None,
+                "status_ind": True,
+                "primary_ind": True,  # optional
+            },
+        )
+
+        # ─────────────────────────────────────────────
+        # 5. ROLE ASSIGNMENT
+        # ─────────────────────────────────────────────
+        if payload.role_id and link:
+            await self._set_user_role(link.link_id, payload.role_id)
+
+        # ─────────────────────────────────────────────
+        # 6. RETURN
+        # ─────────────────────────────────────────────
         return await self.get_user_full_details(user_id=user.user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -440,36 +394,39 @@ class UsersService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_edit(self, user_id: str, payload: UserEdit) -> UserOut:
-        """Edit user details."""
+        # ─────────────────────────────────────────────
+        # 1. GET LINK (SCOPED TO CHAMBER)
+        # ─────────────────────────────────────────────
         link = await self.user_chamber_link_repo.get_first(
             session=self.session,
-            filters={self.user_chamber_link_repo.model.user_id: user_id},
+            filters={
+                UserChamberLink.user_id: user_id,
+                UserChamberLink.chamber_id: self.chamber_id,
+                UserChamberLink.left_date: None,
+            },
         )
-        
+
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
                 message=f"User {user_id} not found in this chamber",
             )
 
+        # ─────────────────────────────────────────────
+        # 2. UPDATE USER (GLOBAL DATA)
+        # ─────────────────────────────────────────────
         update_data: dict = {}
+
         if payload.first_name is not None:
             update_data["first_name"] = payload.first_name.strip()
+
         if payload.last_name is not None:
             update_data["last_name"] = payload.last_name.strip() or None
+
         if payload.phone is not None:
             if payload.phone and (err := FieldValidator.validate_phone(payload.phone)):
                 raise err
             update_data["phone"] = payload.phone
-        
-        if payload.status_ind is not None:            
-            await self.user_chamber_link_repo.update(
-                session=self.session,
-                id_values=link.link_id,
-                data={"status_ind": payload.status_ind},
-            )
-            
-            
 
         if update_data:
             await self.users_repo.update(
@@ -478,16 +435,35 @@ class UsersService(BaseSecuredService):
                 data=update_data,
             )
 
+        # ─────────────────────────────────────────────
+        # 3. UPDATE CHAMBER LINK (STATUS)
+        # ─────────────────────────────────────────────
+        if payload.status_ind is not None and link.status_ind != payload.status_ind:
+            await self.user_chamber_link_repo.update(
+                session=self.session,
+                id_values=link.link_id,
+                data={"status_ind": payload.status_ind},
+            )
+
+        # ─────────────────────────────────────────────
+        # 4. ROLE UPDATE
+        # ─────────────────────────────────────────────
         if payload.role_id is not None:
             role = await self.security_roles_repo.get_by_id(
-                session=self.session, id_values=payload.role_id
+                session=self.session,
+                id_values=payload.role_id,
             )
             if not role:
                 raise ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR, message="Role not found"
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message="Role not found",
                 )
+
             await self._set_user_role(link.link_id, payload.role_id)
 
+        # ─────────────────────────────────────────────
+        # 5. RETURN
+        # ─────────────────────────────────────────────
         return await self.get_user_full_details(user_id=user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -622,8 +598,7 @@ class UsersService(BaseSecuredService):
         # ✅ 1. Soft-delete user (use repository method)
         await self.users_repo.reactivate_deleted_user(
             session=self.session,
-            user_id=user.user_id,
-            current_user_id=self.user_id,
+            user_id=user.user_id
         )
 
         # ✅ 2. Unlink user from this chamber (use repository method)
@@ -631,7 +606,6 @@ class UsersService(BaseSecuredService):
             session=self.session,
             user_id=user.user_id,
             chamber_id=self.chamber_id,
-            current_user_id=self.user_id,
         )
 
         # ✅ 3. Mark deletion request as done

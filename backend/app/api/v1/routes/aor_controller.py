@@ -1,8 +1,8 @@
 """aor_controller.py — HTTP routes for Case AOR (Advocate on Record) module"""
 
-from typing import List
+from typing import List, Optional
 
-from fastapi import Body, Depends, Path
+from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
 from app.dependencies import get_aor_service
@@ -27,6 +27,18 @@ class AorController(BaseController):
         service: AorService = Depends(get_aor_service),
     ) -> BaseOutDto[List[AorOut]]:
         return self.success(result=await service.aors_get_by_case(case_id=case_id))
+    
+    @BaseController.get(
+        "/chamber/",
+        summary="Get all AORs (advocates on record) for a case",
+        response_model=BaseOutDto[List[AorOut]],
+    )
+    async def aors_get_by_chamber(
+        self,
+        search: Optional[str] = Query(None, description="Search by "),
+        service: AorService = Depends(get_aor_service),
+    ) -> BaseOutDto[List[AorOut]]:
+        return self.success(result=await service.aors_get_by_chamber(search=search))
 
     # ── Add AOR ───────────────────────────────────────────────────────────
 

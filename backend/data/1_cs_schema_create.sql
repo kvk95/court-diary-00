@@ -99,6 +99,22 @@ CREATE TABLE refm_case_types (
     status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Case types';
 
+DROP TABLE IF EXISTS refm_client_type;
+CREATE TABLE refm_client_type (
+    code        CHAR(4)     PRIMARY KEY,
+    description VARCHAR(60) NOT NULL,
+    sort_order  INT         NOT NULL,
+    status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client type master';
+DROP TABLE IF EXISTS refm_engagement_type;
+
+CREATE TABLE refm_engagement_type (
+    code        CHAR(4)     PRIMARY KEY,
+    description VARCHAR(60) NOT NULL,
+    sort_order  INT         NOT NULL,
+    status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Engagement type master';
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.4  Email & Communication
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -140,6 +156,14 @@ CREATE TABLE refm_comm_status (
     sort_order    INT         NOT NULL,
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Communication status codes';
+
+DROP TABLE IF EXISTS refm_entity_type;
+CREATE TABLE refm_entity_type (
+    code        CHAR(4)     PRIMARY KEY,
+    description VARCHAR(60) NOT NULL,
+    sort_order  INT         NOT NULL,
+    status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Entity type master for images';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.5  User & Auth Statuses
@@ -701,7 +725,7 @@ DROP TABLE IF EXISTS clients;
 CREATE TABLE clients (
     client_id       CHAR(36)     PRIMARY KEY,  
     chamber_id      CHAR(36)     NOT NULL,  
-    client_type     CHAR(1)      NOT NULL,
+    client_type_code  CHAR(4)      NOT NULL,   -- FK to refm_client_type
     client_name     VARCHAR(200) NOT NULL,
     display_name    VARCHAR(200) NULL,
     contact_person  VARCHAR(150) NULL,
@@ -721,7 +745,7 @@ CREATE TABLE clients (
     client_since    DATE         NULL,
     notes           TEXT         NULL,
     status_ind      BOOLEAN      NOT NULL DEFAULT TRUE,
-    deleted_ind      BOOLEAN      DEFAULT FALSE,
+    deleted_ind     BOOLEAN      DEFAULT FALSE,
     deleted_date    TIMESTAMP    NULL,
     deleted_by      CHAR(36)     NULL,  
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -730,6 +754,8 @@ CREATE TABLE clients (
     updated_by      CHAR(36)     NULL,  
     CONSTRAINT fk_clients_chamber
         FOREIGN KEY (chamber_id)  REFERENCES chamber(chamber_id)     ON DELETE CASCADE,
+    CONSTRAINT fk_clients_type
+        FOREIGN KEY (client_type_code) REFERENCES refm_client_type(code)  ON DELETE RESTRICT,
     CONSTRAINT fk_clients_state
         FOREIGN KEY (state_code)  REFERENCES refm_states(code)       ON DELETE SET NULL,
     CONSTRAINT fk_clients_country
@@ -757,8 +783,8 @@ CREATE TABLE case_clients (
     case_id         CHAR(36)     NOT NULL,  
     client_id       CHAR(36)     NOT NULL,  
     party_role      CHAR(3)      NOT NULL,
-    primary_ind      BOOLEAN      DEFAULT FALSE,
-    engagement_type VARCHAR(20)  NULL,
+    primary_ind     BOOLEAN      DEFAULT FALSE,
+    engagement_type_code CHAR(4)      NULL,
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by      CHAR(36)     NULL,  
     updated_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -771,6 +797,8 @@ CREATE TABLE case_clients (
         FOREIGN KEY (case_id)    REFERENCES cases(case_id)        ON DELETE CASCADE,
     CONSTRAINT fk_case_clients_client
         FOREIGN KEY (client_id)  REFERENCES clients(client_id)    ON DELETE CASCADE,
+    CONSTRAINT fk_case_clients_engagement
+        FOREIGN KEY (engagement_type_code) REFERENCES refm_engagement_type(code) ON DELETE RESTRICT,
     CONSTRAINT fk_case_clients_created_by
         FOREIGN KEY (created_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     CONSTRAINT fk_case_clients_updated_by
@@ -937,48 +965,35 @@ CREATE TABLE client_communications (
     INDEX idx_comm_status (status_code)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client communications';
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 8.7  Client Aliases  →  clients, users
--- ─────────────────────────────────────────────────────────────────────────────
 
-DROP TABLE IF EXISTS client_aliases;
-CREATE TABLE client_aliases (
-    alias_id     CHAR(36)     PRIMARY KEY,  
-    client_id    CHAR(36)     NOT NULL,  
-    alias_name   VARCHAR(200) NOT NULL,
-    alias_type   VARCHAR(50)  NULL,
-    created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by   CHAR(36)     NULL,  
-    CONSTRAINT fk_aliases_client
-        FOREIGN KEY (client_id)  REFERENCES clients(client_id) ON DELETE CASCADE,
-    CONSTRAINT fk_aliases_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id)     ON DELETE SET NULL,
-    INDEX idx_aliases_name (alias_name)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client alternate names';
+DROP TABLE IF EXISTS profile_images;
+CREATE TABLE profile_images (
+    image_id      CHAR(36)     PRIMARY KEY,
+    user_id       CHAR(36)     NULL,       -- FK to users
+    client_id     CHAR(36)     NULL,       -- FK to clients
+    image_data    LONGTEXT     NOT NULL,   -- base64 string
+    description   VARCHAR(255) NULL,
+    deleted_ind   BOOLEAN      DEFAULT FALSE,
+    deleted_date  TIMESTAMP    NULL,
+    deleted_by    CHAR(36)     NULL,
+    created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    created_by    CHAR(36)     NULL,
+    updated_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by    CHAR(36)     NULL,
+    CONSTRAINT fk_profile_images_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_profile_images_client
+        FOREIGN KEY (client_id) REFERENCES clients(client_id) ON DELETE CASCADE,
+    CONSTRAINT fk_profile_images_created_by
+        FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_profile_images_updated_by
+        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_profile_images_deleted_by
+        FOREIGN KEY (deleted_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    INDEX idx_profile_images_user (user_id),
+    INDEX idx_profile_images_client (client_id)
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Profile images for users and clients';
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 8.8  Client Relationships  →  clients, users
--- ─────────────────────────────────────────────────────────────────────────────
-
-DROP TABLE IF EXISTS client_relationships;
-CREATE TABLE client_relationships (
-    relationship_id   CHAR(36)     PRIMARY KEY,  
-    client_id_from    CHAR(36)     NOT NULL,  
-    client_id_to      CHAR(36)     NOT NULL,  
-    relationship_type VARCHAR(50)  NOT NULL,
-    active_ind         BOOLEAN      DEFAULT TRUE,
-    notes             TEXT         NULL,
-    created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        CHAR(36)     NULL,  
-    CONSTRAINT fk_rel_client_from
-        FOREIGN KEY (client_id_from) REFERENCES clients(client_id) ON DELETE CASCADE,
-    CONSTRAINT fk_rel_client_to
-        FOREIGN KEY (client_id_to)   REFERENCES clients(client_id) ON DELETE CASCADE,
-    CONSTRAINT fk_rel_created_by
-        FOREIGN KEY (created_by)     REFERENCES users(user_id)     ON DELETE SET NULL,
-    INDEX idx_rel_from (client_id_from),
-    INDEX idx_rel_to (client_id_to)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client relationships';
 
 -- =============================================================================
 -- 9. TIER 7 — Configuration & Utility

@@ -1,6 +1,6 @@
 """case_clients"""
 
-from sqlalchemy import ForeignKey, Boolean, CHAR, String
+from sqlalchemy import ForeignKey, Boolean, CHAR
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -30,8 +30,8 @@ class CaseClients(BaseModel, TimestampMixin):
     # primary_ind : TINYINT
     primary_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
-    # engagement_type : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
-    engagement_type: Mapped[Optional[str]] = mapped_column(String(20))
+    # engagement_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    engagement_type_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_engagement_type.code", ondelete="RESTRICT"))
 
     # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
@@ -61,6 +61,13 @@ class CaseClients(BaseModel, TimestampMixin):
         "Clients",
         foreign_keys=[client_id], 
         backref=backref("case_clients_client_id_clientss", cascade="all, delete-orphan")
+    )
+
+    # case_clients.engagement_type_code -> refm_engagement_type.code
+    case_clients_engagement_type_code_refm_engagement_type = relationship(
+        "RefmEngagementType",
+        foreign_keys=[engagement_type_code], 
+        backref=backref("case_clients_engagement_type_code_refm_engagement_types", cascade="all, delete-orphan")
     )
 
     # case_clients.created_by -> users.user_id

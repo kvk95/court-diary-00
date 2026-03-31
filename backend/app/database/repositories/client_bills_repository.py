@@ -29,7 +29,9 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
         pending_code: str,
     ) -> dict:
         """Aggregate stats for billing stat cards and reports."""
-        row = (await session.execute(
+        row = (await self.execute(
+            session=session,
+            stmt=
             select(
                 func.count(ClientBills.bill_id).label("cnt"),
                 func.coalesce(func.sum(ClientBills.total_amount), 0).label("total"),
@@ -37,7 +39,9 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
             ).where(ClientBills.chamber_id == chamber_id)
         )).first()
 
-        overdue_row = (await session.execute(
+        overdue_row = (await self.execute(
+            session=session,
+            stmt=
             select(
                 func.count(ClientBills.bill_id).label("cnt"),
                 func.coalesce(
@@ -50,19 +54,24 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
             )
         )).first()
 
-        paid_count = await session.scalar(
+        paid_count = await self.execute_scalar(
+            session=session,
+            stmt=
             select(func.count(ClientBills.bill_id)).where(
                 ClientBills.chamber_id == chamber_id,
                 ClientBills.status_code == paid_code,
-            )
-        ) or 0
+            ),
+            default=0
+        ) 
 
-        pending_count = await session.scalar(
+        pending_count = await self.execute_scalar(
+            session=session,
+            stmt=
             select(func.count(ClientBills.bill_id)).where(
                 ClientBills.chamber_id == chamber_id,
                 ClientBills.status_code == pending_code,
             )
-        ) or 0
+        )
 
         return {
             "total": float(row.total) if row and row.total is not None else 0.0,
@@ -109,27 +118,27 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
 
         client_map: dict = {}
         if client_ids:
-            rows = await session.execute(
+            rows = (await self.execute( session=session, stmt=
                 select(Clients.client_id, Clients.client_name)
                 .where(Clients.client_id.in_(client_ids))
-            )
+            )).all()
             client_map = {r.client_id: r.client_name for r in rows}
 
         case_map: dict = {}
         if case_ids:
-            rows = await session.execute(
+            rows = (await self.execute( session=session, stmt=
                 select(Cases.case_id, Cases.case_number)
                 .where(Cases.case_id.in_(case_ids))
-            )
+            )).all()
             case_map = {r.case_id: r.case_number for r in rows}
 
         status_map: dict = {}
         color_map: dict = {}
         if s_codes:
-            rows = await session.execute(
+            rows = (await self.execute( session=session, stmt=
                 select(RefmBillingStatus.code, RefmBillingStatus.description, RefmBillingStatus.color_code)
                 .where(RefmBillingStatus.code.in_(s_codes))
-            )
+            )).all()
             for r in rows:
                 status_map[r.code] = r.description
                 color_map[r.code] = r.color_code
@@ -176,10 +185,10 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
     async def count_payments(self, session: AsyncSession, bill_id: str) -> int:
         """Count payments on a bill — used by delete-bill guard."""
         from app.database.models.client_payments import ClientPayments
-        return await session.scalar(
+        return await self.execute_scalar( session=session, stmt=
             select(func.count(ClientPayments.payment_id))
             .where(ClientPayments.bill_id == bill_id)
-        ) or 0
+        )
 
     async def get_billing_by_month(
         self,
@@ -189,7 +198,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
         month_end: date,
     ) -> dict:
         """Sum of billed and paid for a specific month."""
-        row = (await session.execute(
+        row = (await self.execute( session=session, stmt=
             select(
                 func.coalesce(func.sum(ClientBills.total_amount), 0).label("billed"),
                 func.coalesce(func.sum(ClientBills.paid_amount), 0).label("paid"),
@@ -211,7 +220,7 @@ class ClientBillsRepository(BaseRepository[ClientBills]):
         limit: int = 10,
     ) -> list:
         """Top clients by total billed amount."""
-        result = await session.execute(
+        result = await self.execute( session=session, stmt=
             select(
                 ClientBills.client_id,
                 Clients.client_name,

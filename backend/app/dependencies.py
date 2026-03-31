@@ -18,6 +18,8 @@ from app.services.reports_service import ReportsService
 from app.services.role_permissions_service import RolePermissionsService
 from app.services.roles_service import RolesService
 from app.services.users_service import UsersService
+from app.services.dashboard_service import DashboardService
+from app.services.aor_service import AorService
 
 
 def get_anonymous_service(session: AsyncSession = Depends(get_session)) -> AnonymousService:
@@ -26,7 +28,8 @@ def get_anonymous_service(session: AsyncSession = Depends(get_session)) -> Anony
 def get_auth_service(session: AsyncSession = Depends(get_session)) -> AuthService:
     return AuthService(session)
 
-def get_cases_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> CasesService:
+def get_cases_service(session: AsyncSession = Depends(get_session), 
+                      _=Depends(get_current_user)) -> CasesService:
     return CasesService(session=session)
 
 async def get_clients_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> ClientsService:
@@ -56,12 +59,8 @@ async def get_role_permissions_service(session: AsyncSession = Depends(get_sessi
 async def get_users_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> UsersService:
     return UsersService(session=session)
 
-from app.services.aor_service import AorService
-
 async def get_aor_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> AorService:
     return AorService(session=session)
-
-from app.services.dashboard_service import DashboardService
 
 async def get_dashboard_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> DashboardService:
     return DashboardService(session=session)

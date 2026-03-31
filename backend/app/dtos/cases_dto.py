@@ -156,6 +156,7 @@ class CaseNoteOut(BaseRecordData):
     author_name: Optional[str] = None
     note_text: str
     private_ind: bool = False
+    created_date: datetime
 
 
 class CaseNoteCreate(BaseInData):
@@ -187,11 +188,13 @@ class CaseClientOut(BaseRecordData):
     case_client_id: str
     client_id: str
     client_name: str
-    client_type: str
+    client_type_code: str
+    client_type_description: str
     party_role: str
     party_role_description: Optional[str] = None
     primary_ind: bool = False
-    engagement_type: Optional[str] = None
+    engagement_type_code: Optional[str] = None
+    engagement_type_description: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
 
@@ -200,7 +203,7 @@ class CaseClientLinkPayload(BaseInData):
     client_id: str
     party_role: str
     primary_ind: bool = False
-    engagement_type: Optional[str] = None
+    engagement_type_code: str
 
     @field_validator("party_role")
     @classmethod

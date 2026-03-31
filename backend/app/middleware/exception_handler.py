@@ -77,7 +77,8 @@ async def build_error_response(
     # Development diagnostics
     if settings.APP_ENV != "production" and exc is not None:
         dto.result = dto.result or {}
-        dto.result["trace"] = traceback.format_exc()
+        if status_code >= 500:
+            dto.result["trace"] = traceback.format_exc()
 
     # Log only server-side failures
     if exc is not None and status_code >= 500:
@@ -85,7 +86,7 @@ async def build_error_response(
             await exception_logger(exc, request=request)
         except Exception:
             pass
-
+        
     return JSONResponse(status_code=status_code, content=dto.model_dump())
 
 

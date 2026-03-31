@@ -16,9 +16,11 @@ class AorOut(BaseRecordData):
     case_aor_id: str
     case_id: str
     user_id: str
-    advocate_name: str           # first_name + last_name of the user
+    advocate_name: str    
+    image_id: Optional[str]
+    image_data: Optional[str]
     primary_ind: bool = False
-    status_code: str = "AC"
+    status_code: str 
     status_description: Optional[str] = None
     appointment_date: Optional[date] = None
     withdrawal_date: Optional[date] = None

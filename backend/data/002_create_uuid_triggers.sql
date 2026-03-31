@@ -233,28 +233,15 @@ BEGIN
 END$$
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Client Aliases
+-- PROFILE IMAGES
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TRIGGER trg_client_aliases_before_insert
-BEFORE INSERT ON client_aliases
+CREATE TRIGGER trg_profile_images_before_insert
+BEFORE INSERT ON profile_images
 FOR EACH ROW
 BEGIN
-    IF NEW.alias_id IS NULL OR NEW.alias_id = '' THEN
-        SET NEW.alias_id = generate_uuid_v7();
-    END IF;
-END$$
-
--- ─────────────────────────────────────────────────────────────────────────────
--- Client Relationships
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TRIGGER trg_client_relationships_before_insert
-BEFORE INSERT ON client_relationships
-FOR EACH ROW
-BEGIN
-    IF NEW.relationship_id IS NULL OR NEW.relationship_id = '' THEN
-        SET NEW.relationship_id = generate_uuid_v7();
+    IF NEW.image_id IS NULL OR NEW.image_id = '' THEN
+        SET NEW.image_id = generate_uuid_v7();
     END IF;
 END$$
 

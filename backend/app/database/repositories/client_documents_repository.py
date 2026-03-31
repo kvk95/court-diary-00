@@ -45,18 +45,18 @@ class ClientDocumentsRepository(BaseRepository[ClientDocuments]):
 
         client_map: dict = {}
         if client_ids:
-            rows = await session.execute(
+            rows = (await self.execute( session=session, stmt=
                 select(Clients.client_id, Clients.client_name)
                 .where(Clients.client_id.in_(client_ids))
-            )
+            )).all()
             client_map = {r.client_id: r.client_name for r in rows}
 
         case_map: dict = {}
         if case_ids:
-            rows = await session.execute(
+            rows = (await self.execute( session=session, stmt=
                 select(Cases.case_id, Cases.case_number)
                 .where(Cases.case_id.in_(case_ids))
-            )
+            )).all()
             case_map = {r.case_id: r.case_number for r in rows}
 
         return [

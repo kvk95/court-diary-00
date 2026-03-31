@@ -16,7 +16,7 @@ class ClientPaymentsRepository(BaseRepository[ClientPayments]):
 
     async def get_total_paid_for_bill(self, session: AsyncSession, bill_id: str) -> float:
         """Sum of all payments on a bill — used by recalculate logic."""
-        result = await session.scalar(
+        result = await self.execute_scalar( session=session, stmt=
             select(func.coalesce(func.sum(ClientPayments.amount), 0))
             .where(ClientPayments.bill_id == bill_id)
         )

@@ -1,11 +1,11 @@
 # app/database/repositories/users_repository.py
 
 from typing import List, Optional, Tuple, Dict, Any
-from datetime import datetime
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
+from app.database.models.profile_images import ProfileImages
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
@@ -70,6 +70,8 @@ class UsersRepository(BaseRepository[Users]):
                 # Chamber fields
                 Chamber.chamber_id,
                 Chamber.chamber_name,
+                ProfileImages.image_id,
+                ProfileImages.image_data,
             )
             .join(
                 UserChamberLink,
@@ -80,6 +82,7 @@ class UsersRepository(BaseRepository[Users]):
                 )
             )
             .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
+            .outerjoin(ProfileImages, Users.user_id == ProfileImages.user_id)
             .outerjoin(
                 UserRoles,
                 and_(
@@ -98,7 +101,7 @@ class UsersRepository(BaseRepository[Users]):
             stmt = stmt.where(Users.email == email)
 
         self._log_stmt(stmt, session)
-        result = await session.execute(stmt)
+        result = await self.execute( session=session, stmt=stmt)
         row = result.first()
 
         if not row:
@@ -120,6 +123,8 @@ class UsersRepository(BaseRepository[Users]):
             "phone": row.phone,
             "status_ind": row.status_ind,
             "created_date": row.created_date,
+            "image_id":row.image_id,
+            "image_data":row.image_data,
             "profile": {
                 "header_color": row.header_color,
                 "sidebar_color": row.sidebar_color,
@@ -177,8 +182,11 @@ class UsersRepository(BaseRepository[Users]):
                 UserProfiles.primary_color,
                 UserProfiles.font_family,
                 Chamber.chamber_name,
+                ProfileImages.image_id,
+                ProfileImages.image_data,
             )
             .join(UserChamberLink, Users.user_id == UserChamberLink.user_id)
+            .outerjoin(ProfileImages, Users.user_id == ProfileImages.user_id)
             .outerjoin(
                 UserRoles,
                 and_(
@@ -233,6 +241,8 @@ class UsersRepository(BaseRepository[Users]):
                 "phone": row.phone,
                 "status_ind": row.status_ind,
                 "created_date": row.created_date,
+                "image_id": row.image_id,
+                "image_data": row.image_data,
                 "role": {
                     "role_id": row.role_id,
                     "role_name": row.role_name,
@@ -323,60 +333,30 @@ class UsersRepository(BaseRepository[Users]):
             stmt = stmt.where(Users.user_id == user_id)
 
         self._log_stmt(stmt, session)
-        res = await session.execute(stmt)
+        res = await self.execute( session=session, stmt=stmt)
         row = res.first()
         if not row:
             return None
         return row.tuple()
-    
-    async def update_deleted_user(
-        self,
-        session: AsyncSession,
-        user_id: str,
-        data: Dict[str, Any],
-    ) -> None:
-        """
-        Update a soft-deleted user (bypasses soft-delete filtering).
-        Used for reactivation scenarios.
-        """
-        from sqlalchemy import update
-        
-        stmt = (
-            update(Users)
-            .where(Users.user_id == user_id)
-            .values(**data)
-        )
-        
-        await session.execute(stmt)
-        await session.flush()
 
     async def reactivate_deleted_user(
         self,
         session: AsyncSession,
         user_id: str,
-        current_user_id: str,
     ) -> None:
-        """
-        Undelete a user (bypasses soft-delete filtering in BaseRepository.update()).
-        Used for reactivating deleted users who are being re-added to a chamber.
-        """
-        from sqlalchemy import update
-        
-        stmt = (
-            update(Users)
-            .where(Users.user_id == user_id)
-            .values(
-                deleted_ind=False,
-                deleted_date=None,
-                deleted_by=None,
-                status_ind=True,
-                updated_by=current_user_id,
-                updated_date=datetime.now(),
-            )
+        await self.bulk_update(
+            session=session,
+            where=[
+                Users.user_id == user_id,
+                Users.deleted_ind.is_(True),
+            ],
+            data={
+                "deleted_ind": False,
+                "deleted_date": None,
+                "deleted_by": None,
+                "status_ind": True,
+            },
         )
-        
-        await session.execute(stmt)
-        await session.flush()
 
     async def get_user_stats(
         self,
@@ -391,7 +371,7 @@ class UsersRepository(BaseRepository[Users]):
         total_users_stmt = select(func.count(func.distinct(UserChamberLink.user_id))).where(
             UserChamberLink.chamber_id == chamber_id
         )
-        total_users_result = await session.execute(total_users_stmt)
+        total_users_result = await self.execute( session=session, stmt=total_users_stmt)
         total_users = total_users_result.scalar_one() or 0
 
         # 2. Active users in chamber (not left, status_ind=True)
@@ -402,7 +382,7 @@ class UsersRepository(BaseRepository[Users]):
                 UserChamberLink.status_ind.is_(True),
             )
         )
-        active_users_result = await session.execute(active_users_stmt)
+        active_users_result = await self.execute( session=session, stmt=active_users_stmt)
         active_users = active_users_result.scalar_one() or 0
 
         # 3. Total roles defined for chamber (via user_roles)
@@ -417,7 +397,7 @@ class UsersRepository(BaseRepository[Users]):
                 UserRoles.end_date.is_(None),
             )
         )
-        total_roles_result = await session.execute(total_roles_stmt)
+        total_roles_result = await self.execute( session=session, stmt=total_roles_stmt)
         total_roles = total_roles_result.scalar_one() or 0
 
         # 4. Pending invitations
@@ -427,7 +407,7 @@ class UsersRepository(BaseRepository[Users]):
                 UserInvitations.status_code == RefmInvitationStatusConstants.PENDING,
             )
         )
-        pending_invites_result = await session.execute(pending_invites_stmt)
+        pending_invites_result = await self.execute( session=session, stmt=pending_invites_stmt)
         pending_invites = pending_invites_result.scalar_one() or 0
 
         return {

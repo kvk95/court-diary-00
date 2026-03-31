@@ -157,6 +157,8 @@ class DashboardService(BaseSecuredService):
             for r in overdue_rows
         ]
 
+        print(f"*****************************{chamber_stats}")
+
         # =========================
         # BUILD RESPONSE
         # =========================

@@ -14,6 +14,7 @@ from app.dtos.clients_dto import (
     ClientEdit,
     ClientListOut,
     ClientSearchOut,
+    ClientSummaryStats,
 )
 from app.services.clients_service import ClientsService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
@@ -30,12 +31,15 @@ class ClientsController(BaseController):
         response_model=BaseOutDto[List[ClientSearchOut]],
     )
     async def clients_search(
-        self,
-        q: str = Query(..., min_length=1, description="Search query"),
+        self,        
+        search: Optional[str] = Query(
+            None,
+            description="Search by case number, petitioner, or respondent",
+        ),
         limit: int = Query(20, ge=1, le=100),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[List[ClientSearchOut]]:
-        return self.success(result=await service.clients_search(query=q, limit=limit))
+        return self.success(result=await service.clients_search(search=search, limit=limit))
 
     # ── List ──────────────────────────────────────────────────────────────
 
@@ -57,6 +61,16 @@ class ClientsController(BaseController):
         ))
 
     # ── Single ────────────────────────────────────────────────────────────
+    @BaseController.get(
+        "/stats",
+        summary="Client summary stats",
+        response_model=BaseOutDto[ClientSummaryStats],
+    )
+    async def clients_get_stats(
+        self,
+        service: ClientsService = Depends(get_clients_service),
+    ) -> BaseOutDto[ClientSummaryStats]:
+        return self.success(result=await service.clients_get_stats())
 
     @BaseController.get(
         "/{client_id}",

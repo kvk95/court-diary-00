@@ -3,7 +3,7 @@
 from datetime import date
 from typing import List, Optional, Any, Callable, Dict, Iterable, TypeVar
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.activity_log import ActivityLog
@@ -12,9 +12,11 @@ from app.database.models.case_notes import CaseNotes
 from app.database.models.cases import Cases
 from app.database.models.clients import Clients
 from app.database.models.hearings import Hearings
-from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
+from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
+from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_courts import RefmCourts
+from app.database.models.refm_engagement_type import RefmEngagementType
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.refm_party_roles import RefmPartyRoles
@@ -47,11 +49,6 @@ from app.dtos.cases_dto import (
 from app.services.base.secured_base_service import BaseSecuredService
 from app.utils.logging_framework.activity_logger import log_activity
 from app.validators import ErrorCodes, ValidationErrorDetail
-
-
-def _full_name(first: Optional[str], last: Optional[str]) -> Optional[str]:
-    parts = [p for p in [first, last] if p]
-    return " ".join(parts) if parts else None
 
 
 class CasesService(BaseSecuredService):
@@ -102,8 +99,7 @@ class CasesService(BaseSecuredService):
         if extra_filters:
             stmt = stmt.where(*extra_filters)
         stmt = stmt.group_by(field)
-        stmt = self.cases_repo.apply_case_visibility( stmt )
-        rows = (await self.session.execute(stmt)).all()        
+        rows = (await self.cases_repo.execute( session=self.session, stmt=stmt)).all()        
         return {r[0]: r[1] for r in rows}
 
     # ─────────────────────────────────────────────
@@ -124,7 +120,7 @@ class CasesService(BaseSecuredService):
                 lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
                 .where(Users.user_id.in_(ids)),
                 lambda r: r.user_id,
-                lambda r: _full_name(r.first_name, r.last_name),
+                lambda r: self.full_name(r.first_name, r.last_name),
             ),
             "case_type_map": await self._load_map(
                 (c.case_type_code for c in cases),
@@ -227,32 +223,8 @@ class CasesService(BaseSecuredService):
         # aggregation using conditional COUNT (CASE WHEN ... END).  One
         # round-trip instead of four.
         today = date.today()
-        cid = self.chamber_id
-        active_code = RefmCaseStatusConstants.ACTIVE
-        adjourned_code = RefmCaseStatusConstants.ADJOURNED
 
-        row = await self.session.execute(
-            select(
-                func.count(Cases.case_id).label("total"),
-                func.count(
-                    case((Cases.status_code == active_code, Cases.case_id), else_=None)
-                ).label("active"),
-                func.count(
-                    case((Cases.status_code == adjourned_code, Cases.case_id), else_=None)
-                ).label("adjourned"),
-                func.count(
-                    case(
-                        (
-                            (Cases.status_code == active_code)
-                            & (Cases.next_hearing_date < today),
-                            Cases.case_id,
-                        ),
-                        else_=None,
-                    )
-                ).label("overdue"),
-            ).where(Cases.chamber_id == cid, Cases.deleted_ind.is_(False))
-        )
-        r = row.one()
+        r = await self.cases_repo.get_case_summary(self.session,today)
         return CaseSummaryStats(
             total=r.total or 0,
             active=r.active or 0,
@@ -309,7 +281,7 @@ class CasesService(BaseSecuredService):
                 respondent=c.respondent,
 
                 aor_user_id=c.aor_user_id,
-                aor_name=_full_name(first_name, last_name),
+                aor_name=self.full_name(first_name, last_name),
             )
             for (
                 c,
@@ -368,7 +340,7 @@ class CasesService(BaseSecuredService):
                 petitioner=c.petitioner,
                 respondent=c.respondent,
                 aor_user_id=c.aor_user_id,
-                aor_name=_full_name(first_name, last_name),
+                aor_name=self.full_name(first_name, last_name),
                 next_hearing_date=c.next_hearing_date,
                 last_hearing_date=c.last_hearing_date,
                 updated_date=c.updated_date,
@@ -381,13 +353,18 @@ class CasesService(BaseSecuredService):
                 ),
                 filing_year=c.filing_year,
                 case_summary=c.case_summary,
-                next_hearing_status=hearing_status_desc,
+                next_hearing_status=await self.refm_resolver.from_column(
+                    column_attr=Hearings.status_code,
+                    code=hearing_status_code,
+                    value_column=RefmHearingStatus.description,
+                    default=None
+                ),
             )
             for (
                 c,
                 first_name,
                 last_name,
-                hearing_status_desc,
+                hearing_status_code,
             ) in rows
         ]
 
@@ -500,7 +477,7 @@ class CasesService(BaseSecuredService):
             lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
             .where(Users.user_id.in_(ids)),
             lambda r: r.user_id,
-            lambda r: _full_name(r.first_name, r.last_name),
+            lambda r: self.full_name(r.first_name, r.last_name),
         )
 
         return [
@@ -649,7 +626,7 @@ class CasesService(BaseSecuredService):
             lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
             .where(Users.user_id.in_(ids)),
             lambda r: r.user_id,
-            lambda r: _full_name(r.first_name, r.last_name),
+            lambda r: self.full_name(r.first_name, r.last_name),
         )
         return [
             CaseNoteOut(
@@ -658,6 +635,7 @@ class CasesService(BaseSecuredService):
                 user_id=n.user_id,
                 author_name=author_map.get(n.user_id),
                 note_text=n.note_text,
+                created_date = n.created_date
             )
             for n in notes
         ]
@@ -679,9 +657,10 @@ class CasesService(BaseSecuredService):
             note_id=note.note_id,
             case_id=note.case_id,
             user_id=note.user_id,
-            author_name=_full_name(u.first_name, u.last_name) if u else None,
+            author_name=self.full_name(u.first_name, u.last_name) if u else None,
             note_text=note.note_text,
             private_ind=bool(note.private_ind),
+            created_date = note.created_date
         )
 
     async def case_notes_edit(self, payload: CaseNoteEdit) -> CaseNoteOut:
@@ -709,9 +688,10 @@ class CasesService(BaseSecuredService):
             note_id=updated.note_id,
             case_id=updated.case_id,
             user_id=updated.user_id,
-            author_name=_full_name(u.first_name, u.last_name) if u else None,
+            author_name=self.full_name(u.first_name, u.last_name) if u else None,
             note_text=updated.note_text,
             private_ind=bool(updated.private_ind),
+            created_date = updated.created_date
         )
 
     async def case_notes_delete(self, payload: CaseNoteDelete) -> dict:
@@ -736,9 +716,9 @@ class CasesService(BaseSecuredService):
                 CaseClients.client_id,
                 CaseClients.party_role,
                 CaseClients.primary_ind,
-                CaseClients.engagement_type,
+                CaseClients.engagement_type_code,
                 Clients.client_name,
-                Clients.client_type,
+                Clients.client_type_code,
                 Clients.email,
                 Clients.phone,
             )
@@ -767,12 +747,24 @@ class CasesService(BaseSecuredService):
             CaseClientOut(
                 case_client_id=r.case_client_id,
                 client_id=r.client_id,
-                client_name=r.client_name,
-                client_type=r.client_type,
+                client_name=r.client_name,                
+                client_type_code=r.client_type_code,
+                client_type_description=await self.refm_resolver.from_column(
+                    column_attr=Clients.client_type_code,
+                    code=r.client_type_code,
+                    value_column=RefmClientType.description,
+                    default=None
+                ),
                 party_role=r.party_role,
                 party_role_description=role_map.get(r.party_role),
                 primary_ind=bool(r.primary_ind),
-                engagement_type=r.engagement_type,
+                engagement_type_code=r.engagement_type_code,
+                engagement_type_description=await self.refm_resolver.from_column(
+                    column_attr=CaseClients.engagement_type_code,
+                    code=r.engagement_type_code,
+                    value_column=RefmEngagementType.description,
+                    default=None
+                ),
                 email=r.email,
                 phone=r.phone,
             )
@@ -802,7 +794,7 @@ class CasesService(BaseSecuredService):
                 "client_id": payload.client_id,
                 "party_role": payload.party_role,
                 "primary_ind": payload.primary_ind,
-                "engagement_type": payload.engagement_type,
+                "engagement_type_code": payload.engagement_type_code,
             },
         )
         await log_activity(
@@ -812,15 +804,28 @@ class CasesService(BaseSecuredService):
         )
         client = await self.session.get(Clients, payload.client_id)
         pr = await self.session.get(RefmPartyRoles, payload.party_role)
+        client_type_code = client.client_type_code if client else ""
         return CaseClientOut(
             case_client_id=link.case_client_id,
             client_id=link.client_id,
-            client_name=client.client_name if client else "",
-            client_type=client.client_type if client else "",
+            client_name=client.client_name if client else "",                            
+            client_type_code=client_type_code,
+            client_type_description=await self.refm_resolver.from_column(
+                column_attr=Clients.client_type_code,
+                code=client_type_code,
+                value_column=RefmClientType.description,
+                default=None
+            ),
             party_role=link.party_role,
             party_role_description=pr.description if pr else None,
-            primary_ind=bool(link.primary_ind),
-            engagement_type=link.engagement_type,
+            primary_ind=bool(link.primary_ind),            
+            engagement_type_code=link.engagement_type_code,
+            engagement_type_description=await self.refm_resolver.from_column(
+                column_attr=CaseClients.engagement_type_code,
+                code=link.engagement_type_code,
+                value_column=RefmEngagementType.description,
+                default=None
+            ),
             email=client.email if client else None,
             phone=client.phone if client else None,
         )
@@ -861,7 +866,7 @@ class CasesService(BaseSecuredService):
             lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
             .where(Users.user_id.in_(ids)),
             lambda r: r.user_id,
-            lambda r: _full_name(r.first_name, r.last_name),
+            lambda r: self.full_name(r.first_name, r.last_name),
         )
 
         return [

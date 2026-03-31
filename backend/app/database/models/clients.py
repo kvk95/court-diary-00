@@ -19,8 +19,8 @@ class Clients(BaseModel, TimestampMixin):
     # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
-    # client_type : CHAR(1) COLLATE "utf8mb4_unicode_ci"
-    client_type: Mapped[str] = mapped_column(CHAR(1), nullable=False)
+    # client_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    client_type_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_client_type.code", ondelete="RESTRICT"), nullable=False)
 
     # client_name : VARCHAR(200) COLLATE "utf8mb4_unicode_ci"
     client_name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -102,6 +102,13 @@ class Clients(BaseModel, TimestampMixin):
         "Chamber",
         foreign_keys=[chamber_id], 
         backref=backref("clients_chamber_id_chambers", cascade="all, delete-orphan")
+    )
+
+    # clients.client_type_code -> refm_client_type.code
+    clients_client_type_code_refm_client_type = relationship(
+        "RefmClientType",
+        foreign_keys=[client_type_code], 
+        backref=backref("clients_client_type_code_refm_client_types", cascade="all, delete-orphan")
     )
 
     # clients.state_code -> refm_states.code

@@ -21,7 +21,11 @@ from typing import (
 )
 
 from fastapi import HTTPException
-from sqlalchemy import Exists, MetaData, Table, and_, func, insert, select, update
+from sqlalchemy import (
+    Exists, Join, MetaData, 
+    Table, and_, false, func, insert, 
+    select, update, Select
+)
 from sqlalchemy import Boolean
 from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,15 +33,24 @@ from sqlalchemy.future import select
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import BinaryExpression, ColumnElement
-from sqlalchemy.sql.schema import Column
+from sqlalchemy.sql.schema import Column, Table
+from sqlalchemy.sql.selectable import Join
 
 from app.core.context import get_request_context
 from app.database.models.base.base_model import BaseModel
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
+from app.database.models.refm_modules import RefmModulesConstants
+from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.dtos.roles_dto import RoleOut
 from app.dtos.users_dto import UserOut
 from .model_helpers import get_writable_columns
+
+from sqlalchemy import Select
+from sqlalchemy.sql.selectable import Join, Subquery, Alias
+from sqlalchemy.sql.schema import Table
+from sqlalchemy.sql.elements import ClauseElement, BooleanClauseList, BinaryExpression
+from sqlalchemy.sql.selectable import Exists
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 FilterKey = Union[InstrumentedAttribute[Any], ColumnElement[Any], Any]
@@ -82,15 +95,26 @@ class BaseRepository(Generic[ModelType]):
         self.model = model
         self.WRITABLE_FIELDS = get_writable_columns(model)
         ctx = get_request_context()
-        
-        user: UserOut = cast(UserOut, ctx.get("user_details"))
 
+        user: UserOut = cast(UserOut, ctx.get("user_details"))
+        self.anonymous = True
         if user:
             self.chamber_id = user.chamber_id
             self.user_id = user.user_id
 
             role: Optional[RoleOut] = user.role
             self.is_admin = bool(role.admin_ind) if role else False
+
+            permissions: List[RolePermissionModuleOut] = user.permissions or []
+            self.has_case_access = any(
+                p.module_code == RefmModulesConstants.CASES and p.read_ind
+                for p in permissions
+            )
+            self.has_client_access = any(
+                p.module_code == RefmModulesConstants.CLIENTS and p.read_ind
+                for p in permissions
+            )
+            self.anonymous = False
 
     # ────────────────────────────────────────────────
     # ──────── FIELD / LOGGING HELPERS ────────
@@ -104,27 +128,6 @@ class BaseRepository(Generic[ModelType]):
         return {
             k: v for k, v in data.items() if k in self.WRITABLE_FIELDS and v is not None
         }
-
-    def apply_case_visibility(
-        self,stmt):
-        stmt = stmt.where(
-            Cases.chamber_id == self.chamber_id,
-            Cases.deleted_ind.is_(False),
-        )
-
-        if not self.is_admin:
-            stmt = stmt.where(
-                Exists().where(
-                    and_(
-                        CaseAors.case_id == Cases.case_id,
-                        CaseAors.user_id == self.user_id,
-                        CaseAors.chamber_id == self.chamber_id,
-                        CaseAors.withdrawal_date.is_(None),
-                    )
-                )
-            )
-
-        return stmt
 
     def _log_stmt(self, stmt, session: AsyncSession):
         """
@@ -149,9 +152,17 @@ class BaseRepository(Generic[ModelType]):
         """
         Centralized execute with logging.
         """
-        stmt = self._apply_chamber_id_filter(stmt)
+        # stmt = self._apply_chamber_id_filter(stmt)
+        stmt = self._apply_restrictions(stmt=stmt)
         self._log_stmt(stmt, session)
         return await session.execute(stmt)
+
+    async def execute_scalar(self, stmt, session: AsyncSession, default:int = 0) -> int:
+        """
+        Centralized execute with logging.
+        """
+        result = await self.execute(session=session, stmt=stmt)
+        return result.scalar() or default
 
     # ────────────────────────────────────────────────
     # ──────── VALIDATION HELPERS ────────
@@ -208,31 +219,156 @@ class BaseRepository(Generic[ModelType]):
 
     # ────────────────────────────────────────────────
     # ──────── PRIVATE HELPERS ────────
-    # ────────────────────────────────────────────────    
+    # ──────────────────────────────────────────────── 
 
-    def _apply_chamber_id_filter(self, stmt: Select) -> Select:
-        """
-        Apply chamber_id_ filter if the model has chamber_id.
-        Supports two conventions:
-        - deleted_ind: bool flag
-        - deleted_date: nullable datetime when deleted
-        """
-        
-        if hasattr(self.model, "chamber_id"):
-            stmt = stmt.where(self.model.chamber_id == self.chamber_id)
-        return stmt
+    def _collect_tables(self, stmt: Select) -> set[Table]:
+        tables: set[Table] = set()
+        exists_tables: set[Table] = set()  # tables inside EXISTS — track separately
 
-    def _apply_soft_delete_filter(self, stmt: Select) -> Select:
-        """
-        Apply soft-delete filter if the model supports it.
-        Supports two conventions:
-        - deleted_ind: bool flag
-        - deleted_date: nullable datetime when deleted
-        """
-        if hasattr(self.model, "deleted_ind"):
-            stmt = stmt.where(self.model.deleted_ind.is_(False))
-        if hasattr(self.model, "deleted_date"):
-            stmt = stmt.where(self.model.deleted_date.is_(None))
+        def _walk(clause: ClauseElement | None, inside_exists: bool = False) -> None:
+            if clause is None:
+                return
+
+            if isinstance(clause, Table):
+                if inside_exists:
+                    exists_tables.add(clause)
+                else:
+                    tables.add(clause)
+
+            elif isinstance(clause, Join):
+                _walk(clause.left, inside_exists)
+                _walk(clause.right, inside_exists)
+
+            elif isinstance(clause, (Subquery, Alias)):
+                _walk(clause.element, inside_exists)
+
+            elif isinstance(clause, Select):
+                for frm in clause.froms:
+                    _walk(frm, inside_exists)
+                _walk_expression(clause.whereclause, inside_exists)
+
+            elif isinstance(clause, ClauseElement) and hasattr(clause, "element"):
+                _walk(clause.element, inside_exists)  # type: ignore[attr-defined]
+
+        def _walk_expression(expr: ClauseElement | None, inside_exists: bool = False) -> None:
+            if expr is None:
+                return
+
+            if isinstance(expr, Select):
+                _walk(expr, inside_exists)
+                return
+
+            if isinstance(expr, BooleanClauseList):
+                for clause in expr.clauses:
+                    _walk_expression(clause, inside_exists)
+                return
+
+            if isinstance(expr, BinaryExpression):
+                _walk_expression(expr.left, inside_exists)
+                _walk_expression(expr.right, inside_exists)
+                return
+
+            if isinstance(expr, Exists):
+                # everything inside an EXISTS is already self-contained
+                _walk(expr.element, inside_exists=True)  # type: ignore[attr-defined]
+                return
+
+            if isinstance(expr, ClauseElement) and hasattr(expr, "element"):
+                inner = expr.element  # type: ignore[attr-defined]
+                if isinstance(inner, ClauseElement):
+                    _walk_expression(inner, inside_exists)
+
+        for frm in stmt.froms:
+            _walk(frm)
+
+        _walk_expression(stmt.whereclause)
+
+        # Only return tables that are in the outer query, not inside EXISTS
+        return tables - exists_tables
+
+    def _where_already_covers(self, stmt: Select, table: Table, col_name: str) -> bool:
+        target_col = table.c.get(col_name)
+        if target_col is None:
+            return False
+
+        where = stmt.whereclause
+        if where is None:
+            return False
+
+        clauses: list[ClauseElement] = (
+            list(where.clauses)          # type: ignore[attr-defined]
+            if isinstance(where, BooleanClauseList)
+            else [where]
+        )
+
+        for clause in clauses:
+            try:
+                sql = str(clause.compile(compile_kwargs={"literal_binds": False}))
+                if f"{table.name}.{col_name}" in sql:
+                    return True
+            except Exception:
+                continue
+        return False
+    
+    
+
+    def _apply_case_visibility(self, stmt: Select) -> Select:
+        stmt = stmt.where(
+            Cases.chamber_id == self.chamber_id,
+            Cases.deleted_ind.is_(False),
+        )
+
+        if self.is_admin:
+            return stmt
+
+        if not self.has_case_access:
+            return stmt.where(false())
+
+        return stmt.where(
+            Exists(
+                select(1)
+                .select_from(CaseAors)
+                .where(
+                    and_(
+                        CaseAors.case_id == Cases.case_id,
+                        CaseAors.user_id == self.user_id,
+                        CaseAors.chamber_id == self.chamber_id,
+                        CaseAors.withdrawal_date.is_(None),
+                    )
+                )
+                .correlate(Cases)
+            )
+        )
+
+    def _apply_restrictions(self, stmt: Select) -> Select:
+        involved_tables = self._collect_tables(stmt)
+        cases_table = Cases.__table__
+
+        # 1. apply_case_visibility if Cases is anywhere in the statement
+        if not self.anonymous and cases_table in involved_tables:
+            if not self._where_already_covers(stmt, cases_table, "chamber_id"):
+                stmt = self._apply_case_visibility(stmt)
+
+        # 2. For every table found (including inside subqueries), apply
+        #    chamber_id + deleted_ind to the OUTER where if not already present.
+        #    Subquery-internal tables that were pre-filtered are skipped by
+        #    _where_already_covers since their filters appear in inner SQL.
+        for table in involved_tables:
+            if table is cases_table:
+                continue  # handled by apply_case_visibility above
+
+            if "chamber_id" in table.c and not self.anonymous:
+                if not self._where_already_covers(stmt, table, "chamber_id"):
+                    stmt = stmt.where(table.c.chamber_id == self.chamber_id)
+
+            if "deleted_ind" in table.c:
+                if not self._where_already_covers(stmt, table, "deleted_ind"):
+                    stmt = stmt.where(table.c.deleted_ind.is_(False))
+
+            if "deleted_date" in table.c:
+                if not self._where_already_covers(stmt, table, "deleted_date"):
+                    stmt = stmt.where(table.c.deleted_date.is_(None))
+
         return stmt
 
     def _paginate(
@@ -321,63 +457,69 @@ class BaseRepository(Generic[ModelType]):
         if where:
             stmt = stmt.where(*where)
 
-        # Soft delete
-        stmt = self._apply_soft_delete_filter(stmt)
-
         # Ordering
         if order_by:
             stmt = stmt.order_by(*order_by)
 
         return stmt
 
-    def _set_audit_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _set_audit_fields(
+        self,
+        data: Dict[str, Any],
+        *,
+        is_update: bool = False,
+    ) -> Dict[str, Any]:
 
         result = data.copy()
 
         # ─────────────────────────────────────────────
-        # 🔥 PRIMARY KEY HANDLING
+        # 🔥 PRIMARY KEY HANDLING (only for insert)
         # ─────────────────────────────────────────────
-        pk_columns = self.model.__table__.primary_key.columns
-        print("*********************** \n\n\n")
-        for col in pk_columns:
-            col_name = col.name
-            col_type = col.type
-            val = result.get(col_name)
+        if not is_update:
+            pk_columns = self.model.__table__.primary_key.columns
 
-            col_length = getattr(col_type, "length", None)
+            for col in pk_columns:
+                col_name = col.name
+                col_type = col.type
+                val = result.get(col_name)
 
-            # Detect UUID-like PK
-            is_uuid_pk = (
-                col_length == 36 and col_name.lower().endswith("id")
-            )
+                col_length = getattr(col_type, "length", None)
 
-            print(f"*******************{col_name}::{val}")
+                is_uuid_pk = (
+                    col_length == 36 and col_name.lower().endswith("id")
+                )
 
-            if is_uuid_pk:
-                if val is None or val == "":
-                    result[col_name] = self.model.generate_uuid()
-                    print(f"*******************{col_name}::{result[col_name]}")
-            else:
-                # Non-UUID PK → let DB handle
-                if col_name in result and result[col_name] is None:
-                    del result[col_name]
-        print("*********************** \n\n\n")
+                if is_uuid_pk:
+                    if val is None or val == "":
+                        result[col_name] = self.model.generate_uuid()
+                else:
+                    if col_name in result and result[col_name] is None:
+                        del result[col_name]
 
         # ─────────────────────────────────────────────
         # 🔹 AUDIT FIELDS
         # ─────────────────────────────────────────────
         if self.user_id:
-            if hasattr(self.model, "created_by") and "created_by" not in result:
-                result["created_by"] = self.user_id
+            # created_by → only on insert
+            if not is_update:
+                if hasattr(self.model, "created_by") and "created_by" not in result:
+                    result["created_by"] = self.user_id
 
-            if hasattr(self.model, "updated_by") and "updated_by" not in result:
+            # updated_by → always
+            if hasattr(self.model, "updated_by"):
                 result["updated_by"] = self.user_id
 
             if hasattr(self.model, "user_id") and "user_id" not in result:
                 result["user_id"] = self.user_id
 
-        if hasattr(self.model, "chamber_id") and "chamber_id" not in result:
-            result["chamber_id"] = self.chamber_id
+        # chamber_id (insert only usually)
+        if not is_update:
+            if hasattr(self.model, "chamber_id") and "chamber_id" not in result:
+                result["chamber_id"] = self.chamber_id
+
+        # 🔥 updated_date ALWAYS on update
+        if is_update and hasattr(self.model, "updated_date"):
+            result["updated_date"] = datetime.utcnow()
 
         return result
 
@@ -391,14 +533,8 @@ class BaseRepository(Generic[ModelType]):
         Perform DB-side UPDATE and reload the entity using the same filters.
         Reused by update() and upsert() to avoid duplication.
         """
-        update_data = data.copy()
-        ctx = get_request_context()
-        user_id = ctx.get("user_id")
-        chamber_id = cast(str, ctx.get("chamber_id"))
-        if hasattr(self.model, "updated_by"):
-            update_data["updated_by"] = user_id
-        if hasattr(self.model, "chamber_id"):
-                update_data["chamber_id"] = chamber_id
+        
+        update_data = self._set_audit_fields(data, is_update=True)
 
         stmt = (
             update(self.model)
@@ -409,7 +545,6 @@ class BaseRepository(Generic[ModelType]):
         await self.execute(stmt, session)
 
         reload_stmt = select(self.model).where(*filters_exprs)
-        reload_stmt = self._apply_soft_delete_filter(reload_stmt)
         
         result = await self.execute(reload_stmt, session)
         return result.scalars().first()
@@ -450,7 +585,7 @@ class BaseRepository(Generic[ModelType]):
             # Fallback to PK lookup
             pk_filters = self._pk_filters_from_values(id_values)
             base = select(self.model).where(*pk_filters)
-            stmt = self._apply_soft_delete_filter(base)
+            stmt = base
 
         result = await self.execute(stmt=stmt, session=session)
         return result.scalars().first()
@@ -693,7 +828,6 @@ class BaseRepository(Generic[ModelType]):
         else:
             pk_filters = self._pk_filters_from_values(id_values)
             stmt = select(self.model).where(*pk_filters)
-            stmt = self._apply_soft_delete_filter(stmt)
 
         result = await self.execute(stmt=stmt, session=session)
         existing = result.scalars().first()
@@ -738,6 +872,55 @@ class BaseRepository(Generic[ModelType]):
         await session.flush()
         await session.refresh(obj)
         return obj
+    
+    async def bulk_update(
+        self,
+        session: AsyncSession,
+        *,
+        id_values: Optional[Union[Any, Dict[str, Any]]] = None,
+        filters: Optional[Dict[FilterKey, Any]] = None,
+        where: Optional[Sequence[Any]] = None,
+        data: Dict[str, Any],
+    ) :
+
+        # ─────────────────────────────────────────────
+        # 1. BUILD FILTERS
+        # ─────────────────────────────────────────────
+        if filters or where:
+            built_filters: List[BinaryExpression] = []
+
+            if filters:
+                for column, value in filters.items():
+                    built_filters.append(column == value)
+
+            if where:
+                for condition in where:
+                    if isinstance(condition, BinaryExpression):
+                        built_filters.append(condition)
+                    elif isinstance(condition, ColumnElement):
+                        built_filters.append(condition.is_(True))
+
+            filters_exprs = built_filters
+        else:
+            filters_exprs = self._pk_filters_from_values(id_values)
+
+        # ─────────────────────────────────────────────
+        # 2. APPLY AUDIT FIELDS
+        # ─────────────────────────────────────────────
+        update_data = self._set_audit_fields(data, is_update=True)
+
+        # ─────────────────────────────────────────────
+        # 3. EXECUTE BULK UPDATE (NO RELOAD)
+        # ─────────────────────────────────────────────
+        stmt = (
+            update(self.model)
+            .where(*filters_exprs)
+            .values(**update_data)
+            .execution_options(synchronize_session=False)
+        )
+
+        result = await self.execute(stmt, session)
+        return result.all()
 
     async def delete(
         self,

@@ -24,10 +24,6 @@ from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import ErrorCodes, ValidationErrorDetail
 
 
-def _full_name(first: Optional[str], last: Optional[str]) -> str:
-    return " ".join(p for p in [first, last] if p) or ""
-
-
 class CollaborationsService(BaseSecuredService):
     def __init__(
         self,
@@ -81,7 +77,7 @@ class CollaborationsService(BaseSecuredService):
         invited_by_name = None
         if c.invited_by:
             u = await self.session.get(Users, c.invited_by)
-            invited_by_name = _full_name(u.first_name, u.last_name) if u else None
+            invited_by_name = self.full_name(u.first_name, u.last_name) if u else None
 
         return CollaborationOut(
             collaboration_id=c.collaboration_id,
