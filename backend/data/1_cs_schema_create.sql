@@ -106,7 +106,6 @@ CREATE TABLE refm_client_type (
     sort_order  INT         NOT NULL,
     status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client type master';
-DROP TABLE IF EXISTS refm_engagement_type;
 
 DROP TABLE IF EXISTS refm_party_type;
 CREATE TABLE refm_party_type (
@@ -115,15 +114,6 @@ CREATE TABLE refm_party_type (
     sort_order  INT         NOT NULL,
     status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='How is the client/party related to chamber';
-
-DROP TABLE IF EXISTS refm_engagement_type;
-
-CREATE TABLE refm_engagement_type (
-    code        CHAR(4)     PRIMARY KEY,
-    description VARCHAR(60) NOT NULL,
-    sort_order  INT         NOT NULL,
-    status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Engagement type master';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.4  Email & Communication
@@ -167,13 +157,21 @@ CREATE TABLE refm_comm_status (
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Communication status codes';
 
-DROP TABLE IF EXISTS refm_entity_type;
-CREATE TABLE refm_entity_type (
+DROP TABLE IF EXISTS refm_img_upload_for;
+CREATE TABLE refm_img_upload_for (
     code        CHAR(4)     PRIMARY KEY,
     description VARCHAR(60) NOT NULL,
     sort_order  INT         NOT NULL,
     status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Entity type master for images';
+
+DROP TABLE IF EXISTS refm_proof_type;
+CREATE TABLE refm_proof_type (
+    code        CHAR(4)     PRIMARY KEY,
+    description VARCHAR(60) NOT NULL,
+    sort_order  INT         NOT NULL,
+    status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='type of id proof';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.5  User & Auth Statuses
@@ -571,7 +569,6 @@ CREATE TABLE cases (
     filing_year       INT          NULL,
     petitioner        TEXT         NOT NULL,
     respondent        TEXT         NOT NULL,
-    aor_user_id       CHAR(36)     NULL,  
     case_summary      TEXT         NULL,
     status_code       CHAR(4)      DEFAULT 'AC',
     next_hearing_date DATE         NULL,
@@ -593,8 +590,6 @@ CREATE TABLE cases (
         FOREIGN KEY (case_type_code) REFERENCES refm_case_types(code)      ON DELETE RESTRICT,
     CONSTRAINT fk_cases_status
         FOREIGN KEY (status_code)    REFERENCES refm_case_status(code)     ON DELETE RESTRICT,
-    CONSTRAINT fk_cases_aor
-        FOREIGN KEY (aor_user_id)    REFERENCES users(user_id)             ON DELETE SET NULL,
     INDEX idx_cases_chamber_status (chamber_id, status_code),
     INDEX idx_cases_next_hearing (next_hearing_date)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Legal cases';
@@ -749,7 +744,7 @@ CREATE TABLE clients (
     state_code      CHAR(4)      NULL,
     postal_code     VARCHAR(12)  NULL,
     country_code    CHAR(2)      DEFAULT 'IN',
-    id_proof_type   VARCHAR(50)  NULL,
+    id_proof_code   CHAR(4)  NULL,
     id_proof_number VARCHAR(100) NULL,
     source_code     VARCHAR(20)  NULL,
     referral_source VARCHAR(150) NULL,
@@ -772,6 +767,8 @@ CREATE TABLE clients (
         FOREIGN KEY (state_code)  REFERENCES refm_states(code)       ON DELETE SET NULL,
     CONSTRAINT fk_clients_country
         FOREIGN KEY (country_code) REFERENCES refm_countries(code)   ON DELETE RESTRICT,
+    CONSTRAINT fk_clients_id_proof_code
+        FOREIGN KEY (id_proof_code) REFERENCES refm_proof_type(code)  ON DELETE RESTRICT,
     CONSTRAINT fk_clients_deleted_by
         FOREIGN KEY (deleted_by)  REFERENCES users(user_id)          ON DELETE SET NULL,
     CONSTRAINT fk_clients_created_by
@@ -796,7 +793,6 @@ CREATE TABLE case_clients (
     client_id       CHAR(36)     NOT NULL,  
     party_role_code      CHAR(4)      NOT NULL,
     primary_ind     BOOLEAN      DEFAULT FALSE,
-    engagement_type_code CHAR(4)      NULL,
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     created_by      CHAR(36)     NULL,  
     updated_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -811,8 +807,6 @@ CREATE TABLE case_clients (
         FOREIGN KEY (client_id)  REFERENCES clients(client_id)    ON DELETE CASCADE,
     CONSTRAINT fk_case_clients_party_role
         FOREIGN KEY (party_role_code) REFERENCES refm_party_roles(code) ON DELETE RESTRICT,
-    CONSTRAINT fk_case_clients_engagement
-        FOREIGN KEY (engagement_type_code) REFERENCES refm_engagement_type(code) ON DELETE RESTRICT,
     CONSTRAINT fk_case_clients_created_by
         FOREIGN KEY (created_by) REFERENCES users(user_id)        ON DELETE SET NULL,
     CONSTRAINT fk_case_clients_updated_by
@@ -985,6 +979,7 @@ CREATE TABLE profile_images (
     image_id      CHAR(36)     PRIMARY KEY,
     user_id       CHAR(36)     NULL,       -- FK to users
     client_id     CHAR(36)     NULL,       -- FK to clients
+	image_upload_code CHAR(4)   NOT NULL,
     image_data    LONGTEXT     NOT NULL,   -- base64 string
     description   VARCHAR(255) NULL,
     deleted_ind   BOOLEAN      DEFAULT FALSE,
@@ -996,6 +991,8 @@ CREATE TABLE profile_images (
     updated_by    CHAR(36)     NULL,
     CONSTRAINT fk_profile_images_user
         FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_profile_images_upload_code
+        FOREIGN KEY (image_upload_code) REFERENCES refm_img_upload_for(code)  ON DELETE RESTRICT,
     CONSTRAINT fk_profile_images_client
         FOREIGN KEY (client_id) REFERENCES clients(client_id) ON DELETE CASCADE,
     CONSTRAINT fk_profile_images_created_by

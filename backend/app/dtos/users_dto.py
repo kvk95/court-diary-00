@@ -12,6 +12,10 @@ from app.dtos.role_permissions_dto import RolePermissionModuleOut
 # USER PROFILE & THEME DTOs
 # =============================================================================
 
+class ImageInfoOut(BaseRecordData):    
+    image_id: Optional[str]
+    image_data: Optional[str]
+
 class UserFullThemeOut(BaseRecordData):
     """User profile theme settings"""
     header_color: str = "0 0% 100%"
@@ -29,7 +33,7 @@ class UserProfileOut(BaseRecordData):
 # USER OUTPUT DTO (Unified for ALL endpoints)
 # =============================================================================
 
-class UserOut(BaseRecordData):
+class UserOut(ImageInfoOut):
     """
     Full user output with profile, permissions, and chamber info.
     Used for login, /me, /{user_id}, and /paged endpoints.
@@ -38,8 +42,6 @@ class UserOut(BaseRecordData):
     full_name: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    image_id: str
-    image_data: str
     email: EmailStr
     phone: Optional[str] = None
     role: Optional[RoleOut] = None

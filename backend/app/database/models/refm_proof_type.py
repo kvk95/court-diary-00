@@ -1,4 +1,4 @@
-"""refm_engagement_type"""
+"""refm_proof_type"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from enum import Enum as PyEnum
@@ -8,8 +8,8 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmEngagementType(BaseModel):
-    __tablename__ = 'refm_engagement_type'
+class RefmProofType(BaseModel):
+    __tablename__ = 'refm_proof_type'
 
     # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
@@ -31,10 +31,18 @@ class RefmEngagementType(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmEngagementTypeConstants:
-    PETITIONER = 'ETPE'
-    RESPONDENT = 'ETRE'
+class RefmProofTypeConstants:
+    AADHAR = 'PTAD'
+    PAN = 'PTPN'
+    DRIVING_LICENCE = 'PTDL'
+    VOTER_ID = 'PTVC'
+    COMPANY_REGISTRATION = 'PTCR'
+    GST = 'PTGT'
 
-class RefmEngagementTypeEnum(str, PyEnum):
-    PETITIONER = RefmEngagementTypeConstants.PETITIONER
-    RESPONDENT = RefmEngagementTypeConstants.RESPONDENT
+class RefmProofTypeEnum(str, PyEnum):
+    AADHAR = RefmProofTypeConstants.AADHAR
+    PAN = RefmProofTypeConstants.PAN
+    DRIVING_LICENCE = RefmProofTypeConstants.DRIVING_LICENCE
+    VOTER_ID = RefmProofTypeConstants.VOTER_ID
+    COMPANY_REGISTRATION = RefmProofTypeConstants.COMPANY_REGISTRATION
+    GST = RefmProofTypeConstants.GST

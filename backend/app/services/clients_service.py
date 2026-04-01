@@ -6,27 +6,25 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_clients import CaseClients
-from app.database.models.cases import Cases
 from app.database.models.clients import Clients
-from app.database.models.hearings import Hearings
 from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_courts import RefmCourts
-from app.database.models.refm_engagement_type import RefmEngagementType
 from app.database.models.refm_hearing_status import RefmHearingStatus
+from app.database.models.refm_party_roles import RefmPartyRoles
 from app.database.models.refm_party_type import RefmPartyType
 from app.database.repositories.case_clients_repository import CaseClientsRepository
 from app.database.repositories.clients_repository import ClientsRepository
 from app.database.repositories.profile_images_repository import ProfileImagesRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
-from app.dtos.cases_dto import CaseListOut
+from app.dtos.cases_dto import CaseClientOut, CaseListOut
 from app.dtos.clients_dto import (
     ClientCreate,
     ClientDetailOut,
     ClientEdit,
     ClientListOut,
-    ClientSearchOut,
+    ClientDetailsOut,
     ClientSummaryStats,
 )
 from app.services.base.secured_base_service import BaseSecuredService
@@ -51,112 +49,151 @@ class ClientsService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def _get_client_details(self, client_id: str) -> Clients:
-        client = await self.clients_repo.get_by_id(
-            session=self.session,
-            filters={Clients.client_id: client_id, Clients.chamber_id: self.chamber_id},
-        )
-        if not client:
-            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client not found")
-        return client
-
+            client = await self.clients_repo.get_by_id(
+                session=self.session,
+                filters={Clients.client_id: client_id, Clients.chamber_id: self.chamber_id},
+            )
+            if not client:
+                raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client not found")
+            return client
+    
     async def _linked_cases_count(self, client_id: str) -> int:
         stmt = select(func.count(CaseClients.case_client_id)).where(CaseClients.client_id == client_id)
-        return await self.case_clients_repo.execute_scalar( session=self.session, stmt=stmt) 
-    
-    async def _linked_cases(self, 
-                            client_id: str,):
+        return await self.case_clients_repo.execute_scalar( session=self.session, stmt=stmt)
+
+    async def _linked_cases(self, client_id: str):
         rows, total = await self.case_clients_repo.list_cases_for_client(
             session=self.session,
             chamber_id=self.chamber_id,
             client_id=client_id,
         )
 
-        records = [
-            CaseListOut(
-                case_id=c.case_id,
-                chamber_id=c.chamber_id,
-                case_number=c.case_number,
-                
-                status_code = c.status_code,
-                status_description = await self.refm_resolver.from_column(
-                    column_attr=Cases.status_code,
-                    code=c.status_code,
-                    value_column=RefmCaseStatus.description,
-                    default=None
-                ),
-                court_id=c.court_id,
-                court_name=await self.refm_resolver.from_column(
-                    column_attr=Cases.court_id,
-                    code=c.court_id,
-                    value_column=RefmCourts.court_name,
-                    default=None
-                ),
-                petitioner=c.petitioner,
-                respondent=c.respondent,
-                aor_user_id=c.aor_user_id,
-                aor_name=self.full_name(first_name, last_name),
-                next_hearing_date=c.next_hearing_date,
-                last_hearing_date=c.last_hearing_date,
-                updated_date=c.updated_date,
-                case_type_code=c.case_type_code,
-                case_type_description=await self.refm_resolver.from_column(
-                    column_attr=Cases.case_type_code,
-                    code=c.case_type_code,
-                    value_column=RefmCaseTypes.description,
-                    default=None
-                ),
-                engagement_type_code=engagement_type_code,
-                engagement_type_description=await self.refm_resolver.from_column(
-                    column_attr=CaseClients.engagement_type_code,
-                    code=engagement_type_code,
-                    value_column=RefmEngagementType.description,
-                    default=None
-                ),
-                filing_year=c.filing_year,
-                case_summary=c.case_summary,
-                next_hearing_status=await self.refm_resolver.from_column(
-                    column_attr=Hearings.status_code,
-                    code=hearing_status_code,
-                    value_column=RefmHearingStatus.description,
-                    default=None
-                ),
-            )
-            for (
-                c,
-                first_name,
-                last_name,
-                hearing_status_code,
-                engagement_type_code
-            ) in rows
-        ]
+        used_court_ids      = {r.Cases.court_id       for r in rows if r.Cases.court_id}
+        used_case_statuses  = {r.Cases.status_code    for r in rows if r.Cases.status_code}
+        used_case_types     = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
+        used_hearing_status = {r.hearing_status_code  for r in rows if r.hearing_status_code}
+        used_party_roles    = {r.party_role_code       for r in rows if r.party_role_code}
 
-        return records , total 
+        court_map = {}
+        if used_court_ids:
+            q = await self.session.execute(
+                select(RefmCourts.court_id, RefmCourts.court_name)
+                .where(RefmCourts.court_id.in_(used_court_ids))
+            )
+            court_map = {r.court_id: r.court_name for r in q}
+
+        status_map = {}
+        if used_case_statuses:
+            q = await self.session.execute(
+                select(RefmCaseStatus.code, RefmCaseStatus.description)
+                .where(RefmCaseStatus.code.in_(used_case_statuses))
+            )
+            status_map = {r.code: r.description for r in q}
+
+        case_type_map = {}
+        if used_case_types:
+            q = await self.session.execute(
+                select(RefmCaseTypes.code, RefmCaseTypes.description)
+                .where(RefmCaseTypes.code.in_(used_case_types))
+            )
+            case_type_map = {r.code: r.description for r in q}
+
+        hearing_status_map = {}
+        if used_hearing_status:
+            q = await self.session.execute(
+                select(RefmHearingStatus.code, RefmHearingStatus.description)
+                .where(RefmHearingStatus.code.in_(used_hearing_status))
+            )
+            hearing_status_map = {r.code: r.description for r in q}
+
+        party_role_map = {}
+        if used_party_roles:
+            q = await self.session.execute(
+                select(RefmPartyRoles.code, RefmPartyRoles.description)
+                .where(RefmPartyRoles.code.in_(used_party_roles))
+            )
+            party_role_map = {r.code: r.description for r in q}
+
+        case_clients_out: list[CaseClientOut] = []
+        records: list[CaseListOut] = []
+
+        for (
+            cases,
+            first_name,
+            last_name,
+            aor_user_id,
+            hearing_status_code,
+            party_role_code,
+            case_client
+        ) in rows:
+            case_clients_out.append(CaseClientOut(
+                case_client_id=case_client.case_client_id,
+                chamber_id=case_client.chamber_id,
+                case_id=case_client.case_id,
+                client_id=case_client.client_id,
+                party_role_code=case_client.party_role_code,
+                party_role_description=party_role_map.get(case_client.party_role_code, ''),
+                primary_ind=bool(case_client.primary_ind),
+            ))
+
+            records.append(CaseListOut(
+                case_id=cases.case_id,
+                chamber_id=cases.chamber_id,
+                case_number=cases.case_number,
+                court_id=cases.court_id,
+                court_name=court_map.get(cases.court_id),
+                status_code=cases.status_code,
+                status_description=status_map.get(cases.status_code),
+                case_type_code=cases.case_type_code,
+                case_type_description=case_type_map.get(cases.case_type_code),
+                filing_year=cases.filing_year,
+                case_summary=cases.case_summary,
+                petitioner=cases.petitioner,
+                respondent=cases.respondent,
+                aor_user_id=aor_user_id or "",
+                aor_name = self.full_name(first_name, last_name) if aor_user_id else "",
+                party_role_code=party_role_code,
+                party_role_description=party_role_map.get(party_role_code, ""),
+                next_hearing_date=cases.next_hearing_date,
+                last_hearing_date=cases.last_hearing_date,
+                next_hearing_status=hearing_status_map.get(hearing_status_code),
+                updated_date=cases.updated_date,
+            ))
+
+        return records, case_clients_out, total
 
     async def _to_detail_out(self, client: Clients) -> ClientDetailOut:
-        records , total = await self._linked_cases(client_id=client.client_id)
-        img = await self.profile_images_repo.get_profile_image_by_clientid(session=self.session,
-                                                                 client_id=client.client_id)
+        records, case_clients_out, total = await self._linked_cases(
+            client_id=client.client_id
+        )
+        img = await self.profile_images_repo.get_profile_image_by_clientid(
+            session=self.session,
+            client_id=client.client_id,
+        )
+
+        client_type_desc = await self.refm_resolver.from_column(
+            column_attr=Clients.client_type_code,
+            code=client.client_type_code,
+            value_column=RefmClientType.description,
+            default=None,
+        )
+        party_type_desc = await self.refm_resolver.from_column(
+            column_attr=Clients.party_type_code,
+            code=client.party_type_code,
+            value_column=RefmPartyType.description,
+            default=None,
+        )
 
         return ClientDetailOut(
             client_id=client.client_id,
             chamber_id=client.chamber_id,
-            client_type_code=client.client_type_code,
-            client_type_description=await self.refm_resolver.from_column(
-                column_attr=Clients.client_type_code,
-                code=client.client_type_code,
-                value_column=RefmClientType.description,
-                default=None
-            ),            
-            party_type_code=client.party_type_code,
-            party_type_description=await self.refm_resolver.from_column(
-                column_attr=Clients.party_type_code,
-                code=client.party_type_code,
-                value_column=RefmPartyType.description,
-                default=None
-            ),
             client_name=client.client_name,
             display_name=client.display_name,
             contact_person=client.contact_person,
+            client_type_code=client.client_type_code,
+            client_type_description=client_type_desc,
+            party_type_code=client.party_type_code,
+            party_type_description=party_type_desc,
             email=client.email,
             phone=client.phone,
             alternate_phone=client.alternate_phone,
@@ -166,8 +203,8 @@ class ClientsService(BaseSecuredService):
             state_code=client.state_code,
             postal_code=client.postal_code,
             country_code=client.country_code,
-            id_proof_type=client.id_proof_type,
-            id_proof_number=client.id_proof_number,            
+            id_proof_code=client.id_proof_code,
+            id_proof_number=client.id_proof_number,
             image_id=img["image_id"] if img else None,
             image_data=img["image_data"] if img else None,
             source_code=client.source_code,
@@ -178,44 +215,56 @@ class ClientsService(BaseSecuredService):
             updated_date=client.updated_date,
             linked_cases_count=total,
             linked_cases=records,
+            case_clients=case_clients_out,
         )
 
     # ─────────────────────────────────────────────────────────────────────
     # SEARCH (for Link Client modal)
     # ─────────────────────────────────────────────────────────────────────
 
-    async def clients_search(self, search: Optional[str], limit: int = 20) -> List[ClientSearchOut]:
+    async def clients_search(self, search: Optional[str], limit: int = 20) -> List[ClientDetailsOut]:
         clients = await self.clients_repo.search_clients(
             session=self.session,
             chamber_id=self.chamber_id,
             search=search,
             limit=limit,
         )
-        client_ids = [c.client_id for c in clients]
 
+        used_client_types = {c.client_type_code for c in clients if c.client_type_code}
+        used_party_types  = {c.party_type_code  for c in clients if c.party_type_code}
+
+        client_type_map = {}
+        if used_client_types:
+            q = await self.session.execute(
+                select(RefmClientType.code, RefmClientType.description)
+                .where(RefmClientType.code.in_(used_client_types))
+            )
+            client_type_map = {r.code: r.description for r in q}
+
+        party_type_map = {}
+        if used_party_types:
+            q = await self.session.execute(
+                select(RefmPartyType.code, RefmPartyType.description)
+                .where(RefmPartyType.code.in_(used_party_types))
+            )
+            party_type_map = {r.code: r.description for r in q}
+
+        client_ids = [c.client_id for c in clients]
         image_map = await self.profile_images_repo.get_images_by_client_ids(
             session=self.session,
             client_ids=client_ids,
         )
+
         return [
-            ClientSearchOut(
+            ClientDetailsOut(
                 client_id=c.client_id,
+                chamber_id=self.chamber_id,
                 client_name=c.client_name,
                 display_name=c.display_name,
                 client_type_code=c.client_type_code,
-                client_type_description=await self.refm_resolver.from_column(
-                    column_attr=Clients.client_type_code,
-                    code=c.client_type_code,
-                    value_column=RefmClientType.description,
-                    default=None
-                ),            
+                client_type_description=client_type_map.get(c.client_type_code, ''),
                 party_type_code=c.party_type_code,
-                party_type_description=await self.refm_resolver.from_column(
-                    column_attr=Clients.party_type_code,
-                    code=c.party_type_code,
-                    value_column=RefmPartyType.description,
-                    default=None
-                ),
+                party_type_description=party_type_map.get(c.party_type_code, ''),
                 phone=c.phone,
                 email=c.email,
                 image_id=image_map.get(c.client_id, {}).get("image_id"),
@@ -224,9 +273,6 @@ class ClientsService(BaseSecuredService):
             for c in clients
         ]
 
-    # ─────────────────────────────────────────────────────────────────────
-    # PAGINATED LIST
-    # ─────────────────────────────────────────────────────────────────────
 
     async def clients_get_paged(
         self,
@@ -236,14 +282,13 @@ class ClientsService(BaseSecuredService):
         client_type_code: Optional[str] = None,
         party_type_code: Optional[str] = None,
     ) -> PagingData[ClientListOut]:
-        
+
         conditions = [
             Clients.chamber_id == self.chamber_id,
             Clients.deleted_ind.is_(False),
         ]
         if client_type_code:
             conditions.append(Clients.client_type_code == client_type_code.upper())
-        
         if party_type_code:
             conditions.append(Clients.party_type_code == party_type_code.upper())
         if search and search.strip():
@@ -264,19 +309,37 @@ class ClientsService(BaseSecuredService):
             order_by=[Clients.client_name.asc()],
         )
 
-        # Get linked case counts in one query
         client_ids = [c.client_id for c in clients]
+
+        # Batch resolve all lookups
+        used_client_types = {c.client_type_code for c in clients if c.client_type_code}
+        used_party_types  = {c.party_type_code  for c in clients if c.party_type_code}
+
+        client_type_map = {}
+        if used_client_types:
+            q = await self.session.execute(
+                select(RefmClientType.code, RefmClientType.description)
+                .where(RefmClientType.code.in_(used_client_types))
+            )
+            client_type_map = {r.code: r.description for r in q}
+
+        party_type_map = {}
+        if used_party_types:
+            q = await self.session.execute(
+                select(RefmPartyType.code, RefmPartyType.description)
+                .where(RefmPartyType.code.in_(used_party_types))
+            )
+            party_type_map = {r.code: r.description for r in q}
+
         case_counts: dict = {}
+        image_map: dict = {}
         if client_ids:
-            rows = await self.session.execute(
+            q = await self.session.execute(
                 select(CaseClients.client_id, func.count(CaseClients.case_client_id).label("cnt"))
                 .where(CaseClients.client_id.in_(client_ids))
                 .group_by(CaseClients.client_id)
             )
-            case_counts = {r.client_id: r.cnt for r in rows}
-
-            
-            client_ids = [c.client_id for c in clients]
+            case_counts = {r.client_id: r.cnt for r in q}
 
             image_map = await self.profile_images_repo.get_images_by_client_ids(
                 session=self.session,
@@ -285,23 +348,14 @@ class ClientsService(BaseSecuredService):
 
         records = [
             ClientListOut(
-                client_id=c.client_id,                
+                client_id=c.client_id,
+                chamber_id=self.chamber_id,
                 client_type_code=c.client_type_code,
-                client_type_description=await self.refm_resolver.from_column(
-                    column_attr=Clients.client_type_code,
-                    code=c.client_type_code,
-                    value_column=RefmClientType.description,
-                    default=None
-                ),            
+                client_type_description=client_type_map.get(c.client_type_code,''),
                 party_type_code=c.party_type_code,
-                party_type_description=await self.refm_resolver.from_column(
-                    column_attr=Clients.party_type_code,
-                    code=c.party_type_code,
-                    value_column=RefmPartyType.description,
-                    default=None
-                ),
+                party_type_description=party_type_map.get(c.party_type_code,''),
                 client_name=c.client_name,
-                contact_person=c.contact_person,                
+                contact_person=c.contact_person,
                 display_name=c.display_name,
                 phone=c.phone,
                 email=c.email,
@@ -312,8 +366,8 @@ class ClientsService(BaseSecuredService):
                 state_code=c.state_code,
                 postal_code=c.postal_code,
                 country_code=c.country_code,
-                id_proof_type=c.id_proof_type,
-                id_proof_number=c.id_proof_number,                
+                id_proof_code=c.id_proof_code,
+                id_proof_number=c.id_proof_number,
                 image_id=image_map.get(c.client_id, {}).get("image_id"),
                 image_data=image_map.get(c.client_id, {}).get("image_data"),
                 source_code=c.source_code,
@@ -325,6 +379,7 @@ class ClientsService(BaseSecuredService):
             )
             for c in clients
         ]
+
         return PagingBuilder(total_records=total, page=page, limit=limit).build(records=records)
 
     # ─────────────────────────────────────────────────────────────────────

@@ -103,10 +103,6 @@ INSERT IGNORE INTO refm_party_type (code, description, sort_order) VALUES
 ('PTCL', 'Client', 10),
 ('PTCP', 'Party to Case', 20);
 
-INSERT IGNORE INTO refm_engagement_type (code, description, sort_order) VALUES
-('ETPE', 'Petitioner', 10),
-('ETRE', 'Respondent', 20);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.4  Email & Communication
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -142,9 +138,17 @@ INSERT IGNORE INTO refm_comm_status (code, description, color_code, sort_order) 
 ('CSRD', 'Read',      '#a855f7', 40),
 ('CSFL', 'Failed',    '#ef4444', 50);
 
-INSERT IGNORE INTO refm_entity_type (code, description, sort_order) VALUES
+INSERT IGNORE INTO refm_img_upload_for (code, description, sort_order) VALUES
 ('ENTU', 'User',    10),
 ('ENTC', 'Client',  20);
+
+INSERT IGNORE INTO refm_proof_type (code, description, sort_order) VALUES
+('PTAD', 'Aadhar',    10),
+('PTPN', 'PAN',  20),
+('PTDL', 'Driving Licence', 30),
+('PTVC', 'Voter ID',  40),
+('PTCR', 'Company Registration',  50),
+('PTGT', 'GST',  60);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.5  User & Auth Statuses
@@ -396,64 +400,64 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 -- =============================================================================
 
 INSERT INTO cases (chamber_id, case_number, court_id, case_type_code, filing_year,
-                   petitioner, respondent, aor_user_id, case_summary, status_code,
+                   petitioner, respondent, case_summary, status_code,
                    next_hearing_date, last_hearing_date, created_by) VALUES
 -- OVERDUE CASES
 (@chamber_vk, 'Crl.O.P.No.234/2025',   1, 'CTCR', 2025,
- 'State of Tamil Nadu', 'Arjun Prasad',      @user_priya,
+ 'State of Tamil Nadu', 'Arjun Prasad',      
  'Quashing of FIR u/s 420 IPC – financial fraud',                      'CSAC',  '2026-03-20', '2026-03-15', @user_vijay),
 
 (@chamber_vk, 'W.P.(MD)No.5678/2025',  1, 'CTWR', 2025,
- 'Tmt. Saraswathi',     'The Tahsildar',     @user_priya,
+ 'Tmt. Saraswathi',     'The Tahsildar',     
  'Challenge to patta cancellation order',                               'CSAC',  '2026-03-22', '2026-03-18', @user_vijay),
 
 (@chamber_vk, 'Crl.M.C.No.89/2026',    6, 'CTCR', 2026,
- 'Ramesh Kumar',        'Inspector of Police', @user_priya,
+ 'Ramesh Kumar',        'Inspector of Police', 
  'Anticipatory bail petition',                                         'CSAC',  '2026-03-18', '2026-03-10', @user_vijay),
 
 -- UPCOMING THIS WEEK
 (@chamber_vk, 'O.S.No.456/2025',       2, 'CTCV', 2025,
- 'Meenkshi Textiles',   'Global Exports Ltd',  @user_priya,
+ 'Meenkshi Textiles',   'Global Exports Ltd',  
  'Suit for specific performance of sale agreement',                     'CSAC',  '2026-03-26', '2026-03-19', @user_vijay),
 
 (@chamber_vk, 'F.C.No.123/2025',       5, 'CTFM', 2025,
- 'Lakshmi Devi',        'Suresh Babu',         @user_priya,
+ 'Lakshmi Devi',        'Suresh Babu',         
  'Divorce petition under Hindu Marriage Act',                           'CSAC',  '2026-03-27', '2026-03-12', @user_vijay),
 
 (@chamber_vk, 'L.C.No.78/2025',        3, 'CTLB', 2025,
- 'Workmen Union',       'ABC Manufacturing',   @user_priya,
+ 'Workmen Union',       'ABC Manufacturing',   
  'Labour dispute – wrongful termination',                                'CSAC',  '2026-03-28', '2026-03-14', @user_vijay),
 
 -- FUTURE CASES
 (@chamber_vk, 'Crl.O.P.No.567/2026',   1, 'CTCR', 2026,
- 'State of Tamil Nadu', 'Murugan',             @user_priya,
+ 'State of Tamil Nadu', 'Murugan',             
  'Quashing of criminal proceedings',                                    'CSAC',  '2026-04-15', NULL,         @user_vijay),
 
 (@chamber_vk, 'W.P.No.9012/2026',      1, 'CTWR', 2026,
- 'Chennai Developers',  'DTCP',                @user_priya,
+ 'Chennai Developers',  'DTCP',                
  'Writ against planning permission denial',                             'CSAC',  '2026-04-20', NULL,         @user_vijay),
 
 -- ADJOURNED CASES
 (@chamber_vk, 'O.S.No.789/2024',       2, 'CTCV', 2024,
- 'Subramanian',         'Venkatesh',           @user_priya,
+ 'Subramanian',         'Venkatesh',           
  'Property partition suit',                                             'CSAD', '2026-04-05', '2026-03-21', @user_vijay),
 
 -- DISPOSED/CLOSED
 (@chamber_vk, 'Crl.M.C.No.45/2024',    6, 'CTCR', 2024,
- 'Anand',               'State of TN',         @user_priya,
+ 'Anand',               'State of TN',         
  'Bail application – disposed',                                         'CSDI', NULL,         '2026-02-15', @user_vijay),
 
 (@chamber_vk, 'F.C.No.56/2024',        5, 'CTFM', 2024,
- 'Priya',               'Rajesh',              @user_priya,
+ 'Priya',               'Rajesh',              
  'Custody matter – closed',                                             'CSCL', NULL,         '2026-01-30', @user_vijay),
 
 -- Sundar Associates Cases
 (@chamber_sundar, 'O.S.No.145/2024',   4, 'CTCV', 2024,
- 'M/s Blue Sky Builders', 'T.N. Housing Board', @user_lokesh,
+ 'M/s Blue Sky Builders', 'T.N. Housing Board', 
  'Specific performance of sale agreement – construction dispute',       'CSAC',  '2026-04-10', '2026-03-01', @user_lokesh),
 
 (@chamber_sundar, 'Crl.O.P.No.88/2025', 1, 'CTCR', 2025,
- 'State of Tamil Nadu', 'Ganesh',              @user_lokesh,
+ 'State of Tamil Nadu', 'Ganesh',              
  'Criminal revision petition',                                          'CSAC',  '2026-03-25', '2026-03-10', @user_lokesh);
 
 
@@ -542,64 +546,64 @@ INSERT INTO hearings
 INSERT INTO clients (chamber_id, client_type_code, party_type_code, client_name, display_name, 
                      contact_person, email, phone, alternate_phone, 
                      address_line1, city, state_code, postal_code, country_code,
-                     id_proof_type, id_proof_number, source_code, referral_source,
+                     id_proof_code, id_proof_number, source_code, referral_source,
                      client_since, notes, deleted_ind, created_by) VALUES
 -- Case parties (PTCP)
 (@chamber_vk, 'CTIN', 'PTCP', 'Arjun Prasad', 'Mr. Arjun Prasad', 'Arjun Prasad', 'arjun.prasad@email.com', '9876501234', NULL,
- 'No. 15, Gandhi Nagar', 'Chennai', 'TN', '600020', 'IN', 'PAN', 'ABCDE1234F', 'REF', 'Existing client referral',
+ 'No. 15, Gandhi Nagar', 'Chennai', 'TN', '600020', 'IN', 'PTPN', 'ABCDE1234F', 'REF', 'Existing client referral',
  '2024-01-10', 'Accused in Crl.O.P.No.234/2025 - FIR quashing case', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Tmt. Saraswathi', 'Mrs. Saraswathi', 'Saraswathi', 'saraswathi@email.com', '9876502345', NULL,
- 'No. 28, Temple Street', 'Chengalpattu', 'TN', '603001', 'IN', 'Aadhaar', '1234-5678-9012', 'WALK', 'Direct walk-in',
+ 'No. 28, Temple Street', 'Chengalpattu', 'TN', '603001', 'IN', 'PTAD', '1234-5678-9012', 'WALK', 'Direct walk-in',
  '2024-02-15', 'Writ petition against patta cancellation', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Ramesh Kumar', 'Mr. Ramesh Kumar', 'Ramesh Kumar', 'ramesh.kumar@email.com', '9876503456', '9876503457',
- 'No. 42, Anna Nagar', 'Chennai', 'TN', '600040', 'IN', 'PAN', 'XYZAB5678C', 'REF', 'Senior Advocate referral',
+ 'No. 42, Anna Nagar', 'Chennai', 'TN', '600040', 'IN', 'PTPN', 'XYZAB5678C', 'REF', 'Senior Advocate referral',
  '2025-12-20', 'Anticipatory bail petition - Crl.M.C.No.89/2026', FALSE, @user_priya),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Lakshmi Devi', 'Mrs. Lakshmi Devi', 'Lakshmi Devi', 'lakshmi.devi@email.com', '9876505678', NULL,
- 'No. 67, Residential Area', 'Chennai', 'TN', '600028', 'IN', 'Aadhaar', '9876-5432-1098', 'REF', 'Family friend referral',
+ 'No. 67, Residential Area', 'Chennai', 'TN', '600028', 'IN', 'PTAD', '9876-5432-1098', 'REF', 'Family friend referral',
  '2025-07-15', 'Divorce petition - F.C.No.123/2025', FALSE, @user_priya),
 
 (@chamber_vk, 'CTCO', 'PTCP', 'Workmen Union', 'Workmen Union - Local Chapter', 'Secretary (Name Redacted)', 'union@workmen.org', '9876506789', NULL,
- 'Trade Union Office, Teynampet', 'Chennai', 'TN', '600018', 'IN', 'Registration', 'TU/2020/1234', 'REF', 'Trade association referral',
+ 'Trade Union Office, Teynampet', 'Chennai', 'TN', '600018', 'IN', 'PTCR', 'TU/2020/1234', 'REF', 'Trade association referral',
  '2025-03-20', 'Labour dispute - wrongful termination case', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Murugan', 'Mr. Murugan', 'Murugan', 'murugan@email.com', '9876507890', NULL,
- 'No. 89, Village Road', 'Kanchipuram', 'TN', '631501', 'IN', 'PAN', 'MURGA1234D', 'WALK', 'Direct approach',
+ 'No. 89, Village Road', 'Kanchipuram', 'TN', '631501', 'IN', 'PTPN', 'MURGA1234D', 'WALK', 'Direct approach',
  '2026-01-05', 'Criminal proceedings quashing - Crl.O.P.No.567/2026', FALSE, @user_priya),
 
 (@chamber_vk, 'CTCO', 'PTCP', 'Chennai Developers', 'Chennai Developers Ltd', 'VP Legal (Name Redacted)', 'legal@chennaidev.com', '9876508901', '9876508902',
- 'Corporate Office, OMR', 'Chennai', 'TN', '600096', 'IN', 'GST', '33CHNDE1234F1Z9', 'REF', 'Corporate client',
+ 'Corporate Office, OMR', 'Chennai', 'TN', '600096', 'IN', 'PTGT', '33CHNDE1234F1Z9', 'REF', 'Corporate client',
  '2026-01-20', 'Writ against DTCP planning permission denial', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Subramanian', 'Mr. Subramanian', 'Subramanian', 'subramanian@email.com', '9876509012', NULL,
- 'No. 34, Heritage Colony', 'Chennai', 'TN', '600041', 'IN', 'PAN', 'SUBRA5678E', 'REF', 'Long-time client',
+ 'No. 34, Heritage Colony', 'Chennai', 'TN', '600041', 'IN', 'PTPN', 'SUBRA5678E', 'REF', 'Long-time client',
  '2024-05-10', 'Property partition suit - O.S.No.789/2024', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Anand', 'Mr. Anand', 'Anand', 'anand@email.com', '9876500123', NULL,
- 'No. 12, Bail Road', 'Chennai', 'TN', '600034', 'IN', 'Aadhaar', '1111-2222-3333', 'WALK', 'Court complex reference',
+ 'No. 12, Bail Road', 'Chennai', 'TN', '600034', 'IN', 'PTAD', '1111-2222-3333', 'WALK', 'Court complex reference',
  '2024-01-05', 'Bail application - disposed (Crl.M.C.No.45/2024)', FALSE, @user_priya),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Priya', 'Mrs. Priya', 'Priya', 'priya.custody@email.com', '9876500234', NULL,
- 'No. 56, Family Court Area', 'Chennai', 'TN', '600014', 'IN', 'Aadhaar', '4444-5555-6666', 'REF', 'Family court referral',
+ 'No. 56, Family Court Area', 'Chennai', 'TN', '600014', 'IN', 'PTAD', '4444-5555-6666', 'REF', 'Family court referral',
  '2024-01-15', 'Custody matter - closed (F.C.No.56/2024)', FALSE, @user_vijay),
 
 (@chamber_sundar, 'CTCO', 'PTCP', 'M/s Blue Sky Builders', 'Blue Sky Builders Pvt Ltd', 'Managing Director', 'contact@bluesky.com', '9445101234', '9445101235',
- 'Construction Site Office, Gandhipuram', 'Coimbatore', 'TN', '641012', 'IN', 'GST', '33BLUSK1234F1Z2', 'WEB', 'Website contact',
+ 'Construction Site Office, Gandhipuram', 'Coimbatore', 'TN', '641012', 'IN', 'PTGT', '33BLUSK1234F1Z2', 'WEB', 'Website contact',
  '2024-08-01', 'Construction dispute - specific performance case', FALSE, @user_lokesh),
 
 (@chamber_sundar, 'CTIN', 'PTCP', 'Ganesh', 'Mr. Ganesh', 'Ganesh', 'ganesh.criminal@email.com', '9445102345', NULL,
- 'No. 78, Court Road', 'Coimbatore', 'TN', '641018', 'IN', 'PAN', 'GANES9012F', 'REF', 'Local advocate referral',
+ 'No. 78, Court Road', 'Coimbatore', 'TN', '641018', 'IN', 'PTPN', 'GANES9012F', 'REF', 'Local advocate referral',
  '2025-03-10', 'Criminal revision petition - Crl.O.P.No.88/2025', FALSE, @user_lokesh),
 
 -- General chamber clients (PTCL)
 (@chamber_vk, 'CTCO', 'PTCL', 'Meenkshi Textiles', 'Meenkshi Textiles Pvt Ltd', 'Rajesh Mehta (Director)', 'contact@meenkshi.com', '9876504567', '9876504568',
- 'Plot 156, Industrial Estate', 'Chennai', 'TN', '600032', 'IN', 'GST', '33ABCDE1234F1Z5', 'WEB', 'Website inquiry',
+ 'Plot 156, Industrial Estate', 'Chennai', 'TN', '600032', 'IN', 'PTGT', '33ABCDE1234F1Z5', 'WEB', 'Website inquiry',
  '2025-06-10', 'Corporate advisory client — not currently a party to litigation', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCL', 'Sundar Raj', 'Mr. Sundar Raj', 'Sundar Raj', 'sundar.raj@email.com', '9876509999', NULL,
- 'No. 101, Main Road', 'Chennai', 'TN', '600050', 'IN', 'PAN', 'SUNDR1234X', 'REF', 'Walk-in consultation',
+ 'No. 101, Main Road', 'Chennai', 'TN', '600050', 'IN', 'PTPN', 'SUNDR1234X', 'REF', 'Walk-in consultation',
  '2026-02-01', 'General advisory client — no active case', FALSE, @user_vijay);
 
 
@@ -623,34 +627,34 @@ SET @client_ganesh       = (SELECT client_id FROM clients WHERE client_name = 'G
 -- -----------------------------------------------------------------------------
 
 INSERT INTO case_clients (chamber_id, case_id, client_id, party_role_code, 
-                          primary_ind, engagement_type_code, created_by) VALUES
+                          primary_ind, created_by) VALUES
 -- VijayKrishnan & Associates Case-Client Links
-(@chamber_vk, @case1, @client_arjun,       'PRPE', TRUE,  'ETPE', @user_vijay),
-(@chamber_vk, @case1, @client_saraswathi,  'PRRE', FALSE, 'ETRE', @user_vijay),
-
-(@chamber_vk, @case2, @client_saraswathi,  'PRPE', TRUE,  'ETPE', @user_vijay),
-(@chamber_vk, @case2, @client_ramesh,      'PRRE', FALSE, 'ETRE', @user_vijay),
-
-(@chamber_vk, @case3, @client_ramesh,      'PRPE', TRUE,  'ETPE', @user_priya),
-(@chamber_vk, @case3, @client_murugan,     'PRRE', FALSE, 'ETRE', @user_priya),
-
-(@chamber_vk, @case4, @client_meenkshi,    'PRPE', TRUE,  'ETPE', @user_vijay),
-(@chamber_vk, @case4, @client_lakshmi,     'PRRE', FALSE, 'ETRE', @user_vijay),
-
-(@chamber_vk, @case5, @client_lakshmi,     'PRPE', TRUE,  'ETPE', @user_priya),
-(@chamber_vk, @case5, @client_subramanian, 'PRRE', FALSE, 'ETRE', @user_priya),
-
-(@chamber_vk, @case6, @client_workmen,     'PRPE', TRUE,  'ETPE', @user_vijay),
-(@chamber_vk, @case6, @client_bluesky,     'PRRE', FALSE, 'ETRE', @user_vijay),
-
-(@chamber_vk, @case7, @client_murugan,     'PRPE', TRUE,  'ETPE', @user_priya),
-(@chamber_vk, @case7, @client_anand,       'PRRE', FALSE, 'ETRE', @user_priya),
-
-(@chamber_vk, @case8, @client_chennai_dev, 'PRPE', TRUE,  'ETPE', @user_vijay),
-(@chamber_vk, @case8, @client_ganesh,      'PRRE', FALSE, 'ETRE', @user_vijay),
-
-(@chamber_vk, @case9, @client_subramanian, 'PRPE', TRUE,  'ETPE', @user_vijay),
-(@chamber_vk, @case9, @client_priya_cust,  'PRRE', FALSE, 'ETRE', @user_vijay);
+(@chamber_vk, @case1, @client_arjun,       'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case1, @client_saraswathi,  'PRRE', FALSE, @user_vijay),
+														  
+(@chamber_vk, @case2, @client_saraswathi,  'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case2, @client_ramesh,      'PRRE', FALSE, @user_vijay),
+														  
+(@chamber_vk, @case3, @client_ramesh,      'PRPE', TRUE,  @user_priya),
+(@chamber_vk, @case3, @client_murugan,     'PRRE', FALSE, @user_priya),
+														  
+(@chamber_vk, @case4, @client_meenkshi,    'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case4, @client_lakshmi,     'PRRE', FALSE, @user_vijay),
+														  
+(@chamber_vk, @case5, @client_lakshmi,     'PRPE', TRUE,  @user_priya),
+(@chamber_vk, @case5, @client_subramanian, 'PRRE', FALSE, @user_priya),
+														  
+(@chamber_vk, @case6, @client_workmen,     'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case6, @client_bluesky,     'PRRE', FALSE, @user_vijay),
+														  
+(@chamber_vk, @case7, @client_murugan,     'PRPE', TRUE,  @user_priya),
+(@chamber_vk, @case7, @client_anand,       'PRRE', FALSE, @user_priya),
+														  
+(@chamber_vk, @case8, @client_chennai_dev, 'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case8, @client_ganesh,      'PRRE', FALSE, @user_vijay),
+														  
+(@chamber_vk, @case9, @client_subramanian, 'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case9, @client_priya_cust,  'PRRE', FALSE, @user_vijay);
 
 
 -- -----------------------------------------------------------------------------
@@ -752,29 +756,29 @@ VALUES
 (@chamber_vk, 'senlawyer@example.com', @role_senior_vk, @user_vijay, '2026-03-22', '2026-04-21', 'ISPN', 'Join our team as a Senior Advocate.', @user_vijay);
 
 -- Users (varied avatar styles)
-INSERT INTO profile_images (user_id, client_id, image_data, description, created_by)
+INSERT INTO profile_images (user_id, client_id, image_upload_code, image_data, description, created_by)
 VALUES
-(@user_vijay,   NULL, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM0YzUxYzgiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjQwIiByPSIxNSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNzAiIHI9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiNmZmYiLz48cG9seWdvbiBwb2ludHM9IjUwLDMwIDU1LDQwIDQ1LDQwIiBmaWxsPSIjZmZmIi8+PC9zdmc+', 'Avatar: abstract person icon for Vijay',   @user_vijay),
-(@user_priya,   NULL, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNmYzRlMDIiLz48Y2lyY2xlIGN4PSIzNSIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iNjUiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0zMCA3MCBRNTAgODAgNzAgNzAiIHN0cm9rZT0iI2ZmZiIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI2Ii8+PC9zdmc+', 'Avatar: smiley face for Priya',   @user_vijay),
-(@user_karthik, NULL, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyMjJkMzIiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDMwIDkwLDcwIDUwLDkwIDEwLDcwIDEwLDMwIiBmaWxsPSIjZTU5YzQyIiBmaWxsLW9wYWNpdHk9IjAuOSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiPks8L3RleHQ+PC9zdmc+', 'Avatar: hexagon with initial K for Karthik', @user_vijay),
-(@user_lokesh,  NULL, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNmZjY2Y2MiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48cGF0aCBkPSJNMzUsMzUgTDY1LDY1IE02NSwzNSBMNjUsMzUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI4IiBmaWxsPSJub25lIi8+PC9zdmc+', 'Avatar: abstract cross pattern for Lokesh',  @user_vijay);
+(@user_vijay,   NULL,	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM0YzUxYzgiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjQwIiByPSIxNSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNzAiIHI9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiNmZmYiLz48cG9seWdvbiBwb2ludHM9IjUwLDMwIDU1LDQwIDQ1LDQwIiBmaWxsPSIjZmZmIi8+PC9zdmc+', 'Avatar: abstract person icon for Vijay',   @user_vijay),
+(@user_priya,   NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNmYzRlMDIiLz48Y2lyY2xlIGN4PSIzNSIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iNjUiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0zMCA3MCBRNTAgODAgNzAgNzAiIHN0cm9rZT0iI2ZmZiIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI2Ii8+PC9zdmc+', 'Avatar: smiley face for Priya',   @user_vijay),
+(@user_karthik, NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyMjJkMzIiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDMwIDkwLDcwIDUwLDkwIDEwLDcwIDEwLDMwIiBmaWxsPSIjZTU5YzQyIiBmaWxsLW9wYWNpdHk9IjAuOSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiPks8L3RleHQ+PC9zdmc+', 'Avatar: hexagon with initial K for Karthik', @user_vijay),
+(@user_lokesh,  NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNmZjY2Y2MiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48cGF0aCBkPSJNMzUsMzUgTDY1LDY1IE02NSwzNSBMNjUsMzUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI4IiBmaWxsPSJub25lIi8+PC9zdmc+', 'Avatar: abstract cross pattern for Lokesh',  @user_vijay);
 
 -- Clients (diverse avatars)
-INSERT INTO profile_images (user_id, client_id, image_data, description, created_by)
+INSERT INTO profile_images (user_id, client_id, image_upload_code, image_data, description, created_by)
 VALUES
-( NULL, @client_arjun,       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxNTQzNjAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZmZDk2NiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjI1IiBmaWxsPSIjMTU0MzYwIi8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IkFyaWFsIj5BUDwvdGV4dD48L3N2Zz4=', 'Avatar: ringed initial for Arjun Prasad',       @user_vijay),
-( NULL, @client_saraswathi,  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM5YzI3YzAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZmYzQwMCIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNDAiIHI9IjEwIiBmaWxsPSIjOWMyN2MwIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiM5YzI3YzAiLz48cG9seWdvbiBwb2ludHM9IjUwLDcwIDQwLDYwIDYwLDYwIiBmaWxsPSIjOWMyN2MwIi8+PC9zdmc+', 'Avatar: abstract flower for Saraswathi',   @user_vijay),
-( NULL, @client_ramesh,      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyQzNCNUUiLz48cG9seWdvbiBwb2ludHM9IjUwLDIwIDgwLDQwIDgwLDYwIDUwLDgwIDIwLDYwIDIwLDQwIiBmaWxsPSIjRkZENjY2Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzJDM0I1RSIgZm9udC1mYW1pbHk9IkFyaWFsIj5SSzwvdGV4dD48L3N2Zz4=', 'Avatar: diamond with initials RK for Ramesh',      @user_priya),
-( NULL, @client_meenkshi,    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiM5RTlFOUUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjQwIiByPSIxMiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNzAiIHI9IjE4IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiM5ZTllOWUiLz48L3N2Zz4=', 'Avatar: snowman style for Meenkshi Textiles', @user_vijay),
-( NULL, @client_lakshmi,     'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFNUIzMkIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNSIgc3Ryb2tlPSIjZmZmIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyNSIgc3Ryb2tlPSIjZmZmIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjUiLz48L3N2Zz4=', 'Avatar: target pattern for Lakshmi Devi',      @user_priya),
-( NULL, @client_workmen,     'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxRjI5MzUiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDM1IDkwLDY1IDUwLDkwIDEwLDY1IDEwLDM1IiBmaWxsPSIjRkZBNjI2Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzFGMjkzNSIgZm9udC1mYW1pbHk9IkFyaWFsIj5XPC90ZXh0Pjwvc3ZnPg==', 'Avatar: pentagon with W for Workmen Union',     @user_vijay),
-( NULL, @client_murugan,     'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxRjg3QkUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0ZGQzEwNyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjI1IiBmaWxsPSIjMjI4QkUwIi8+PHJlY3QgeD0iNDUiIHk9IjQ1IiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNmZmMiLz48L3N2Zz4=', 'Avatar: bullseye for Murugan',           @user_priya),
-( NULL, @client_chennai_dev, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFMjhFNjAiLz48cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48cmVjdCB4PSIzNSIgeT0iMzUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48dGV4dCB4PSI1MCIgeT0iNTUiIGZvbnQtc2l6ZT0iMjgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0iQXJpYWwiPkNEPC90ZXh0Pjwvc3ZnPg==', 'Avatar: stacked squares for Chennai Developers',@user_vijay),
-( NULL, @client_subramanian, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM0RDU2NzAiLz48cGF0aCBkPSJNMzAsMjAgTDcwLDIwIEw4MCw1MCBMNzAsODAgTDMwLDgwIEwyMCw1MCBaIiBmaWxsPSIjRkZENzU1Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzRENTY3MCIgZm9udC1mYW1pbHk9IkFyaWFsIj5TVTwvdGV4dD48L3N2Zz4=', 'Avatar: house shape for Subramanian',       @user_vijay),
-( NULL, @client_anand,       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNGRjhDMDAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48L3N2Zz4=', 'Avatar: concentric circles for Anand',             @user_priya),
-( NULL, @client_priya_cust,  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM5QjI2MjYiLz48cG9seWdvbiBwb2ludHM9IjUwLDIwIDc1LDQwIDc1LDYwIDUwLDgwIDI1LDYwIDI1LDQwIiBmaWxsPSIjRkZERDk5Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzliMjYyNiIgZm9udC1mYW1pbHk9IkFyaWFsIj5QQzwvdGV4dD48L3N2Zz4=', 'Avatar: diamond with PC for Priya (custody)',   @user_vijay),
-( NULL, @client_bluesky,     'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyOTc5QkYiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjgiLz48L3N2Zz4=', 'Avatar: gradient circles for Blue Sky Builders', @user_lokesh),
-( NULL, @client_ganesh,      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM2NjRDNjAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjQiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjgiLz48L3N2Zz4=', 'Avatar: bullseye pattern for Ganesh',            @user_lokesh);
+( NULL, @client_arjun, 	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxNTQzNjAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZmZDk2NiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjI1IiBmaWxsPSIjMTU0MzYwIi8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IkFyaWFsIj5BUDwvdGV4dD48L3N2Zz4=', 'Avatar: ringed initial for Arjun Prasad',       @user_vijay),
+( NULL, @client_saraswathi,   	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM5YzI3YzAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZmYzQwMCIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNDAiIHI9IjEwIiBmaWxsPSIjOWMyN2MwIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiM5YzI3YzAiLz48cG9seWdvbiBwb2ludHM9IjUwLDcwIDQwLDYwIDYwLDYwIiBmaWxsPSIjOWMyN2MwIi8+PC9zdmc+', 'Avatar: abstract flower for Saraswathi',   @user_vijay),
+( NULL, @client_ramesh,   	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyQzNCNUUiLz48cG9seWdvbiBwb2ludHM9IjUwLDIwIDgwLDQwIDgwLDYwIDUwLDgwIDIwLDYwIDIwLDQwIiBmaWxsPSIjRkZENjY2Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzJDM0I1RSIgZm9udC1mYW1pbHk9IkFyaWFsIj5SSzwvdGV4dD48L3N2Zz4=', 'Avatar: diamond with initials RK for Ramesh',      @user_priya),
+( NULL, @client_meenkshi,     	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiM5RTlFOUUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjQwIiByPSIxMiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNzAiIHI9IjE4IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiM5ZTllOWUiLz48L3N2Zz4=', 'Avatar: snowman style for Meenkshi Textiles', @user_vijay),
+( NULL, @client_lakshmi,     	'ENTC', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFNUIzMkIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNSIgc3Ryb2tlPSIjZmZmIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyNSIgc3Ryb2tlPSIjZmZmIiBmaWxsPSJub25lIiBzdHJva2Utd2lkdGg9IjUiLz48L3N2Zz4=', 'Avatar: target pattern for Lakshmi Devi',      @user_priya),
+( NULL, @client_workmen,   	'ENTC',   'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxRjI5MzUiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDM1IDkwLDY1IDUwLDkwIDEwLDY1IDEwLDM1IiBmaWxsPSIjRkZBNjI2Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzFGMjkzNSIgZm9udC1mYW1pbHk9IkFyaWFsIj5XPC90ZXh0Pjwvc3ZnPg==', 'Avatar: pentagon with W for Workmen Union',     @user_vijay),
+( NULL, @client_murugan,      	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMxRjg3QkUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0ZGQzEwNyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjI1IiBmaWxsPSIjMjI4QkUwIi8+PHJlY3QgeD0iNDUiIHk9IjQ1IiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNmZmMiLz48L3N2Zz4=', 'Avatar: bullseye for Murugan',           @user_priya),
+( NULL, @client_chennai_dev,  	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNFMjhFNjAiLz48cmVjdCB4PSIyMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48cmVjdCB4PSIzNSIgeT0iMzUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48dGV4dCB4PSI1MCIgeT0iNTUiIGZvbnQtc2l6ZT0iMjgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0iQXJpYWwiPkNEPC90ZXh0Pjwvc3ZnPg==', 'Avatar: stacked squares for Chennai Developers',@user_vijay),
+( NULL, @client_subramanian,  	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM0RDU2NzAiLz48cGF0aCBkPSJNMzAsMjAgTDcwLDIwIEw4MCw1MCBMNzAsODAgTDMwLDgwIEwyMCw1MCBaIiBmaWxsPSIjRkZENzU1Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzRENTY3MCIgZm9udC1mYW1pbHk9IkFyaWFsIj5TVTwvdGV4dD48L3N2Zz4=', 'Avatar: house shape for Subramanian',       @user_vijay),
+( NULL, @client_anand,        	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNGRjhDMDAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48L3N2Zz4=', 'Avatar: concentric circles for Anand',             @user_priya),
+( NULL, @client_priya_cust,   	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM5QjI2MjYiLz48cG9seWdvbiBwb2ludHM9IjUwLDIwIDc1LDQwIDc1LDYwIDUwLDgwIDI1LDYwIDI1LDQwIiBmaWxsPSIjRkZERDk5Ii8+PHRleHQgeD0iNTAiIHk9IjU1IiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSIgZmlsbD0iIzliMjYyNiIgZm9udC1mYW1pbHk9IkFyaWFsIj5QQzwvdGV4dD48L3N2Zz4=', 'Avatar: diamond with PC for Priya (custody)',   @user_vijay),
+( NULL, @client_bluesky,     	'ENTC', 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyOTc5QkYiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjUiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyMCIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjgiLz48L3N2Zz4=', 'Avatar: gradient circles for Blue Sky Builders', @user_lokesh),
+( NULL, @client_ganesh,       	'ENTC','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM2NjRDNjAiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjIiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjQiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIyNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjYiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iI0ZGRkZGRiIgZmlsbC1vcGFjaXR5PSIwLjgiLz48L3N2Zz4=', 'Avatar: bullseye pattern for Ganesh',            @user_lokesh);
 
 -- =============================================================================
 -- 25. SEED DATA — TIER 11  (Audit & Activity Logs for Dashboard)

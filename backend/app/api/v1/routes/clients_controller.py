@@ -15,7 +15,7 @@ from app.dtos.clients_dto import (
     ClientDetailOut,
     ClientEdit,
     ClientListOut,
-    ClientSearchOut,
+    ClientDetailsOut,
     ClientSummaryStats,
 )
 from app.services.clients_service import ClientsService
@@ -30,7 +30,7 @@ class ClientsController(BaseController):
     @BaseController.get(
         "/search",
         summary="Search clients by name, phone, or email",
-        response_model=BaseOutDto[List[ClientSearchOut]],
+        response_model=BaseOutDto[List[ClientDetailsOut]],
     )
     async def clients_search(
         self,        
@@ -40,7 +40,7 @@ class ClientsController(BaseController):
         ),
         limit: int = Query(20, ge=1, le=100),
         service: ClientsService = Depends(get_clients_service),
-    ) -> BaseOutDto[List[ClientSearchOut]]:
+    ) -> BaseOutDto[List[ClientDetailsOut]]:
         return self.success(result=await service.clients_search(search=search, limit=limit))
 
     # ── List ──────────────────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.case_aors import CaseAors
 from app.database.models.case_clients import CaseClients
 from app.database.models.cases import Cases
 from app.database.models.hearings import Hearings
@@ -23,19 +24,14 @@ class CaseClientsRepository(BaseRepository[CaseClients]):
         chamber_id: str,
         client_id: str,
     ):
-        # ─────────────────────────────────────────────
-        # 1. SUBQUERY: LATEST HEARING
-        # ─────────────────────────────────────────────
         latest_hearing = (
             select(
                 Hearings.case_id,
                 Hearings.status_code,
-                func.row_number()
-                .over(
+                func.row_number().over(
                     partition_by=Hearings.case_id,
                     order_by=Hearings.hearing_date.desc(),
-                )
-                .label("rn"),
+                ).label("rn"),
             )
             .where(
                 Hearings.deleted_ind.is_(False),
@@ -45,62 +41,55 @@ class CaseClientsRepository(BaseRepository[CaseClients]):
         )
 
         latest_hearing = (
-            select(
-                latest_hearing.c.case_id,
-                latest_hearing.c.status_code,
-            )
+            select(latest_hearing.c.case_id, latest_hearing.c.status_code)
             .where(latest_hearing.c.rn == 1)
             .subquery()
         )
 
-        # ─────────────────────────────────────────────
-        # 2. BASE QUERY (DRIVEN BY CaseClients)
-        # ─────────────────────────────────────────────
         stmt = (
             select(
                 Cases,
                 Users.first_name,
                 Users.last_name,
+                CaseAors.user_id.label("aor_user_id"),  # ✅ ADD THIS
                 latest_hearing.c.status_code.label("hearing_status_code"),
-                CaseClients.engagement_type_code,
+                CaseClients.party_role_code,
+                CaseClients,
             )
-            .select_from(CaseClients)
-            .join(
-                Cases,
-                Cases.case_id == CaseClients.case_id,
+            .join(CaseClients, CaseClients.case_id == Cases.case_id)
+
+            # ✅ FIXED AOR JOIN
+            .outerjoin(
+                CaseAors,
+                and_(
+                    CaseAors.case_id == Cases.case_id,
+                    CaseAors.primary_ind.is_(True),
+                    CaseAors.withdrawal_date.is_(None),
+                ),
             )
             .outerjoin(
                 Users,
-                Cases.aor_user_id == Users.user_id,
+                Users.user_id == CaseAors.user_id,
             )
-            .outerjoin(
-                latest_hearing,
-                latest_hearing.c.case_id == CaseClients.case_id ,
-            )
+
+            .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)
+
             .where(
                 CaseClients.client_id == client_id,
                 CaseClients.chamber_id == chamber_id,
                 Cases.deleted_ind.is_(False),
-                Cases.chamber_id == chamber_id,
             )
-            .distinct(Cases.case_id)
             .order_by(Cases.updated_date.desc())
         )
 
-        rows = (await self.execute(stmt=stmt, session=session)).all()
+        rows = (await self.execute(session=session, stmt=stmt)).all()
 
-        # ─────────────────────────────────────────────
-        # 3. COUNT QUERY (CONSISTENT)
-        # ─────────────────────────────────────────────
         count_stmt = (
             select(func.count())
             .select_from(CaseClients)
-            .join(Cases, Cases.case_id == CaseClients.case_id)
             .where(
                 CaseClients.client_id == client_id,
                 CaseClients.chamber_id == chamber_id,
-                Cases.deleted_ind.is_(False),
-                Cases.chamber_id == chamber_id,
             )
         )
 

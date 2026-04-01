@@ -64,6 +64,7 @@ class AorService(BaseSecuredService):
 
         return AorOut(
             case_aor_id=aor.case_aor_id,
+            chamber_id=self.chamber_id,
             case_id=aor.case_id,
             user_id=aor.user_id,
             advocate_name=advocate_name,
@@ -141,6 +142,7 @@ class AorService(BaseSecuredService):
         return [
             AorOut(
                 case_aor_id=row.case_aor_id,
+                chamber_id=self.chamber_id,
                 case_id=row.case_id,
                 user_id=row.user_id,
                 advocate_name=self.full_name(row.first_name, row.last_name),

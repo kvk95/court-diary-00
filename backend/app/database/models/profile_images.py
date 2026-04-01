@@ -23,6 +23,9 @@ class ProfileImages(BaseModel, TimestampMixin):
     # client_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     client_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("clients.client_id", ondelete="CASCADE"))
 
+    # image_upload_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    image_upload_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_img_upload_for.code", ondelete="RESTRICT"), nullable=False)
+
     # image_data : LONGTEXT
     image_data: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
 
@@ -59,6 +62,13 @@ class ProfileImages(BaseModel, TimestampMixin):
         "Clients",
         foreign_keys=[client_id], 
         backref=backref("profile_images_client_id_clientss", cascade="all, delete-orphan")
+    )
+
+    # profile_images.image_upload_code -> refm_img_upload_for.code
+    profile_images_image_upload_code_refm_img_upload_for = relationship(
+        "RefmImgUploadFor",
+        foreign_keys=[image_upload_code], 
+        backref=backref("profile_images_image_upload_code_refm_img_upload_fors", cascade="all, delete-orphan")
     )
 
     # profile_images.deleted_by -> users.user_id

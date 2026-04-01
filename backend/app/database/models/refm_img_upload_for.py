@@ -1,4 +1,4 @@
-"""refm_entity_type"""
+"""refm_img_upload_for"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from enum import Enum as PyEnum
@@ -8,8 +8,8 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmEntityType(BaseModel):
-    __tablename__ = 'refm_entity_type'
+class RefmImgUploadFor(BaseModel):
+    __tablename__ = 'refm_img_upload_for'
 
     # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
@@ -31,10 +31,10 @@ class RefmEntityType(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmEntityTypeConstants:
+class RefmImgUploadForConstants:
     USER = 'ENTU'
     CLIENT = 'ENTC'
 
-class RefmEntityTypeEnum(str, PyEnum):
-    USER = RefmEntityTypeConstants.USER
-    CLIENT = RefmEntityTypeConstants.CLIENT
+class RefmImgUploadForEnum(str, PyEnum):
+    USER = RefmImgUploadForConstants.USER
+    CLIENT = RefmImgUploadForConstants.CLIENT

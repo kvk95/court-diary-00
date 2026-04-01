@@ -37,9 +37,6 @@ class Cases(BaseModel, TimestampMixin):
     # respondent : TEXT COLLATE "utf8mb4_unicode_ci"
     respondent: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # aor_user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
-    aor_user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
-
     # case_summary : TEXT COLLATE "utf8mb4_unicode_ci"
     case_summary: Mapped[Optional[str]] = mapped_column(Text)
 
@@ -89,13 +86,6 @@ class Cases(BaseModel, TimestampMixin):
         "RefmCaseTypes",
         foreign_keys=[case_type_code], 
         backref=backref("cases_case_type_code_refm_case_typess", cascade="all, delete-orphan")
-    )
-
-    # cases.aor_user_id -> users.user_id
-    cases_aor_user_id_users = relationship(
-        "Users",
-        foreign_keys=[aor_user_id], 
-        backref=backref("cases_aor_user_id_userss", cascade="all, delete-orphan")
     )
 
     # cases.status_code -> refm_case_status.code

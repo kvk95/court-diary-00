@@ -61,8 +61,8 @@ class Clients(BaseModel, TimestampMixin):
     # country_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
     country_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_countries.code", ondelete="RESTRICT"), default='IN')
 
-    # id_proof_type : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    id_proof_type: Mapped[Optional[str]] = mapped_column(String(50))
+    # id_proof_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    id_proof_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_proof_type.code", ondelete="RESTRICT"))
 
     # id_proof_number : VARCHAR(100) COLLATE "utf8mb4_unicode_ci"
     id_proof_number: Mapped[Optional[str]] = mapped_column(String(100))
@@ -130,6 +130,13 @@ class Clients(BaseModel, TimestampMixin):
         "RefmCountries",
         foreign_keys=[country_code], 
         backref=backref("clients_country_code_refm_countriess", cascade="all, delete-orphan")
+    )
+
+    # clients.id_proof_code -> refm_proof_type.code
+    clients_id_proof_code_refm_proof_type = relationship(
+        "RefmProofType",
+        foreign_keys=[id_proof_code], 
+        backref=backref("clients_id_proof_code_refm_proof_types", cascade="all, delete-orphan")
     )
 
     # clients.deleted_by -> users.user_id

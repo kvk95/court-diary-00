@@ -10,17 +10,18 @@ from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import (
     CaseClientLinkPayload,
+    CaseClientLinkedOut,
     CaseClientOut,
     CaseCreate,
     CaseDelete,
     CaseDetailOut,
     CaseEdit,
-    CaseBasicInfoOut,
     CaseListOut,
     CaseNoteCreate,
     CaseNoteDelete,
     CaseNoteEdit,
     CaseNoteOut,
+    CaseQuickHearingOut,
     CaseSummaryStats,
     HearingCreate,
     HearingDelete,
@@ -55,7 +56,7 @@ class CasesController(BaseController):
     @BaseController.get(
         "/cases/lookup",
         summary="Get cases for quick hearing add (dropdown / search)",
-        response_model=BaseOutDto[list[CaseBasicInfoOut]],
+        response_model=BaseOutDto[list[CaseQuickHearingOut]],
     )
     async def get_cases_for_lookup(
         self,
@@ -65,7 +66,7 @@ class CasesController(BaseController):
             description="Search by case number, petitioner, or respondent",
         ),
         service: CasesService = Depends(get_cases_service),
-    ) -> BaseOutDto[list[CaseBasicInfoOut]]:
+    ) -> BaseOutDto[list[CaseQuickHearingOut]]:
         """
         Returns a lightweight list of cases for quick selection.
 
@@ -292,13 +293,13 @@ class CasesController(BaseController):
     @BaseController.get(
         "/{case_id}/clients",
         summary="Get clients linked to a case",
-        response_model=BaseOutDto[List[CaseClientOut]],
+        response_model=BaseOutDto[List[CaseClientLinkedOut]],
     )
     async def case_clients_get(
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
-    ) -> BaseOutDto[List[CaseClientOut]]:
+    ) -> BaseOutDto[List[CaseClientLinkedOut]]:
         return self.success(result=await service.case_clients_get(case_id=case_id))
 
     # ── Case Clients — Link ───────────────────────────────────────────────

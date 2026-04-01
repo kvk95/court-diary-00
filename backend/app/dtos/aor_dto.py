@@ -5,26 +5,26 @@ from typing import Optional
 
 from pydantic import field_validator
 
-from app.dtos.base.base_data import BaseInData, BaseRecordData
+from app.dtos.base.base_data import BaseInData
+from app.dtos.users_dto import ImageInfoOut
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AOR status codes:  AC=Active  WD=Withdrawn  SU=Substituted
 # ─────────────────────────────────────────────────────────────────────────────
 
-class AorOut(BaseRecordData):
+class AorOut(ImageInfoOut):
     case_aor_id: str
     case_id: str
     user_id: str
+    chamber_id: str
     advocate_name: str    
-    image_id: Optional[str]
-    image_data: Optional[str]
     primary_ind: bool = False
-    status_code: str 
-    status_description: Optional[str] = None
     appointment_date: Optional[date] = None
     withdrawal_date: Optional[date] = None
-    notes: Optional[str] = None
+    status_code: str 
+    status_description: Optional[str] = None
+    notes: Optional[str] = None    
     created_date: Optional[datetime] = None
 
 
