@@ -1,6 +1,7 @@
 """refm_party_roles"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -41,3 +42,12 @@ class RefmPartyRolesConstants:
     PLAINTIFF = 'PRPL'
     WITNESS = 'PRWI'
     ADVOCATE_ON_RECORD = 'PRAO'
+
+class RefmPartyRolesEnum(str, PyEnum):
+    PETITIONER = RefmPartyRolesConstants.PETITIONER
+    RESPONDENT = RefmPartyRolesConstants.RESPONDENT
+    APPELLANT = RefmPartyRolesConstants.APPELLANT
+    DEFENDANT = RefmPartyRolesConstants.DEFENDANT
+    PLAINTIFF = RefmPartyRolesConstants.PLAINTIFF
+    WITNESS = RefmPartyRolesConstants.WITNESS
+    ADVOCATE_ON_RECORD = RefmPartyRolesConstants.ADVOCATE_ON_RECORD

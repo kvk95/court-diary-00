@@ -324,4 +324,3 @@ class AorService(BaseSecuredService):
                 "primary_ind":False,
             },
         )
-        await self.session.flush()

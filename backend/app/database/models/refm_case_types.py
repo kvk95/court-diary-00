@@ -1,6 +1,7 @@
 """refm_case_types"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -38,3 +39,12 @@ class RefmCaseTypesConstants:
     LABOUR_CASE = 'CTLB'
     TAX_MATTER = 'CTTX'
     CONSUMER_CASE = 'CTCN'
+
+class RefmCaseTypesEnum(str, PyEnum):
+    CRIMINAL = RefmCaseTypesConstants.CRIMINAL
+    CIVIL_SUIT = RefmCaseTypesConstants.CIVIL_SUIT
+    WRIT_PETITION = RefmCaseTypesConstants.WRIT_PETITION
+    FAMILY_MATTER = RefmCaseTypesConstants.FAMILY_MATTER
+    LABOUR_CASE = RefmCaseTypesConstants.LABOUR_CASE
+    TAX_MATTER = RefmCaseTypesConstants.TAX_MATTER
+    CONSUMER_CASE = RefmCaseTypesConstants.CONSUMER_CASE

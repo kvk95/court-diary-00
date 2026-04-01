@@ -1,6 +1,7 @@
 """refm_courts"""
 
 from sqlalchemy import ForeignKey, Boolean, CHAR, Integer, String, Text
+from enum import Enum as PyEnum
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text

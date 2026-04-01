@@ -1,6 +1,7 @@
 """refm_hearing_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -40,3 +41,11 @@ class RefmHearingStatusConstants:
     ADJOURNED = 'HSAD'
     ORDER_RESERVED = 'HSOR'
     DISPOSED = 'HSDI'
+
+class RefmHearingStatusEnum(str, PyEnum):
+    UPCOMING = RefmHearingStatusConstants.UPCOMING
+    SCHEDULED = RefmHearingStatusConstants.SCHEDULED
+    COMPLETED = RefmHearingStatusConstants.COMPLETED
+    ADJOURNED = RefmHearingStatusConstants.ADJOURNED
+    ORDER_RESERVED = RefmHearingStatusConstants.ORDER_RESERVED
+    DISPOSED = RefmHearingStatusConstants.DISPOSED

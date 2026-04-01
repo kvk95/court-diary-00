@@ -1,6 +1,7 @@
 """refm_user_deletion_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -37,3 +38,8 @@ class RefmUserDeletionStatusConstants:
     PENDING = 'DSPN'
     DELETED = 'DSDE'
     REJECTED = 'DSRJ'
+
+class RefmUserDeletionStatusEnum(str, PyEnum):
+    PENDING = RefmUserDeletionStatusConstants.PENDING
+    DELETED = RefmUserDeletionStatusConstants.DELETED
+    REJECTED = RefmUserDeletionStatusConstants.REJECTED

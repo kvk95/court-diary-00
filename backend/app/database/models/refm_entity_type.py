@@ -1,6 +1,7 @@
 """refm_entity_type"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -33,3 +34,7 @@ class RefmEntityType(BaseModel):
 class RefmEntityTypeConstants:
     USER = 'ENTU'
     CLIENT = 'ENTC'
+
+class RefmEntityTypeEnum(str, PyEnum):
+    USER = RefmEntityTypeConstants.USER
+    CLIENT = RefmEntityTypeConstants.CLIENT

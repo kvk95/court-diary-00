@@ -733,7 +733,7 @@ class CasesService(BaseSecuredService):
             select(
                 CaseClients.case_client_id,
                 CaseClients.client_id,
-                CaseClients.party_role,
+                CaseClients.party_role_code,
                 CaseClients.primary_ind,
                 CaseClients.engagement_type_code,
                 Clients.client_name,
@@ -752,7 +752,7 @@ class CasesService(BaseSecuredService):
 
         # OPTIMISATION: fetch only the role codes actually used in this case
         # rather than the entire RefmPartyRoles table.
-        used_roles = {r.party_role for r in result_rows if r.party_role}
+        used_roles = {r.party_role_code for r in result_rows if r.party_role_code}
         role_map: dict = {}
         if used_roles:
             pr_rows = await self.session.execute(
@@ -774,8 +774,8 @@ class CasesService(BaseSecuredService):
                     value_column=RefmClientType.description,
                     default=None
                 ),
-                party_role=r.party_role,
-                party_role_description=role_map.get(r.party_role),
+                party_role_code=r.party_role_code,
+                party_role_description=role_map.get(r.party_role_code),
                 primary_ind=bool(r.primary_ind),
                 engagement_type_code=r.engagement_type_code,
                 engagement_type_description=await self.refm_resolver.from_column(
@@ -797,13 +797,13 @@ class CasesService(BaseSecuredService):
             filters={
                 CaseClients.case_id: case_id,
                 CaseClients.client_id: payload.client_id,
-                CaseClients.party_role: payload.party_role,
+                CaseClients.party_role_code: payload.party_role_code,
             },
         )
         if existing:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
-                message=f"Client already linked to this case as {payload.party_role}",
+                message=f"Client already linked to this case as {payload.party_role_code}",
             )
         link = await self.case_clients_repo.create(
             session=self.session,
@@ -811,7 +811,7 @@ class CasesService(BaseSecuredService):
                 "chamber_id": self.chamber_id,
                 "case_id": case_id,
                 "client_id": payload.client_id,
-                "party_role": payload.party_role,
+                "party_role_code": payload.party_role_code,
                 "primary_ind": payload.primary_ind,
                 "engagement_type_code": payload.engagement_type_code,
             },
@@ -819,10 +819,10 @@ class CasesService(BaseSecuredService):
         await log_activity(
             action="Client linked to case",
             target=f"case:{case_id}",
-            metadata={"client_id": payload.client_id, "role": payload.party_role},
+            metadata={"client_id": payload.client_id, "role": payload.party_role_code},
         )
         client = await self.session.get(Clients, payload.client_id)
-        pr = await self.session.get(RefmPartyRoles, payload.party_role)
+        pr = await self.session.get(RefmPartyRoles, payload.party_role_code)
         client_type_code = client.client_type_code if client else ""
         return CaseClientOut(
             case_client_id=link.case_client_id,
@@ -835,7 +835,7 @@ class CasesService(BaseSecuredService):
                 value_column=RefmClientType.description,
                 default=None
             ),
-            party_role=link.party_role,
+            party_role_code=link.party_role_code,
             party_role_description=pr.description if pr else None,
             primary_ind=bool(link.primary_ind),            
             engagement_type_code=link.engagement_type_code,

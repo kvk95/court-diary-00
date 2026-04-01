@@ -4,6 +4,8 @@ from sqlalchemy import func, or_, select, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.case_clients import CaseClients
 from app.database.models.clients import Clients
+from app.database.models.refm_client_type import RefmClientTypeConstants
+from app.database.models.refm_party_type import RefmPartyTypeConstants
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
@@ -22,15 +24,15 @@ class ClientsRepository(BaseRepository[Clients]):
             func.count(Clients.client_id).label("total"),
 
             func.count(
-                case((Clients.status_ind.is_(True), 1))
-            ).label("active"),
+                case((Clients.party_type_code == RefmPartyTypeConstants.PARTY_TO_CASE, 1))
+            ).label("parties"),
 
             func.count(
-                case((Clients.client_type_code == "CTIN", 1))
+                case((Clients.client_type_code == RefmClientTypeConstants.INDIVIDUAL, 1))
             ).label("individual"),
 
             func.count(
-                case((Clients.client_type_code == "CTCO", 1))
+                case((Clients.client_type_code == RefmClientTypeConstants.CORPORATE, 1))
             ).label("corporate"),
 
             # 🔥 ASSOCIATIONS (separate query)
@@ -60,8 +62,7 @@ class ClientsRepository(BaseRepository[Clients]):
             select(Clients)
             .where(
                 Clients.chamber_id == chamber_id,
-                Clients.deleted_ind.is_(False),
-                Clients.status_ind.is_(True),                
+                Clients.deleted_ind.is_(False),          
             ).order_by(Clients.client_name.asc())
             .limit(limit)
         )

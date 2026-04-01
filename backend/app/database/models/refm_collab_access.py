@@ -1,6 +1,7 @@
 """refm_collab_access"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -40,3 +41,8 @@ class RefmCollabAccessConstants:
     READ_ONLY = 'CARO'
     READ_WRITE = 'CARW'
     FULL_ACCESS = 'CAFU'
+
+class RefmCollabAccessEnum(str, PyEnum):
+    READ_ONLY = RefmCollabAccessConstants.READ_ONLY
+    READ_WRITE = RefmCollabAccessConstants.READ_WRITE
+    FULL_ACCESS = RefmCollabAccessConstants.FULL_ACCESS

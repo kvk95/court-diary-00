@@ -22,6 +22,9 @@ class Clients(BaseModel, TimestampMixin):
     # client_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     client_type_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_client_type.code", ondelete="RESTRICT"), nullable=False)
 
+    # party_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    party_type_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_party_type.code", ondelete="RESTRICT"), nullable=False)
+
     # client_name : VARCHAR(200) COLLATE "utf8mb4_unicode_ci"
     client_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
@@ -76,9 +79,6 @@ class Clients(BaseModel, TimestampMixin):
     # notes : TEXT COLLATE "utf8mb4_unicode_ci"
     notes: Mapped[Optional[str]] = mapped_column(Text)
 
-    # status_ind : TINYINT
-    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
     # deleted_ind : TINYINT
     deleted_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
@@ -109,6 +109,13 @@ class Clients(BaseModel, TimestampMixin):
         "RefmClientType",
         foreign_keys=[client_type_code], 
         backref=backref("clients_client_type_code_refm_client_types", cascade="all, delete-orphan")
+    )
+
+    # clients.party_type_code -> refm_party_type.code
+    clients_party_type_code_refm_party_type = relationship(
+        "RefmPartyType",
+        foreign_keys=[party_type_code], 
+        backref=backref("clients_party_type_code_refm_party_types", cascade="all, delete-orphan")
     )
 
     # clients.state_code -> refm_states.code

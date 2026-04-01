@@ -192,7 +192,7 @@ class CaseClientOut(BaseRecordData):
     client_name: str
     client_type_code: str
     client_type_description: str
-    party_role: str
+    party_role_code: str
     party_role_description: Optional[str] = None
     primary_ind: bool = False
     engagement_type_code: Optional[str] = None
@@ -203,11 +203,11 @@ class CaseClientOut(BaseRecordData):
 
 class CaseClientLinkPayload(BaseInData):
     client_id: str
-    party_role: str
+    party_role_code: str
     primary_ind: bool = False
     engagement_type_code: str
 
-    @field_validator("party_role")
+    @field_validator("party_role_code")
     @classmethod
     def party_role_not_empty(cls, v: str) -> str:
         if not v or not v.strip():

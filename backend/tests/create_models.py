@@ -333,7 +333,7 @@ def generate_model_class(table):
             f"from sqlalchemy.dialects.mysql import {', '.join(sorted(mysql_types))}"
         )
 
-    if has_enum:
+    if has_enum or table.name.startswith("refm_"):
         imports.append("from enum import Enum as PyEnum")
 
     if has_relationship:
@@ -426,6 +426,7 @@ def generate_model_class(table):
                         constants_lines.append(f"    {key} = {repr(value)}")
 
                     if constants_lines:
+                        # Build the constants class name
                         refm_class_name = (
                             "Refm"
                             + "".join(
@@ -433,9 +434,30 @@ def generate_model_class(table):
                             )
                             + "Constants"
                         )
+
+                        # Build the constants class code
                         constants_class_code = (
                             f"\nclass {refm_class_name}:\n"
                             + "\n".join(constants_lines)
+                            + "\n"
+                        )
+
+                        # Build the enum class name
+                        refm_enum_name = (
+                            "Refm"
+                            + "".join(
+                                part.capitalize() for part in table.name[5:].split("_")
+                            )
+                            + "Enum"
+                        )
+
+                        # Build the enum class code by referencing constants
+                        enum_class_code = (
+                            f"\nclass {refm_enum_name}(str, PyEnum):\n"
+                            + "\n".join(
+                                f"    {line.split('=')[0].strip()} = {refm_class_name}.{line.split('=')[0].strip()}"
+                                for line in constants_lines
+                            )
                             + "\n"
                         )
         except Exception:
@@ -444,6 +466,7 @@ def generate_model_class(table):
 
     if constants_class_code:
         code += constants_class_code
+        code += enum_class_code
     # <<< END APPEND CONSTANTS CLASS >>>
 
     return f'"""{table.name}"""\n\n' + code

@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_clients import CaseClients
@@ -15,6 +15,7 @@ from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_engagement_type import RefmEngagementType
 from app.database.models.refm_hearing_status import RefmHearingStatus
+from app.database.models.refm_party_type import RefmPartyType
 from app.database.repositories.case_clients_repository import CaseClientsRepository
 from app.database.repositories.clients_repository import ClientsRepository
 from app.database.repositories.profile_images_repository import ProfileImagesRepository
@@ -145,6 +146,13 @@ class ClientsService(BaseSecuredService):
                 code=client.client_type_code,
                 value_column=RefmClientType.description,
                 default=None
+            ),            
+            party_type_code=client.party_type_code,
+            party_type_description=await self.refm_resolver.from_column(
+                column_attr=Clients.party_type_code,
+                code=client.party_type_code,
+                value_column=RefmPartyType.description,
+                default=None
             ),
             client_name=client.client_name,
             display_name=client.display_name,
@@ -166,7 +174,6 @@ class ClientsService(BaseSecuredService):
             referral_source=client.referral_source,
             client_since=client.client_since,
             notes=client.notes,
-            status_ind=client.status_ind,
             created_date=client.created_date,
             updated_date=client.updated_date,
             linked_cases_count=total,
@@ -201,6 +208,13 @@ class ClientsService(BaseSecuredService):
                     code=c.client_type_code,
                     value_column=RefmClientType.description,
                     default=None
+                ),            
+                party_type_code=c.party_type_code,
+                party_type_description=await self.refm_resolver.from_column(
+                    column_attr=Clients.party_type_code,
+                    code=c.party_type_code,
+                    value_column=RefmPartyType.description,
+                    default=None
                 ),
                 phone=c.phone,
                 email=c.email,
@@ -219,15 +233,19 @@ class ClientsService(BaseSecuredService):
         page: int,
         limit: int,
         search: Optional[str] = None,
-        client_type: Optional[str] = None,
+        client_type_code: Optional[str] = None,
+        party_type_code: Optional[str] = None,
     ) -> PagingData[ClientListOut]:
-        from sqlalchemy import or_
+        
         conditions = [
             Clients.chamber_id == self.chamber_id,
             Clients.deleted_ind.is_(False),
         ]
-        if client_type:
-            conditions.append(Clients.client_type == client_type.upper())
+        if client_type_code:
+            conditions.append(Clients.client_type_code == client_type_code.upper())
+        
+        if party_type_code:
+            conditions.append(Clients.party_type_code == party_type_code.upper())
         if search and search.strip():
             kw = f"%{search.strip()}%"
             conditions.append(
@@ -274,6 +292,13 @@ class ClientsService(BaseSecuredService):
                     code=c.client_type_code,
                     value_column=RefmClientType.description,
                     default=None
+                ),            
+                party_type_code=c.party_type_code,
+                party_type_description=await self.refm_resolver.from_column(
+                    column_attr=Clients.party_type_code,
+                    code=c.party_type_code,
+                    value_column=RefmPartyType.description,
+                    default=None
                 ),
                 client_name=c.client_name,
                 contact_person=c.contact_person,                
@@ -295,7 +320,6 @@ class ClientsService(BaseSecuredService):
                 referral_source=c.referral_source,
                 client_since=c.client_since,
                 notes=c.notes,
-                status_ind=c.status_ind,
                 linked_cases_count=case_counts.get(c.client_id, 0),
                 created_date=c.created_date,
             )
@@ -315,7 +339,7 @@ class ClientsService(BaseSecuredService):
 
         return ClientSummaryStats(
             total=rows.total or 0,
-            active=rows.active or 0,
+            parties=rows.parties or 0,
             individual=rows.individual or 0,
             corporate=rows.corporate or 0,
             case_associations=rows.case_associations or 0,

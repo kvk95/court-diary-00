@@ -5,6 +5,8 @@ from typing import List, Optional
 from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
+from app.database.models.refm_client_type import RefmClientTypeEnum
+from app.database.models.refm_party_type import RefmPartyTypeEnum
 from app.dependencies import get_clients_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
@@ -53,11 +55,12 @@ class ClientsController(BaseController):
         page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
         search: Optional[str] = Query(None, description="Search name, phone, email"),
-        client_type: Optional[str] = Query(None, description="I=Individual, O=Organization"),
+        client_type_code: Optional[RefmClientTypeEnum] = Query(None),
+        party_type_code: Optional[RefmPartyTypeEnum] = Query(None),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[PagingData[ClientListOut]]:
-        return self.success(result=await service.clients_get_paged(
-            page=page, limit=limit, search=search, client_type=client_type
+        return self.success(result=await service.clients_get_paged(            
+            page=page, limit=limit, search=search, client_type_code=client_type_code,party_type_code=party_type_code
         ))
 
     # ── Single ────────────────────────────────────────────────────────────

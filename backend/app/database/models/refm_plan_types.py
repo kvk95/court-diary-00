@@ -1,6 +1,7 @@
 """refm_plan_types"""
 
 from sqlalchemy import Boolean, CHAR, Integer, Numeric, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -49,3 +50,8 @@ class RefmPlanTypesConstants:
     FREE = 'PTFR'
     PRO = 'PTPR'
     ENTERPRISE = 'PTEN'
+
+class RefmPlanTypesEnum(str, PyEnum):
+    FREE = RefmPlanTypesConstants.FREE
+    PRO = RefmPlanTypesConstants.PRO
+    ENTERPRISE = RefmPlanTypesConstants.ENTERPRISE

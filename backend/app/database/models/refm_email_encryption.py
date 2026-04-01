@@ -1,6 +1,7 @@
 """refm_email_encryption"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -35,3 +36,9 @@ class RefmEmailEncryptionConstants:
     TLS = 'EETL'
     SSL = 'EESS'
     BOTH = 'EEBT'
+
+class RefmEmailEncryptionEnum(str, PyEnum):
+    NONE = RefmEmailEncryptionConstants.NONE
+    TLS = RefmEmailEncryptionConstants.TLS
+    SSL = RefmEmailEncryptionConstants.SSL
+    BOTH = RefmEmailEncryptionConstants.BOTH

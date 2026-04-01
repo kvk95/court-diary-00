@@ -1,6 +1,7 @@
 """refm_login_status"""
 
 from sqlalchemy import CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -30,3 +31,7 @@ class RefmLoginStatus(BaseModel):
 class RefmLoginStatusConstants:
     SUCCESS = 'LSSU'
     FAILED = 'LSFA'
+
+class RefmLoginStatusEnum(str, PyEnum):
+    SUCCESS = RefmLoginStatusConstants.SUCCESS
+    FAILED = RefmLoginStatusConstants.FAILED

@@ -1,6 +1,7 @@
 """refm_email_status"""
 
 from sqlalchemy import CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -37,3 +38,11 @@ class RefmEmailStatusConstants:
     OPENED = 'ESOP'
     FAILED = 'ESFL'
     BOUNCED = 'ESBN'
+
+class RefmEmailStatusEnum(str, PyEnum):
+    PENDING = RefmEmailStatusConstants.PENDING
+    SENT = RefmEmailStatusConstants.SENT
+    DELIVERED = RefmEmailStatusConstants.DELIVERED
+    OPENED = RefmEmailStatusConstants.OPENED
+    FAILED = RefmEmailStatusConstants.FAILED
+    BOUNCED = RefmEmailStatusConstants.BOUNCED

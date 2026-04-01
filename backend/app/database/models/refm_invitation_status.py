@@ -1,6 +1,7 @@
 """refm_invitation_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -38,3 +39,9 @@ class RefmInvitationStatusConstants:
     ACCEPTED = 'ISAC'
     REJECTED = 'ISRJ'
     EXPIRED = 'ISEX'
+
+class RefmInvitationStatusEnum(str, PyEnum):
+    PENDING = RefmInvitationStatusConstants.PENDING
+    ACCEPTED = RefmInvitationStatusConstants.ACCEPTED
+    REJECTED = RefmInvitationStatusConstants.REJECTED
+    EXPIRED = RefmInvitationStatusConstants.EXPIRED

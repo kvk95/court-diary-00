@@ -1,6 +1,7 @@
 """refm_comm_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -39,3 +40,10 @@ class RefmCommStatusConstants:
     DELIVERED = 'CSDL'
     READ = 'CSRD'
     FAILED = 'CSFL'
+
+class RefmCommStatusEnum(str, PyEnum):
+    PENDING = RefmCommStatusConstants.PENDING
+    SENT = RefmCommStatusConstants.SENT
+    DELIVERED = RefmCommStatusConstants.DELIVERED
+    READ = RefmCommStatusConstants.READ
+    FAILED = RefmCommStatusConstants.FAILED

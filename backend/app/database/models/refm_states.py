@@ -1,6 +1,7 @@
 """refm_states"""
 
 from sqlalchemy import ForeignKey, Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -45,3 +46,10 @@ class RefmStatesConstants:
     KARNATAKA = 'KA'
     MAHARASHTRA = 'MH'
     DELHI = 'DL'
+
+class RefmStatesEnum(str, PyEnum):
+    TAMIL_NADU = RefmStatesConstants.TAMIL_NADU
+    KERALA = RefmStatesConstants.KERALA
+    KARNATAKA = RefmStatesConstants.KARNATAKA
+    MAHARASHTRA = RefmStatesConstants.MAHARASHTRA
+    DELHI = RefmStatesConstants.DELHI

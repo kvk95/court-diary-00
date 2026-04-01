@@ -1,6 +1,7 @@
 """refm_engagement_type"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -33,3 +34,7 @@ class RefmEngagementType(BaseModel):
 class RefmEngagementTypeConstants:
     PETITIONER = 'ETPE'
     RESPONDENT = 'ETRE'
+
+class RefmEngagementTypeEnum(str, PyEnum):
+    PETITIONER = RefmEngagementTypeConstants.PETITIONER
+    RESPONDENT = RefmEngagementTypeConstants.RESPONDENT

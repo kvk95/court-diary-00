@@ -1,6 +1,7 @@
 """refm_case_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -38,3 +39,9 @@ class RefmCaseStatusConstants:
     ADJOURNED = 'CSAD'
     DISPOSED = 'CSDI'
     CLOSED = 'CSCL'
+
+class RefmCaseStatusEnum(str, PyEnum):
+    ACTIVE = RefmCaseStatusConstants.ACTIVE
+    ADJOURNED = RefmCaseStatusConstants.ADJOURNED
+    DISPOSED = RefmCaseStatusConstants.DISPOSED
+    CLOSED = RefmCaseStatusConstants.CLOSED

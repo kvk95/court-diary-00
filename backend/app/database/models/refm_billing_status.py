@@ -1,6 +1,7 @@
 """refm_billing_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -39,3 +40,10 @@ class RefmBillingStatusConstants:
     OVERDUE = 'BSOV'
     CANCELLED = 'BSCN'
     ADJUSTED = 'BSAD'
+
+class RefmBillingStatusEnum(str, PyEnum):
+    PENDING = RefmBillingStatusConstants.PENDING
+    PAID = RefmBillingStatusConstants.PAID
+    OVERDUE = RefmBillingStatusConstants.OVERDUE
+    CANCELLED = RefmBillingStatusConstants.CANCELLED
+    ADJUSTED = RefmBillingStatusConstants.ADJUSTED

@@ -1,6 +1,7 @@
 """refm_modules"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String, Text
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -45,3 +46,16 @@ class RefmModulesConstants:
     REPORTS = 'RPRT'
     SETTINGS = 'SETT'
     USER_MANAGEMENT = 'USER'
+
+class RefmModulesEnum(str, PyEnum):
+    ADMIN = RefmModulesConstants.ADMIN
+    BILLING = RefmModulesConstants.BILLING
+    CALENDAR = RefmModulesConstants.CALENDAR
+    CASES = RefmModulesConstants.CASES
+    CLIENTS = RefmModulesConstants.CLIENTS
+    COLLABORATIONS = RefmModulesConstants.COLLABORATIONS
+    DASHBOARD = RefmModulesConstants.DASHBOARD
+    HEARINGS = RefmModulesConstants.HEARINGS
+    REPORTS = RefmModulesConstants.REPORTS
+    SETTINGS = RefmModulesConstants.SETTINGS
+    USER_MANAGEMENT = RefmModulesConstants.USER_MANAGEMENT

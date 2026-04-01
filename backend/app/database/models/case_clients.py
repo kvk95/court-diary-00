@@ -24,8 +24,8 @@ class CaseClients(BaseModel, TimestampMixin):
     # client_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     client_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("clients.client_id", ondelete="CASCADE"), nullable=False)
 
-    # party_role : CHAR(3) COLLATE "utf8mb4_unicode_ci"
-    party_role: Mapped[str] = mapped_column(CHAR(3), nullable=False)
+    # party_role_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    party_role_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_party_roles.code", ondelete="RESTRICT"), nullable=False)
 
     # primary_ind : TINYINT
     primary_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
@@ -61,6 +61,13 @@ class CaseClients(BaseModel, TimestampMixin):
         "Clients",
         foreign_keys=[client_id], 
         backref=backref("case_clients_client_id_clientss", cascade="all, delete-orphan")
+    )
+
+    # case_clients.party_role_code -> refm_party_roles.code
+    case_clients_party_role_code_refm_party_roles = relationship(
+        "RefmPartyRoles",
+        foreign_keys=[party_role_code], 
+        backref=backref("case_clients_party_role_code_refm_party_roless", cascade="all, delete-orphan")
     )
 
     # case_clients.engagement_type_code -> refm_engagement_type.code

@@ -1,13 +1,15 @@
-"""refm_client_type"""
+"""refm_party_type"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func, text
+from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmClientType(BaseModel):
-    __tablename__ = 'refm_client_type'
+class RefmPartyType(BaseModel):
+    __tablename__ = 'refm_party_type'
 
     # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
@@ -29,14 +31,10 @@ class RefmClientType(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmClientTypeConstants:
-    INDIVIDUAL = 'CTIN'
-    CORPORATE = 'CTCO'
-    GOVERNMENT = 'CTGO'
-    TRUST = 'CTTR'
+class RefmPartyTypeConstants:
+    CLIENT = 'PTCL'
+    PARTY_TO_CASE = 'PTCP'
 
-class RefmClientTypeEnum(str, PyEnum):
-    INDIVIDUAL = RefmClientTypeConstants.INDIVIDUAL
-    CORPORATE = RefmClientTypeConstants.CORPORATE
-    GOVERNMENT = RefmClientTypeConstants.GOVERNMENT
-    TRUST = RefmClientTypeConstants.TRUST
+class RefmPartyTypeEnum(str, PyEnum):
+    CLIENT = RefmPartyTypeConstants.CLIENT
+    PARTY_TO_CASE = RefmPartyTypeConstants.PARTY_TO_CASE

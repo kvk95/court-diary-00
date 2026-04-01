@@ -2,6 +2,7 @@
 
 from typing import Optional
 from fastapi import Body, Depends, Path, Query
+from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusEnum
 from app.dtos.users_dto import (
     UserOut, 
     UserCreate, 
@@ -157,7 +158,7 @@ class UsersController(BaseController):
         self,
         page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
-        status: Optional[str] = Query(None, description="Filter by status code: P, D, R"),
+        status: Optional[RefmUserDeletionStatusEnum] = Query(None),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[PagingData[DeletionRequestOut]]:
         data = await service.get_deletion_requests(page=page, limit=limit, status=status)

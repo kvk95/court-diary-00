@@ -1,6 +1,7 @@
 """refm_hearing_purpose"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -54,3 +55,25 @@ class RefmHearingPurposeConstants:
     SUMMONS_NOTICE = 'HPSN'
     WRITTEN_STATEMENT = 'HPWS'
     OTHER = 'HPOT'
+
+class RefmHearingPurposeEnum(str, PyEnum):
+    ADMISSION = RefmHearingPurposeConstants.ADMISSION
+    APPEARANCE = RefmHearingPurposeConstants.APPEARANCE
+    ARGUMENTS = RefmHearingPurposeConstants.ARGUMENTS
+    BAIL_HEARING = RefmHearingPurposeConstants.BAIL_HEARING
+    COMPLIANCE = RefmHearingPurposeConstants.COMPLIANCE
+    CROSS_EXAMINATION = RefmHearingPurposeConstants.CROSS_EXAMINATION
+    EVIDENCE = RefmHearingPurposeConstants.EVIDENCE
+    FRAMING_OF_CHARGES = RefmHearingPurposeConstants.FRAMING_OF_CHARGES
+    FRAMING_OF_ISSUES = RefmHearingPurposeConstants.FRAMING_OF_ISSUES
+    INTERIM_RELIEF = RefmHearingPurposeConstants.INTERIM_RELIEF
+    MEDIATION = RefmHearingPurposeConstants.MEDIATION
+    MENTION = RefmHearingPurposeConstants.MENTION
+    ORDER_PRONOUNCED = RefmHearingPurposeConstants.ORDER_PRONOUNCED
+    PART_HEARD = RefmHearingPurposeConstants.PART_HEARD
+    PLEADINGS = RefmHearingPurposeConstants.PLEADINGS
+    SENTENCING = RefmHearingPurposeConstants.SENTENCING
+    STEPS = RefmHearingPurposeConstants.STEPS
+    SUMMONS_NOTICE = RefmHearingPurposeConstants.SUMMONS_NOTICE
+    WRITTEN_STATEMENT = RefmHearingPurposeConstants.WRITTEN_STATEMENT
+    OTHER = RefmHearingPurposeConstants.OTHER

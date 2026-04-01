@@ -1,6 +1,7 @@
 """refm_aor_status"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
+from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -37,3 +38,8 @@ class RefmAorStatusConstants:
     ACTIVE = 'ASAC'
     WITHDRAWN = 'ASWD'
     SUBSTITUTED = 'ASSU'
+
+class RefmAorStatusEnum(str, PyEnum):
+    ACTIVE = RefmAorStatusConstants.ACTIVE
+    WITHDRAWN = RefmAorStatusConstants.WITHDRAWN
+    SUBSTITUTED = RefmAorStatusConstants.SUBSTITUTED

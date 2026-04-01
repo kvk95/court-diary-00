@@ -108,6 +108,16 @@ CREATE TABLE refm_client_type (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Client type master';
 DROP TABLE IF EXISTS refm_engagement_type;
 
+DROP TABLE IF EXISTS refm_party_type;
+CREATE TABLE refm_party_type (
+    code        CHAR(4)     PRIMARY KEY,
+    description VARCHAR(60) NOT NULL,
+    sort_order  INT         NOT NULL,
+    status_ind  BOOLEAN     NOT NULL DEFAULT TRUE
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='How is the client/party related to chamber';
+
+DROP TABLE IF EXISTS refm_engagement_type;
+
 CREATE TABLE refm_engagement_type (
     code        CHAR(4)     PRIMARY KEY,
     description VARCHAR(60) NOT NULL,
@@ -725,7 +735,8 @@ DROP TABLE IF EXISTS clients;
 CREATE TABLE clients (
     client_id       CHAR(36)     PRIMARY KEY,  
     chamber_id      CHAR(36)     NOT NULL,  
-    client_type_code  CHAR(4)      NOT NULL,   -- FK to refm_client_type
+    client_type_code  CHAR(4)      NOT NULL,
+	party_type_code  CHAR(4)      NOT NULL,
     client_name     VARCHAR(200) NOT NULL,
     display_name    VARCHAR(200) NULL,
     contact_person  VARCHAR(150) NULL,
@@ -744,7 +755,6 @@ CREATE TABLE clients (
     referral_source VARCHAR(150) NULL,
     client_since    DATE         NULL,
     notes           TEXT         NULL,
-    status_ind      BOOLEAN      NOT NULL DEFAULT TRUE,
     deleted_ind     BOOLEAN      DEFAULT FALSE,
     deleted_date    TIMESTAMP    NULL,
     deleted_by      CHAR(36)     NULL,  
@@ -756,6 +766,8 @@ CREATE TABLE clients (
         FOREIGN KEY (chamber_id)  REFERENCES chamber(chamber_id)     ON DELETE CASCADE,
     CONSTRAINT fk_clients_type
         FOREIGN KEY (client_type_code) REFERENCES refm_client_type(code)  ON DELETE RESTRICT,
+    CONSTRAINT fk_party_type
+        FOREIGN KEY (party_type_code) REFERENCES refm_party_type(code)  ON DELETE RESTRICT,
     CONSTRAINT fk_clients_state
         FOREIGN KEY (state_code)  REFERENCES refm_states(code)       ON DELETE SET NULL,
     CONSTRAINT fk_clients_country
@@ -782,7 +794,7 @@ CREATE TABLE case_clients (
     chamber_id      CHAR(36)     NOT NULL,  
     case_id         CHAR(36)     NOT NULL,  
     client_id       CHAR(36)     NOT NULL,  
-    party_role      CHAR(3)      NOT NULL,
+    party_role_code      CHAR(4)      NOT NULL,
     primary_ind     BOOLEAN      DEFAULT FALSE,
     engagement_type_code CHAR(4)      NULL,
     created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
@@ -790,13 +802,15 @@ CREATE TABLE case_clients (
     updated_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     updated_by      CHAR(36)     NULL,  
     CONSTRAINT uk_case_client
-        UNIQUE KEY (case_id, client_id, party_role),
+        UNIQUE KEY (case_id, client_id, party_role_code),
     CONSTRAINT fk_case_clients_chamber
         FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)   ON DELETE CASCADE,
     CONSTRAINT fk_case_clients_case
         FOREIGN KEY (case_id)    REFERENCES cases(case_id)        ON DELETE CASCADE,
     CONSTRAINT fk_case_clients_client
         FOREIGN KEY (client_id)  REFERENCES clients(client_id)    ON DELETE CASCADE,
+    CONSTRAINT fk_case_clients_party_role
+        FOREIGN KEY (party_role_code) REFERENCES refm_party_roles(code) ON DELETE RESTRICT,
     CONSTRAINT fk_case_clients_engagement
         FOREIGN KEY (engagement_type_code) REFERENCES refm_engagement_type(code) ON DELETE RESTRICT,
     CONSTRAINT fk_case_clients_created_by

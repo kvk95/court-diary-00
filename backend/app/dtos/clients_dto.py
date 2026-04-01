@@ -38,7 +38,8 @@ class ClientSearchOut(BaseRecordData):
     referral_source: Optional[str] = None
     client_since: Optional[date] = None
     notes: Optional[str] = None
-    status_ind: bool = True
+    party_type_code:str
+    party_type_description: str
     created_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
 
@@ -56,7 +57,7 @@ class ClientDetailOut(ClientListOut):
 
 class ClientSummaryStats(BaseRecordData):
     total: int
-    active: int
+    parties: int
     individual: int
     corporate: int
     case_associations: int
