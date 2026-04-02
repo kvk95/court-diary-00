@@ -440,12 +440,16 @@ class ClientsService(BaseSecuredService):
     async def clients_edit(self, client_id: str, payload: ClientEdit) -> ClientDetailOut:
         await self._get_client_details(client_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
-        if data:
-            await self.clients_repo.update(
-                session=self.session,
-                id_values=client_id,
-                data=self.clients_repo.map_fields_to_db_column(data),
-            )
+        client = await self.clients_repo.update(
+            session=self.session,
+            id_values=client_id,
+            data=self.clients_repo.map_fields_to_db_column(data),
+        )
+
+        existing_img = await self.profile_images_repo.get_profile_image_by_clientid(
+            session=self.session,
+            client_id=client.client_id,
+        )        
 
         if payload.image_data:           
             image_details = {
@@ -454,6 +458,7 @@ class ClientsService(BaseSecuredService):
                 "image_data":payload.image_data,
                 "description":"Client image uploaded"
             }
+            payload.image_id = existing_img["image_id"] if existing_img else ''
             if payload.image_id:
                 image_details["image_id"] = payload.image_id
                 img:ProfileImages = await self.profile_images_repo.upsert(
@@ -468,8 +473,8 @@ class ClientsService(BaseSecuredService):
                     session=self.session,
                     data=self.profile_images_repo.map_fields_to_db_column(image_details),
                 )
-                
-        return await self.clients_get_by_id(client_id)
+
+        return await self._to_detail_out(client)
 
     # ─────────────────────────────────────────────────────────────────────
     # DELETE (soft)
