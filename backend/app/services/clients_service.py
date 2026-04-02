@@ -447,21 +447,28 @@ class ClientsService(BaseSecuredService):
                 data=self.clients_repo.map_fields_to_db_column(data),
             )
 
-        if payload.image_data:
+        if payload.image_data:           
             image_details = {
                 "client_id":client_id,
-                "image_id":payload.image_id,
                 "image_upload_code":RefmImgUploadForConstants.CLIENT,
                 "image_data":payload.image_data,
                 "description":"Client image uploaded"
             }
-            img:ProfileImages = await self.profile_images_repo.upsert(
-                filters={
-                    ProfileImages.image_id: payload.image_id,
-                },
-                session=self.session,
-                data=self.profile_images_repo.map_fields_to_db_column(image_details),
-            )
+            if payload.image_id:
+                image_details["image_id"] = payload.image_id
+                img:ProfileImages = await self.profile_images_repo.upsert(
+                    filters={
+                        ProfileImages.image_id: payload.image_id,
+                    },
+                    session=self.session,
+                    data=self.profile_images_repo.map_fields_to_db_column(image_details),
+                )
+            else:
+                img:ProfileImages = await self.profile_images_repo.create(
+                    session=self.session,
+                    data=self.profile_images_repo.map_fields_to_db_column(image_details),
+                )
+                
         return await self.clients_get_by_id(client_id)
 
     # ─────────────────────────────────────────────────────────────────────

@@ -89,8 +89,7 @@ class ClientCreate(BaseInData):
 
 
 class ClientEdit(ClientCreate):
-    image_id: Optional[str]    
-    pass
+    image_id: Optional[str]
 
 from app.dtos.cases_dto import CaseListOut
 ClientDetailOut.model_rebuild()
