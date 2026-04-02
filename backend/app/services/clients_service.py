@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_clients import CaseClients
 from app.database.models.clients import Clients
+from app.database.models.profile_images import ProfileImages
 from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatus
+from app.database.models.refm_img_upload_for import RefmImgUploadForConstants
 from app.database.models.refm_party_roles import RefmPartyRoles
 from app.database.models.refm_party_type import RefmPartyType
 from app.database.repositories.case_clients_repository import CaseClientsRepository
@@ -418,6 +420,17 @@ class ClientsService(BaseSecuredService):
             session=self.session,
             data=self.clients_repo.map_fields_to_db_column(data),
         )
+        if payload.image_data:
+            image_details = {
+                "client_id":client.client_id,
+                "image_upload_code":RefmImgUploadForConstants.CLIENT,
+                "image_data":payload.image_data,
+                "description":"Client image uploaded"
+            }
+            img:ProfileImages = await self.profile_images_repo.create(
+                session=self.session,
+                data=self.profile_images_repo.map_fields_to_db_column(image_details),
+            )
         return await self._to_detail_out(client)
 
     # ─────────────────────────────────────────────────────────────────────
@@ -432,6 +445,22 @@ class ClientsService(BaseSecuredService):
                 session=self.session,
                 id_values=client_id,
                 data=self.clients_repo.map_fields_to_db_column(data),
+            )
+
+        if payload.image_data:
+            image_details = {
+                "client_id":client_id,
+                "image_id":payload.image_id,
+                "image_upload_code":RefmImgUploadForConstants.CLIENT,
+                "image_data":payload.image_data,
+                "description":"Client image uploaded"
+            }
+            img:ProfileImages = await self.profile_images_repo.upsert(
+                filters={
+                    ProfileImages.image_id: payload.image_id,
+                },
+                session=self.session,
+                data=self.profile_images_repo.map_fields_to_db_column(image_details),
             )
         return await self.clients_get_by_id(client_id)
 

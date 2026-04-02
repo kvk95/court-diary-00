@@ -85,9 +85,11 @@ class ClientCreate(BaseInData):
     referral_source: Optional[str] = None
     client_since: Optional[date] = None
     notes: Optional[str] = None
+    image_data: Optional[str]
 
 
 class ClientEdit(ClientCreate):
+    image_id: Optional[str]    
     pass
 
 from app.dtos.cases_dto import CaseListOut
