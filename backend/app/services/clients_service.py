@@ -480,6 +480,11 @@ class ClientsService(BaseSecuredService):
     async def clients_notes_edit(self, client_id: str, payload: ClientNotesEdit) -> ClientDetailOut:
         await self._get_client_details(client_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
+        if not payload.notes or not payload.notes.strip():
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Notes is required"
+            )
         client = await self.clients_repo.update(
             session=self.session,
             id_values=client_id,
