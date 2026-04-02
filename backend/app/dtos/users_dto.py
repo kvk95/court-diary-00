@@ -46,8 +46,8 @@ class UserOut(ImageInfoOut):
     phone: Optional[str] = None
     role: Optional[RoleOut] = None
     active_ind: bool = True    
-    image_id: str
-    image_data: str
+    image_id: Optional[str] = None
+    image_data: Optional[str] = None
     created_date: Optional[datetime] = None
     chamber_name: Optional[str] = None
     profile: Optional[UserProfileOut] = None
@@ -67,6 +67,7 @@ class UserCreate(BaseInData):
     password: str
     status_ind: bool = True
     role_id: Optional[int] = None
+    image_data: Optional[str]
 
     @field_validator("email")
     @classmethod
@@ -83,12 +84,8 @@ class UserCreate(BaseInData):
         return v.strip()
 
 
-class UserEdit(BaseInData):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    phone: Optional[str] = None
-    status_ind: Optional[bool] = None
-    role_id: Optional[int] = None
+class UserEdit(UserCreate):
+    image_id: Optional[str]
 
 
 class UserStatusToggle(BaseInData):

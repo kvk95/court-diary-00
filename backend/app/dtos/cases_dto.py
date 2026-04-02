@@ -229,9 +229,15 @@ class CaseDetailOut(CaseListOut):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class RecentActivityItem(BaseRecordData):
-    action: str
+    action: str                     # raw action (for debugging / fallback)
     actor_name: Optional[str] = None
     timestamp: Optional[datetime] = None
+
+    # 🔥 NEW (UI-friendly)
+    title: Optional[str] = None
+    description: Optional[str] = None
+    type: Optional[str] = None     # CREATE / UPDATE / DELETE / LINK
+    icon: Optional[str] = None
 
 from app.dtos.clients_dto import ClientDetailsOut
 CaseClientLinkedOut.model_rebuild()

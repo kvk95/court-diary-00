@@ -7,13 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_clients import CaseClients
 from app.database.models.clients import Clients
-from app.database.models.profile_images import ProfileImages
 from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatus
-from app.database.models.refm_img_upload_for import RefmImgUploadForConstants
+from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
 from app.database.models.refm_party_roles import RefmPartyRoles
 from app.database.models.refm_party_type import RefmPartyType
 from app.database.repositories.case_clients_repository import CaseClientsRepository
@@ -31,6 +30,7 @@ from app.dtos.clients_dto import (
     ClientSummaryStats,
 )
 from app.services.base.secured_base_service import BaseSecuredService
+from app.services.image_service import ImageService
 from app.validators import ErrorCodes, ValidationErrorDetail
 
 
@@ -41,11 +41,13 @@ class ClientsService(BaseSecuredService):
         clients_repo: Optional[ClientsRepository] = None,
         case_clients_repo: Optional[CaseClientsRepository] = None,
         profile_images_repo: Optional[ProfileImagesRepository] = None,
+        image_service: Optional[ImageService] = None,
     ):
         super().__init__(session)
         self.clients_repo = clients_repo or ClientsRepository()
         self.case_clients_repo = case_clients_repo or CaseClientsRepository()
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
+        self.image_service = image_service or ImageService(session)
 
     # ─────────────────────────────────────────────────────────────────────
     # HELPERS
@@ -421,17 +423,14 @@ class ClientsService(BaseSecuredService):
             session=self.session,
             data=self.clients_repo.map_fields_to_db_column(data),
         )
-        if payload.image_data:
-            image_details = {
-                "client_id":client.client_id,
-                "image_upload_code":RefmImgUploadForConstants.CLIENT,
-                "image_data":payload.image_data,
-                "description":"Client image uploaded"
-            }
-            img:ProfileImages = await self.profile_images_repo.create(
-                session=self.session,
-                data=self.profile_images_repo.map_fields_to_db_column(image_details),
-            )
+
+        await self.image_service.handle_image(
+            session=self.session,
+            payload=payload,
+            entity_id=client.client_id,
+            image_upload_code=RefmImgUploadForEnum.CLIENT,
+            description="Client image uploaded"
+        )
         return await self._to_detail_out(client)
 
     # ─────────────────────────────────────────────────────────────────────
@@ -447,33 +446,13 @@ class ClientsService(BaseSecuredService):
             data=self.clients_repo.map_fields_to_db_column(data),
         )
 
-        existing_img = await self.profile_images_repo.get_profile_image_by_clientid(
+        await self.image_service.handle_image(
             session=self.session,
-            client_id=client.client_id,
-        )        
-
-        if payload.image_data:           
-            image_details = {
-                "client_id":client_id,
-                "image_upload_code":RefmImgUploadForConstants.CLIENT,
-                "image_data":payload.image_data,
-                "description":"Client image uploaded"
-            }
-            payload.image_id = existing_img["image_id"] if existing_img else ''
-            if payload.image_id:
-                image_details["image_id"] = payload.image_id
-                img:ProfileImages = await self.profile_images_repo.upsert(
-                    filters={
-                        ProfileImages.image_id: payload.image_id,
-                    },
-                    session=self.session,
-                    data=self.profile_images_repo.map_fields_to_db_column(image_details),
-                )
-            else:
-                img:ProfileImages = await self.profile_images_repo.create(
-                    session=self.session,
-                    data=self.profile_images_repo.map_fields_to_db_column(image_details),
-                )
+            payload=payload,
+            entity_id=client_id,
+            image_upload_code=RefmImgUploadForEnum.CLIENT,
+            description="Client image uploaded"
+        )
 
         return await self._to_detail_out(client)
 

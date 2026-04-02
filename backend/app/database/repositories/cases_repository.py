@@ -275,6 +275,7 @@ class CasesRepository(BaseRepository[Cases]):
             stmt = stmt.order_by(Cases.updated_date.desc())
 
         stmt = stmt.limit(limit).offset((page - 1) * limit)
+        stmt = stmt.distinct()
         rows = (await self.execute(stmt=stmt, session=session)).all()
 
         count_stmt = (
@@ -361,8 +362,7 @@ class CasesRepository(BaseRepository[Cases]):
             )
 
         stmt = stmt.order_by(Cases.updated_date.desc()).limit(limit)
-
-        # 🔑 FIX: Deduplicate at both SQL and ORM levels
+        
         stmt = stmt.distinct()
         result = await session.execute(stmt)
         return result.unique().all()

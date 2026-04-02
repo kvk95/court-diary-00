@@ -53,6 +53,7 @@ from app.dtos.cases_dto import (
 )
 from app.dtos.clients_dto import ClientDetailsOut
 from app.services.base.secured_base_service import BaseSecuredService
+from app.utils.activity_formatter import format_activity
 from app.utils.logging_framework.activity_logger import log_activity
 from app.validators import ErrorCodes, ValidationErrorDetail
 
@@ -1206,10 +1207,17 @@ class CasesService(BaseSecuredService):
     # RECENT ACTIVITY
     # ─────────────────────────────────────────────────────────────────────
 
-    async def cases_get_recent_activity(self, case_id: str, limit: int = 10) -> List[RecentActivityItem]:
+    async def cases_get_recent_activity(
+        self, case_id: str, limit: int = 10
+    ) -> List[RecentActivityItem]:
         try:
             rows = await self.session.execute(
-                select(ActivityLog.action, ActivityLog.user_id, ActivityLog.created_date)
+                select(
+                    ActivityLog.action,
+                    ActivityLog.user_id,
+                    ActivityLog.created_date,
+                    ActivityLog.metadata,   # 🔥 IMPORTANT
+                )
                 .where(
                     ActivityLog.chamber_id == self.chamber_id,
                     ActivityLog.target.like(f"case:{case_id}%"),
@@ -1221,19 +1229,25 @@ class CasesService(BaseSecuredService):
         except Exception:
             return []
 
+        # ---------------------------------------------
+        # 🔹 LOAD ACTOR NAMES (same as before)
+        # ---------------------------------------------
         actor_map = await self._load_map(
-            (r.user_id for r in activity_rows),
-            lambda ids: select(Users.user_id, Users.first_name, Users.last_name)
-            .where(Users.user_id.in_(ids)),
+            (r.user_id for r in activity_rows if r.user_id),
+            lambda ids: select(
+                Users.user_id, Users.first_name, Users.last_name
+            ).where(Users.user_id.in_(ids)),
             lambda r: r.user_id,
             lambda r: self.full_name(r.first_name, r.last_name),
         )
 
+        # ---------------------------------------------
+        # 🔹 FORMAT TO TIMELINE (🔥 CORE CHANGE)
+        # ---------------------------------------------
         return [
-            RecentActivityItem(
-                action=r.action,
+            format_activity(
+                log=r,
                 actor_name=actor_map.get(r.user_id) if r.user_id else None,
-                timestamp=r.created_date,
             )
             for r in activity_rows
         ]

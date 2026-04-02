@@ -41,9 +41,11 @@ from app.database.models.base.base_model import BaseModel
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
 from app.database.models.refm_modules import RefmModulesConstants
+from app.database.repositories.base.relationship_config import RELATIONSHIP_CONFIG
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.dtos.roles_dto import RoleOut
 from app.dtos.users_dto import UserOut
+from app.utils.logging_framework.activity_logger import log_activity
 from .model_helpers import get_writable_columns
 
 from sqlalchemy import Select
@@ -94,6 +96,9 @@ class BaseRepository(Generic[ModelType]):
     def __init__(self, model: Type[ModelType]):
         self.model = model
         self.WRITABLE_FIELDS = get_writable_columns(model)
+        self.LOG_ENTITY = getattr(self.model, "__name__", "UNKNOWN")
+        self.LOG_TARGET_FIELD = None 
+
         ctx = get_request_context()
 
         user: UserOut = cast(UserOut, ctx.get("user_details"))
@@ -119,6 +124,46 @@ class BaseRepository(Generic[ModelType]):
     # ────────────────────────────────────────────────
     # ──────── FIELD / LOGGING HELPERS ────────
     # ────────────────────────────────────────────────
+
+    async def _log_activity(
+        self,
+        *,
+        action: str,
+        target: str | None = None,
+        metadata: dict | None = None,
+    ):
+
+        await log_activity(
+            action=action,
+            actor_user_id=self.user_id,
+            actor_chamber_id=self.chamber_id,
+            target=target,
+            metadata=metadata,
+        )
+
+    def _get_relationship_config(self):
+        return RELATIONSHIP_CONFIG.get(self.model)
+
+    def _get_entity_id(self, obj):
+        pk_names = self._pk_names()
+        if len(pk_names) == 1:
+            return getattr(obj, pk_names[0], None)
+        return {k: getattr(obj, k) for k in pk_names}
+    
+    def _compute_diff(self, old_obj, new_data: dict):
+        changes = {}
+
+        for field, new_val in new_data.items():
+            old_val = getattr(old_obj, field, None)
+
+            # normalize for comparison
+            if old_val != new_val:
+                changes[field] = {
+                    "old": old_val,
+                    "new": new_val,
+                }
+
+        return changes
 
     def map_fields_to_db_column(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -503,11 +548,13 @@ class BaseRepository(Generic[ModelType]):
         filters_exprs: Sequence[BinaryExpression],
         data: Dict[str, Any],
     ) -> Optional[ModelType]:
-        """
-        Perform DB-side UPDATE and reload the entity using the same filters.
-        Reused by update() and upsert() to avoid duplication.
-        """
-        
+
+        # 🟢 1. LOAD OLD STATE
+        old_stmt = select(self.model).where(*filters_exprs)
+        old_result = await self.execute(old_stmt, session)
+        old_obj = old_result.scalars().first()
+
+        # 🟢 2. APPLY UPDATE
         update_data = self._set_audit_fields(data, is_update=True)
 
         stmt = (
@@ -518,10 +565,51 @@ class BaseRepository(Generic[ModelType]):
         )
         await self.execute(stmt, session)
 
+        # 🟢 3. RELOAD NEW STATE
         reload_stmt = select(self.model).where(*filters_exprs)
-        
         result = await self.execute(reload_stmt, session)
-        return result.scalars().first()
+        new_obj = result.scalars().first()
+
+        # 🟢 4. AUTO LOG 🔥
+        if old_obj and new_obj:
+            changes = self._compute_diff(old_obj, update_data)
+
+            if changes:
+
+                rel = self._get_relationship_config()
+
+                if rel and old_obj and new_obj:
+                    changes = self._compute_diff(old_obj, update_data)
+
+                    if changes:
+
+                        parent_id = getattr(new_obj, rel["parent_field"], None)
+                        child_id = getattr(new_obj, rel["child_field"], None)
+
+                        await log_activity(
+                            action=f"{rel['entity']}_UPDATED",
+                            target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
+                            metadata={
+                                "relationship": rel["entity"],
+                                "parent_id": parent_id,
+                                "child_id": child_id,
+                                "changes": changes,
+                            },
+                        )
+
+                entity_id = self._get_entity_id(new_obj)
+
+                await log_activity(
+                    action=f"{self.LOG_ENTITY.upper()}_UPDATED",
+                    target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
+                    metadata={
+                        "entity": self.LOG_ENTITY,
+                        "entity_id": entity_id,
+                        "changes": changes,
+                    },
+                )
+
+        return new_obj
 
     # ────────────────────────────────────────────────
     # ──────── READ OPERATIONS ────────
@@ -708,6 +796,34 @@ class BaseRepository(Generic[ModelType]):
         session.add(obj)
         await session.flush()
         await session.refresh(obj)
+
+        entity_id = self._get_entity_id(obj)
+
+        rel = self._get_relationship_config()
+
+        if rel:
+            parent_id = getattr(obj, rel["parent_field"], None)
+            child_id = getattr(obj, rel["child_field"], None)
+
+            await log_activity(
+                action=f"{rel['entity']}_LINKED",
+                target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
+                metadata={
+                    "relationship": rel["entity"],
+                    "parent_id": parent_id,
+                    "child_id": child_id,
+                },
+            )
+
+        await log_activity(
+            action=f"{self.LOG_ENTITY.upper()}_CREATED",
+            target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
+            metadata={
+                "entity": self.LOG_ENTITY,
+                "entity_id": entity_id,
+            },
+        )
+
         return obj
 
     async def update(
@@ -785,9 +901,11 @@ class BaseRepository(Generic[ModelType]):
         - If filters/where provided → use them
         - Else → fallback to primary key equality using id_values
         """
+        print(F"*******1 {filters}*******")
         self._validate_query_params(
             filters=filters, where=where, joins=None, order_by=None
         )
+        print(F"*******12 {filters}*******")
 
         # Build selection statement
         if filters or where:
@@ -802,6 +920,8 @@ class BaseRepository(Generic[ModelType]):
         else:
             pk_filters = self._pk_filters_from_values(id_values)
             stmt = select(self.model).where(*pk_filters)
+
+        print(F"*******1 {stmt}*******")
 
         result = await self.execute(stmt=stmt, session=session)
         existing = result.scalars().first()
@@ -894,7 +1014,10 @@ class BaseRepository(Generic[ModelType]):
         )
 
         result = await self.execute(stmt, session)
-        return result.all()
+
+        stmt_select = select(self.model).where(*filters_exprs)
+        result = await self.execute(stmt_select, session)
+        return result.scalars().all()
 
     async def delete(
         self,
@@ -955,6 +1078,35 @@ class BaseRepository(Generic[ModelType]):
             session.add(obj)
         else:
             await session.delete(obj)
+
+        entity_id = self._get_entity_id(obj)
+
+        rel = self._get_relationship_config()
+
+        if rel:
+            from app.utils.logging_framework.activity_logger import log_activity
+
+            parent_id = getattr(obj, rel["parent_field"], None)
+            child_id = getattr(obj, rel["child_field"], None)
+
+            await log_activity(
+                action=f"{rel['entity']}_UNLINKED",
+                target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
+                metadata={
+                    "relationship": rel["entity"],
+                    "parent_id": parent_id,
+                    "child_id": child_id,
+                },
+            )
+
+        await log_activity(
+            action=f"{self.LOG_ENTITY.upper()}_DELETED",
+            target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
+            metadata={
+                "entity": self.LOG_ENTITY,
+                "entity_id": entity_id,
+            },
+)
 
         await session.flush()
 

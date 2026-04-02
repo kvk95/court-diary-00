@@ -8,6 +8,7 @@ from app.auth.deps import get_current_user
 from app.database.models.base.session import get_session
 from app.services.anonymous_service import AnonymousService
 from app.services.auth_service import AuthService
+from app.services.image_service import ImageService
 from app.services.billing_service import BillingService
 from app.services.calendar_service import CalendarService
 from app.services.cases_service import CasesService
@@ -28,12 +29,16 @@ def get_anonymous_service(session: AsyncSession = Depends(get_session)) -> Anony
 def get_auth_service(session: AsyncSession = Depends(get_session)) -> AuthService:
     return AuthService(session)
 
+def get_image_service(session: AsyncSession = Depends(get_session), 
+                      _=Depends(get_current_user)) -> ImageService:
+    return ImageService(session=session)
+
 def get_cases_service(session: AsyncSession = Depends(get_session), 
                       _=Depends(get_current_user)) -> CasesService:
     return CasesService(session=session)
 
 async def get_clients_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> ClientsService:
-    return ClientsService(session=session)
+    return ClientsService(session=session,image_service=get_image_service())
 
 async def get_billing_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> BillingService:
     return BillingService(session=session)
@@ -57,7 +62,7 @@ async def get_role_permissions_service(session: AsyncSession = Depends(get_sessi
     return RolePermissionsService(session=session)
 
 async def get_users_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> UsersService:
-    return UsersService(session=session)
+    return UsersService(session=session,image_service=get_image_service())
 
 async def get_aor_service(session: AsyncSession = Depends(get_session), _=Depends(get_current_user)) -> AorService:
     return AorService(session=session)

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.delete_account_requests import DeleteAccountRequests
+from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.users import Users
@@ -32,6 +33,7 @@ from app.dtos.users_dto import (
 )
 from app.dtos.roles_dto import RoleOut
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
+from app.services.image_service import ImageService
 from app.utils.security import hash_password
 from app.validators import (
     ErrorCodes,
@@ -54,6 +56,7 @@ class UsersService(BaseSecuredService):
         delete_account_repo: Optional[DeleteAccountRequestsRepository] = None,
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
         profile_images_repo: Optional[ProfileImagesRepository] = None,
+        image_service: Optional[ImageService] = None,
     ):
         super().__init__(session)
         self.security_roles_repo = security_roles_repo or SecurityRolesRepository()
@@ -63,6 +66,7 @@ class UsersService(BaseSecuredService):
         self.delete_account_repo = delete_account_repo or DeleteAccountRequestsRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
+        self.image_service = image_service or ImageService(session)
 
     async def get_user_stats(self) -> UserStatsOut:
         """
@@ -365,6 +369,7 @@ class UsersService(BaseSecuredService):
         # ─────────────────────────────────────────────
         # 4. UPSERT CHAMBER LINK (CORE CHANGE)
         # ─────────────────────────────────────────────
+        print(f"************\n\n\n\n\n {user.user_id}\n\n\n*************")
         link = await self.user_chamber_link_repo.upsert(
             session=self.session,
             filters={
@@ -372,6 +377,7 @@ class UsersService(BaseSecuredService):
                 UserChamberLink.chamber_id: self.chamber_id,
             },
             data={
+                "user_id": user.user_id,
                 "left_date": None,
                 "status_ind": True,
                 "primary_ind": True,  # optional
@@ -385,8 +391,16 @@ class UsersService(BaseSecuredService):
             await self._set_user_role(link.link_id, payload.role_id)
 
         # ─────────────────────────────────────────────
-        # 6. RETURN
+        # 6. IMAGE
         # ─────────────────────────────────────────────
+
+        await self.image_service.handle_image(
+            session=self.session,
+            payload=payload,
+            entity_id=user.user_id,
+            image_upload_code=RefmImgUploadForEnum.USER,
+            description="Client image uploaded"
+        )
         return await self.get_user_full_details(user_id=user.user_id)
 
     # ─────────────────────────────────────────────────────────────────────────
