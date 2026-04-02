@@ -221,70 +221,41 @@ class BaseRepository(Generic[ModelType]):
     # ──────── PRIVATE HELPERS ────────
     # ──────────────────────────────────────────────── 
 
-    def _collect_tables(self, stmt: Select) -> set[Table]:
-        tables: set[Table] = set()
-        exists_tables: set[Table] = set()  # tables inside EXISTS — track separately
+    def _collect_tables(self, stmt) -> tuple[set[Table], set[Table]]:
+        # Restrictions only apply to SELECT statements
+        # Update/Delete/Insert have different structure and are already
+        # scoped by their own WHERE clauses built by the caller
+        if not isinstance(stmt, Select):
+            return set(), set()
 
-        def _walk(clause: ClauseElement | None, inside_exists: bool = False) -> None:
+        inner_tables: set[Table] = set()
+        outer_tables: set[Table] = set()
+
+        def _walk_outer(clause: ClauseElement | None, is_outer: bool = False) -> None:
             if clause is None:
                 return
-
             if isinstance(clause, Table):
-                if inside_exists:
-                    exists_tables.add(clause)
+                if is_outer:
+                    outer_tables.add(clause)
                 else:
-                    tables.add(clause)
-
-            elif isinstance(clause, Join):
-                _walk(clause.left, inside_exists)
-                _walk(clause.right, inside_exists)
-
-            elif isinstance(clause, (Subquery, Alias)):
-                _walk(clause.element, inside_exists)
-
-            elif isinstance(clause, Select):
-                for frm in clause.froms:
-                    _walk(frm, inside_exists)
-                _walk_expression(clause.whereclause, inside_exists)
-
-            elif isinstance(clause, ClauseElement) and hasattr(clause, "element"):
-                _walk(clause.element, inside_exists)  # type: ignore[attr-defined]
-
-        def _walk_expression(expr: ClauseElement | None, inside_exists: bool = False) -> None:
-            if expr is None:
+                    inner_tables.add(clause)
                 return
-
-            if isinstance(expr, Select):
-                _walk(expr, inside_exists)
+            if isinstance(clause, Join):
+                _walk_outer(clause.left, is_outer)
+                _walk_outer(clause.right, is_outer=clause.isouter or is_outer)
                 return
-
-            if isinstance(expr, BooleanClauseList):
-                for clause in expr.clauses:
-                    _walk_expression(clause, inside_exists)
+            if isinstance(clause, (Subquery, Alias)):
                 return
-
-            if isinstance(expr, BinaryExpression):
-                _walk_expression(expr.left, inside_exists)
-                _walk_expression(expr.right, inside_exists)
-                return
-
-            if isinstance(expr, Exists):
-                # everything inside an EXISTS is already self-contained
-                _walk(expr.element, inside_exists=True)  # type: ignore[attr-defined]
-                return
-
-            if isinstance(expr, ClauseElement) and hasattr(expr, "element"):
-                inner = expr.element  # type: ignore[attr-defined]
-                if isinstance(inner, ClauseElement):
-                    _walk_expression(inner, inside_exists)
+            if isinstance(clause, ClauseElement) and hasattr(clause, "element"):
+                inner = clause.element  # type: ignore[attr-defined]
+                if isinstance(inner, (Subquery, Alias)):
+                    return
+                _walk_outer(inner, is_outer)
 
         for frm in stmt.froms:
-            _walk(frm)
+            _walk_outer(frm)
 
-        _walk_expression(stmt.whereclause)
-
-        # Only return tables that are in the outer query, not inside EXISTS
-        return tables - exists_tables
+        return inner_tables, outer_tables
 
     def _where_already_covers(self, stmt: Select, table: Table, col_name: str) -> bool:
         target_col = table.c.get(col_name)
@@ -340,22 +311,25 @@ class BaseRepository(Generic[ModelType]):
             )
         )
 
-    def _apply_restrictions(self, stmt: Select) -> Select:
-        involved_tables = self._collect_tables(stmt)
+    def _apply_restrictions(self, stmt) -> Select:
+        # Only apply to SELECT — Update/Delete are caller-scoped
+        if not isinstance(stmt, Select):
+            return stmt
+
+        inner_tables, outer_tables = self._collect_tables(stmt)
+        involved_tables = inner_tables | outer_tables
         cases_table = Cases.__table__
 
-        # 1. apply_case_visibility if Cases is anywhere in the statement
         if not self.anonymous and cases_table in involved_tables:
             if not self._where_already_covers(stmt, cases_table, "chamber_id"):
                 stmt = self._apply_case_visibility(stmt)
 
-        # 2. For every table found (including inside subqueries), apply
-        #    chamber_id + deleted_ind to the OUTER where if not already present.
-        #    Subquery-internal tables that were pre-filtered are skipped by
-        #    _where_already_covers since their filters appear in inner SQL.
         for table in involved_tables:
             if table is cases_table:
-                continue  # handled by apply_case_visibility above
+                continue
+
+            if table in outer_tables:
+                continue
 
             if "chamber_id" in table.c and not self.anonymous:
                 if not self._where_already_covers(stmt, table, "chamber_id"):

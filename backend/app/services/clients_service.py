@@ -18,7 +18,7 @@ from app.database.repositories.case_clients_repository import CaseClientsReposit
 from app.database.repositories.clients_repository import ClientsRepository
 from app.database.repositories.profile_images_repository import ProfileImagesRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
-from app.dtos.cases_dto import CaseClientOut, CaseListOut
+from app.dtos.cases_dto import CaseListOut
 from app.dtos.clients_dto import (
     ClientCreate,
     ClientDetailOut,
@@ -114,7 +114,6 @@ class ClientsService(BaseSecuredService):
             )
             party_role_map = {r.code: r.description for r in q}
 
-        case_clients_out: list[CaseClientOut] = []
         records: list[CaseListOut] = []
 
         for (
@@ -124,18 +123,7 @@ class ClientsService(BaseSecuredService):
             aor_user_id,
             hearing_status_code,
             party_role_code,
-            case_client
         ) in rows:
-            case_clients_out.append(CaseClientOut(
-                case_client_id=case_client.case_client_id,
-                chamber_id=case_client.chamber_id,
-                case_id=case_client.case_id,
-                client_id=case_client.client_id,
-                party_role_code=case_client.party_role_code,
-                party_role_description=party_role_map.get(case_client.party_role_code, ''),
-                primary_ind=bool(case_client.primary_ind),
-            ))
-
             records.append(CaseListOut(
                 case_id=cases.case_id,
                 chamber_id=cases.chamber_id,
@@ -160,10 +148,10 @@ class ClientsService(BaseSecuredService):
                 updated_date=cases.updated_date,
             ))
 
-        return records, case_clients_out, total
+        return records, total
 
     async def _to_detail_out(self, client: Clients) -> ClientDetailOut:
-        records, case_clients_out, total = await self._linked_cases(
+        records, total = await self._linked_cases(
             client_id=client.client_id
         )
         img = await self.profile_images_repo.get_profile_image_by_clientid(
@@ -215,7 +203,7 @@ class ClientsService(BaseSecuredService):
             updated_date=client.updated_date,
             linked_cases_count=total,
             linked_cases=records,
-            case_clients=case_clients_out,
+            # case_clients=case_clients_out,
         )
 
     # ─────────────────────────────────────────────────────────────────────

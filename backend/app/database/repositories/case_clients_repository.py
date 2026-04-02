@@ -1,6 +1,6 @@
 
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_aors import CaseAors
@@ -46,38 +46,75 @@ class CaseClientsRepository(BaseRepository[CaseClients]):
             .subquery()
         )
 
+        primary_aor = (
+            select(
+                CaseAors.case_id,
+                func.min(CaseAors.user_id).label("aor_user_id"),
+            )
+            .where(
+                CaseAors.chamber_id == chamber_id,
+                CaseAors.primary_ind.is_(True),
+                CaseAors.withdrawal_date.is_(None),
+            )
+            .group_by(CaseAors.case_id)
+            .subquery()
+        )
+
+        # ONE row per case for this client — pick primary if exists,
+        # else pick the first role alphabetically
+        linked_cases = (
+            select(
+                CaseClients.case_id,
+                CaseClients.case_client_id,
+                CaseClients.client_id,
+                CaseClients.party_role_code,
+                CaseClients.primary_ind,
+                CaseClients.chamber_id,
+                func.row_number().over(
+                    partition_by=CaseClients.case_id,
+                    order_by=[
+                        CaseClients.primary_ind.desc(),
+                        CaseClients.party_role_code.asc(),
+                    ],
+                ).label("rn"),
+            )
+            .where(
+                CaseClients.client_id == client_id,
+                CaseClients.chamber_id == chamber_id,
+            )
+            .subquery()
+        )
+
+        # Wrap to filter rn == 1 — guarantees one row per case
+        linked_cases_deduped = (
+            select(
+                linked_cases.c.case_id,
+                linked_cases.c.case_client_id,
+                linked_cases.c.client_id,
+                linked_cases.c.party_role_code,
+                linked_cases.c.primary_ind,
+                linked_cases.c.chamber_id,
+            )
+            .where(linked_cases.c.rn == 1)
+            .subquery()
+        )
+
         stmt = (
             select(
                 Cases,
                 Users.first_name,
                 Users.last_name,
-                CaseAors.user_id.label("aor_user_id"),  # ✅ ADD THIS
+                primary_aor.c.aor_user_id,
                 latest_hearing.c.status_code.label("hearing_status_code"),
-                CaseClients.party_role_code,
-                CaseClients,
+                linked_cases_deduped.c.party_role_code,
             )
-            .join(CaseClients, CaseClients.case_id == Cases.case_id)
-
-            # ✅ FIXED AOR JOIN
-            .outerjoin(
-                CaseAors,
-                and_(
-                    CaseAors.case_id == Cases.case_id,
-                    CaseAors.primary_ind.is_(True),
-                    CaseAors.withdrawal_date.is_(None),
-                ),
-            )
-            .outerjoin(
-                Users,
-                Users.user_id == CaseAors.user_id,
-            )
-
+            .join(linked_cases_deduped, Cases.case_id == linked_cases_deduped.c.case_id)
+            .outerjoin(primary_aor, Cases.case_id == primary_aor.c.case_id)
+            .outerjoin(Users, Users.user_id == primary_aor.c.aor_user_id)
             .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)
-
             .where(
-                CaseClients.client_id == client_id,
-                CaseClients.chamber_id == chamber_id,
                 Cases.deleted_ind.is_(False),
+                Cases.chamber_id == chamber_id,
             )
             .order_by(Cases.updated_date.desc())
         )
@@ -85,14 +122,12 @@ class CaseClientsRepository(BaseRepository[CaseClients]):
         rows = (await self.execute(session=session, stmt=stmt)).all()
 
         count_stmt = (
-            select(func.count())
-            .select_from(CaseClients)
+            select(func.count(distinct(CaseClients.case_id)))
             .where(
                 CaseClients.client_id == client_id,
                 CaseClients.chamber_id == chamber_id,
             )
         )
-
         total = await self.execute_scalar(session=session, stmt=count_stmt, default=0)
 
         return rows, total

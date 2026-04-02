@@ -49,7 +49,7 @@ class ClientListOut(ClientDetailsOut):
 
 class ClientDetailOut(ClientListOut):
     linked_cases: List["CaseListOut"]
-    case_clients: List["CaseClientOut"]
+    # case_clients: List["CaseClientOut"]
 
 class ClientSummaryStats(BaseRecordData):
     total: int
@@ -89,5 +89,5 @@ class ClientCreate(BaseInData):
 class ClientEdit(ClientCreate):
     pass
 
-from app.dtos.cases_dto import CaseClientOut, CaseListOut
+from app.dtos.cases_dto import CaseListOut
 ClientDetailOut.model_rebuild()
