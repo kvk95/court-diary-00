@@ -27,6 +27,7 @@ from app.dtos.clients_dto import (
     ClientEdit,
     ClientListOut,
     ClientDetailsOut,
+    ClientNotesEdit,
     ClientSummaryStats,
 )
 from app.services.base.secured_base_service import BaseSecuredService
@@ -473,6 +474,17 @@ class ClientsService(BaseSecuredService):
                     session=self.session,
                     data=self.profile_images_repo.map_fields_to_db_column(image_details),
                 )
+
+        return await self._to_detail_out(client)
+
+    async def clients_notes_edit(self, client_id: str, payload: ClientNotesEdit) -> ClientDetailOut:
+        await self._get_client_details(client_id)
+        data = payload.model_dump(exclude_unset=True, exclude_none=True)
+        client = await self.clients_repo.update(
+            session=self.session,
+            id_values=client_id,
+            data=self.clients_repo.map_fields_to_db_column(data),
+        )
 
         return await self._to_detail_out(client)
 

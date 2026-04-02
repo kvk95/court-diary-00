@@ -91,5 +91,8 @@ class ClientCreate(BaseInData):
 class ClientEdit(ClientCreate):
     image_id: Optional[str]
 
+class ClientNotesEdit(BaseInData):
+    notes: Optional[str] = None
+
 from app.dtos.cases_dto import CaseListOut
 ClientDetailOut.model_rebuild()

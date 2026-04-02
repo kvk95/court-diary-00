@@ -16,6 +16,7 @@ from app.dtos.clients_dto import (
     ClientEdit,
     ClientListOut,
     ClientDetailsOut,
+    ClientNotesEdit,
     ClientSummaryStats,
 )
 from app.services.clients_service import ClientsService
@@ -115,6 +116,19 @@ class ClientsController(BaseController):
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[ClientDetailOut]:
         return self.success(result=await service.clients_edit(client_id=client_id, payload=payload))
+
+    @BaseController.put(
+        "/{client_id}/notes",
+        summary="Edit Notes",
+        response_model=BaseOutDto[ClientDetailOut],
+    )
+    async def clients_notes_edit(
+        self,
+        client_id: str = Path(..., min_length=36, max_length=36),
+        payload: ClientNotesEdit = Body(...),
+        service: ClientsService = Depends(get_clients_service),
+    ) -> BaseOutDto[ClientDetailOut]:
+        return self.success(result=await service.clients_notes_edit(client_id=client_id, payload=payload))
 
     # ── Delete ────────────────────────────────────────────────────────────
 
