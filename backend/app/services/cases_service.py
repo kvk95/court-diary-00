@@ -285,6 +285,7 @@ class CasesService(BaseSecuredService):
             clients_out.append(ClientDetailsOut(
                 image_id=row.image_id,
                 image_data=row.image_data,
+                case_client_id=cc.case_client_id,
                 client_id=cl.client_id,
                 chamber_id=cl.chamber_id,
                 client_type_code=cl.client_type_code,
@@ -386,6 +387,7 @@ class CasesService(BaseSecuredService):
             case_summary=case.case_summary,
             status_code=case.status_code,
             status_description=maps["status_map"].get(case.status_code),
+            case_client_id = case_clients_out[0].case_client_id if case_clients_out else '',
             next_hearing_date=case.next_hearing_date,
             last_hearing_date=case.last_hearing_date,
             next_hearing_status=latest_status,
@@ -436,6 +438,7 @@ class CasesService(BaseSecuredService):
 
         rows = await self.cases_repo.list_cases_for_quick_hearing(
             session=self.session,
+            chamber_id=self.chamber_id,
             search=search,
             limit=limit,
         )
@@ -444,6 +447,13 @@ class CasesService(BaseSecuredService):
         used_statuses    = {r.Cases.status_code        for r in rows if r.Cases.status_code}
         used_case_types  = {r.Cases.case_type_code     for r in rows if r.Cases.case_type_code}
         used_party_roles = {r.party_role_code          for r in rows if r.party_role_code}
+
+        print(f"******************{used_party_roles}")
+        for party in used_party_roles:
+            print(f"***********8party{party}")
+
+        for r in rows:
+            print(f"ROW party_role_code={r.party_role_code!r}  aor_user_id={r.aor_user_id!r}")
 
         court_map = {}
         if used_court_ids:
@@ -479,24 +489,24 @@ class CasesService(BaseSecuredService):
 
         return [
             CaseQuickHearingOut(
-                case_id=c.case_id,
-                chamber_id=c.chamber_id,
-                case_number=c.case_number,
-                court_id=c.court_id,
-                court_name=court_map.get(c.court_id),
-                status_code=c.status_code,
-                status_description=status_map.get(c.status_code),
-                case_type_code=c.case_type_code,
-                case_type_description=case_type_map.get(c.case_type_code),
-                filing_year=c.filing_year,
-                petitioner=c.petitioner,
-                respondent=c.respondent,
-                aor_user_id=aor_user_id,
-                aor_name=self.full_name(first_name, last_name),
-                party_role_code=party_role_code,
-                party_role_description=party_role_map.get(party_role_code,''),
+                case_id=r.Cases.case_id,
+                chamber_id=r.Cases.chamber_id,
+                case_number=r.Cases.case_number,
+                court_id=r.Cases.court_id,
+                court_name=court_map.get(r.Cases.court_id),
+                status_code=r.Cases.status_code,
+                status_description=status_map.get(r.Cases.status_code),
+                case_type_code=r.Cases.case_type_code,
+                case_type_description=case_type_map.get(r.Cases.case_type_code),
+                filing_year=r.Cases.filing_year,
+                petitioner=r.Cases.petitioner,
+                respondent=r.Cases.respondent,
+                aor_user_id='', #r.aor_user_id,
+                aor_name=self.full_name(r.first_name, r.last_name),
+                party_role_code='',#r.party_role_code,
+                party_role_description=party_role_map.get(r.party_role_code,''),
             )
-            for c, first_name, last_name, aor_user_id, party_role_code in rows
+            for r in rows
         ]
 
     # ─────────────────────────────────────────────────────────────────────
@@ -586,16 +596,17 @@ class CasesService(BaseSecuredService):
                 case_summary=c.case_summary,
                 petitioner=c.petitioner,
                 respondent=c.respondent,
-                aor_user_id=aor_user_id,
+                aor_user_id=aor_user_id or '',
                 aor_name=self.full_name(first_name, last_name),
-                party_role_code=party_role_code,
+                party_role_code=party_role_code or '',
                 party_role_description=party_role_map.get(party_role_code, ""),
+                case_client_id=case_client_id or '',
                 next_hearing_date=c.next_hearing_date,
                 last_hearing_date=c.last_hearing_date,
                 next_hearing_status=hearing_status_map.get(hearing_status_code),
                 updated_date=c.updated_date,
             )
-            for c, first_name, last_name, hearing_status_code, party_role_code,aor_user_id in rows
+            for c, first_name, last_name, hearing_status_code, party_role_code,case_client_id, aor_user_id in rows
         ]
 
         return PagingBuilder(total_records=total, page=page, limit=limit).build(records=records)
@@ -1067,6 +1078,7 @@ class CasesService(BaseSecuredService):
                 case_summary=ca.case_summary,
                 status_code=ca.status_code,
                 status_description=case_status_map.get(ca.status_code),
+                case_client_id=cc.case_client_id,
                 next_hearing_date=ca.next_hearing_date,
                 last_hearing_date=ca.last_hearing_date,
                 next_hearing_status=None,
@@ -1081,6 +1093,7 @@ class CasesService(BaseSecuredService):
             client_detail = ClientDetailsOut(
                 image_id=row.image_id,
                 image_data=row.image_data,
+                case_client_id=cc.case_client_id,
                 client_id=cl.client_id,
                 chamber_id=cl.chamber_id,
                 client_type_code=cl.client_type_code,

@@ -68,6 +68,12 @@ class ClientsService(BaseSecuredService):
             client_id=client_id,
         )
 
+        print(f"[_linked_cases] client_id={client_id} total={total} rows_count={len(rows)}")
+        for i, r in enumerate(rows):
+            print(f"  row[{i}] Cases={r.Cases.case_id if hasattr(r, 'Cases') else 'NO_CASES'} "
+                f"party_role={getattr(r, 'party_role_code', 'MISSING')} "
+                f"case_client_id={getattr(r, 'case_client_id', 'MISSING')}")
+
         used_court_ids      = {r.Cases.court_id       for r in rows if r.Cases.court_id}
         used_case_statuses  = {r.Cases.status_code    for r in rows if r.Cases.status_code}
         used_case_types     = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
@@ -123,6 +129,7 @@ class ClientsService(BaseSecuredService):
             aor_user_id,
             hearing_status_code,
             party_role_code,
+            case_client_id
         ) in rows:
             records.append(CaseListOut(
                 case_id=cases.case_id,
@@ -142,6 +149,7 @@ class ClientsService(BaseSecuredService):
                 aor_name = self.full_name(first_name, last_name) if aor_user_id else "",
                 party_role_code=party_role_code,
                 party_role_description=party_role_map.get(party_role_code, ""),
+                case_client_id=case_client_id,
                 next_hearing_date=cases.next_hearing_date,
                 last_hearing_date=cases.last_hearing_date,
                 next_hearing_status=hearing_status_map.get(hearing_status_code),
@@ -203,6 +211,8 @@ class ClientsService(BaseSecuredService):
             updated_date=client.updated_date,
             linked_cases_count=total,
             linked_cases=records,
+            
+            case_client_id= '',
             # case_clients=case_clients_out,
         )
 
@@ -245,6 +255,7 @@ class ClientsService(BaseSecuredService):
 
         return [
             ClientDetailsOut(
+                case_client_id="",
                 client_id=c.client_id,
                 chamber_id=self.chamber_id,
                 client_name=c.client_name,
@@ -336,6 +347,7 @@ class ClientsService(BaseSecuredService):
 
         records = [
             ClientListOut(
+                case_client_id="",
                 client_id=c.client_id,
                 chamber_id=self.chamber_id,
                 client_type_code=c.client_type_code,

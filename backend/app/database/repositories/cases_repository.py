@@ -217,7 +217,7 @@ class CasesRepository(BaseRepository[Cases]):
 
         # Primary client party role per case
         primary_role = (
-            select(CaseClients.case_id, CaseClients.party_role_code)
+            select(CaseClients.case_id, CaseClients.party_role_code,CaseClients.case_client_id)
             .where(
                 CaseClients.chamber_id == chamber_id,
                 CaseClients.primary_ind.is_(True),
@@ -233,6 +233,7 @@ class CasesRepository(BaseRepository[Cases]):
                 Users.last_name,
                 latest_hearing.c.status_code.label("hearing_status_code"),
                 primary_role.c.party_role_code,
+                primary_role.c.case_client_id,
                 CaseAors.user_id.label("aor_user_id"),
             )
             .outerjoin(
@@ -301,17 +302,17 @@ class CasesRepository(BaseRepository[Cases]):
     async def list_cases_for_quick_hearing(
         self,
         session: AsyncSession,
+        chamber_id: str,
         search: Optional[str] = None,
         limit: int = 50,
     ):
-        # One row per case — primary AOR user
-        # MIN(user_id) satisfies only_full_group_by while still picking one user
         primary_aor = (
             select(
                 CaseAors.case_id,
                 func.min(CaseAors.user_id).label("aor_user_id"),
             )
             .where(
+                CaseAors.chamber_id == chamber_id,
                 CaseAors.primary_ind.is_(True),
                 CaseAors.withdrawal_date.is_(None),
             )
@@ -319,13 +320,15 @@ class CasesRepository(BaseRepository[Cases]):
             .subquery()
         )
 
-        # One row per case — primary client party role
         primary_role = (
             select(
                 CaseClients.case_id,
                 func.min(CaseClients.party_role_code).label("party_role_code"),
             )
-            .where(CaseClients.primary_ind.is_(True))
+            .where(
+                CaseClients.chamber_id == chamber_id,
+                CaseClients.primary_ind.is_(True),
+            )
             .group_by(CaseClients.case_id)
             .subquery()
         )
@@ -341,6 +344,10 @@ class CasesRepository(BaseRepository[Cases]):
             .outerjoin(primary_aor, Cases.case_id == primary_aor.c.case_id)
             .outerjoin(Users, Users.user_id == primary_aor.c.aor_user_id)
             .outerjoin(primary_role, Cases.case_id == primary_role.c.case_id)
+            .where(
+                Cases.chamber_id == chamber_id,
+                Cases.deleted_ind.is_(False),
+            )
         )
 
         if search and search.strip():
@@ -355,5 +362,7 @@ class CasesRepository(BaseRepository[Cases]):
 
         stmt = stmt.order_by(Cases.updated_date.desc()).limit(limit)
 
-        rows = (await self.execute(session=session, stmt=stmt)).all()
-        return rows
+        # 🔑 FIX: Deduplicate at both SQL and ORM levels
+        stmt = stmt.distinct()
+        result = await session.execute(stmt)
+        return result.unique().all()

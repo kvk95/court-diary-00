@@ -107,6 +107,7 @@ class CaseClientsRepository(BaseRepository[CaseClients]):
                 primary_aor.c.aor_user_id,
                 latest_hearing.c.status_code.label("hearing_status_code"),
                 linked_cases_deduped.c.party_role_code,
+                linked_cases_deduped.c.case_client_id,
             )
             .join(linked_cases_deduped, Cases.case_id == linked_cases_deduped.c.case_id)
             .outerjoin(primary_aor, Cases.case_id == primary_aor.c.case_id)

@@ -37,6 +37,7 @@ class CaseQuickHearingOut(CaseBasicInfoOut):
     party_role_description: str
 
 class CaseListOut(CaseQuickHearingOut):
+    case_client_id: str
     next_hearing_date: Optional[date] = None
     last_hearing_date: Optional[date] = None
     next_hearing_status: Optional[str] = None

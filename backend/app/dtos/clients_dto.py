@@ -15,7 +15,8 @@ from app.dtos.users_dto import ImageInfoOut
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ClientDetailsOut(ImageInfoOut):
-    """Slim DTO for Link Client modal search results."""
+    """Slim DTO for Link Client modal search results."""    
+    case_client_id: str
     client_id: str
     chamber_id: str
     client_type_code: str
