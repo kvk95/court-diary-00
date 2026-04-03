@@ -337,6 +337,7 @@ CREATE TABLE users (
     last_name             VARCHAR(60)  NULL,
     phone                 VARCHAR(20)  NULL,
     status_ind            BOOLEAN      NOT NULL DEFAULT TRUE,
+	advocate_ind		  BOOLEAN      NOT NULL DEFAULT FALSE,
     deleted_ind           BOOLEAN      DEFAULT FALSE,
     deleted_date          TIMESTAMP    NULL,
     deleted_by            CHAR(36)     NULL,  
@@ -1195,19 +1196,20 @@ CREATE TABLE user_invitations (
 
 DROP TABLE IF EXISTS login_audit;
 CREATE TABLE login_audit (
-    login_id       CHAR(36)     PRIMARY KEY,  
-    user_id        CHAR(36)     NULL,  
-    chamber_id     CHAR(36)     NOT NULL,  
+    login_id       CHAR(36)     PRIMARY KEY,   
     email          VARCHAR(120) NULL,
     status_code    CHAR(4)      NULL,
     failure_reason VARCHAR(255) NULL,
     login_time     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    ip_address     VARCHAR(45)  NULL,
     user_agent     TEXT         NULL,
+    actor_user_id        CHAR(36)     NULL,  
+    actor_chamber_id     CHAR(36)     NOT NULL,
+    ip_address     VARCHAR(45)  NULL, 
+    created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_login_user
-        FOREIGN KEY (user_id)    REFERENCES users(user_id)             ON DELETE SET NULL,
+        FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)             ON DELETE SET NULL,
     CONSTRAINT fk_login_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)        ON DELETE CASCADE,
+        FOREIGN KEY (actor_chamber_id) REFERENCES chamber(chamber_id)        ON DELETE CASCADE,
     CONSTRAINT fk_login_status
         FOREIGN KEY (status_code) REFERENCES refm_login_status(code)  ON DELETE SET NULL,
     INDEX idx_login_time (login_time DESC)
@@ -1219,9 +1221,7 @@ CREATE TABLE login_audit (
 
 DROP TABLE IF EXISTS db_call_log;
 CREATE TABLE db_call_log (
-    id            CHAR(36)     PRIMARY KEY,  
-    chamber_id    CHAR(36)     NULL,  
-    user_id       CHAR(36)     NULL,  
+    id            CHAR(36)     PRIMARY KEY,
     timestamp     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     duration_ms   DOUBLE       NOT NULL,
     raw_query     LONGTEXT     NOT NULL,
@@ -1230,14 +1230,13 @@ CREATE TABLE db_call_log (
     repo          VARCHAR(255) NULL,
     error         LONGTEXT     NULL,
     metadata_json JSON         NULL,
+    actor_user_id        CHAR(36)     NULL,  
+    actor_chamber_id     CHAR(36)     NULL, 
     created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by    CHAR(36)     NULL,  
     CONSTRAINT fk_db_log_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE SET NULL,
+        FOREIGN KEY (actor_chamber_id) REFERENCES chamber(chamber_id) ON DELETE SET NULL,
     CONSTRAINT fk_db_log_user
-        FOREIGN KEY (user_id)    REFERENCES users(user_id)      ON DELETE SET NULL,
-    CONSTRAINT fk_db_log_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL
+        FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)      ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='DB query log';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1247,8 +1246,6 @@ CREATE TABLE db_call_log (
 DROP TABLE IF EXISTS exception_log;
 CREATE TABLE exception_log (
     id             CHAR(36)     PRIMARY KEY,  
-    chamber_id     CHAR(36)     NULL,  
-    user_id        CHAR(36)     NULL,  
     timestamp      DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     exception_type VARCHAR(255) NOT NULL,
     message        LONGTEXT     NULL,
@@ -1260,14 +1257,13 @@ CREATE TABLE exception_log (
     headers        JSON         NULL,
     error_code     VARCHAR(50)  NULL,
     metadata_json  JSON         NULL,
-    created_date   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by     CHAR(36)     NULL,  
+    actor_user_id        CHAR(36)     NULL,  
+    actor_chamber_id     CHAR(36)     NULL, 
+    created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_exc_log_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE SET NULL,
+        FOREIGN KEY (actor_chamber_id) REFERENCES chamber(chamber_id) ON DELETE SET NULL,
     CONSTRAINT fk_exc_log_user
-        FOREIGN KEY (user_id)    REFERENCES users(user_id)      ON DELETE SET NULL,
-    CONSTRAINT fk_exc_log_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL
+        FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)      ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Application errors log';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1276,22 +1272,19 @@ CREATE TABLE exception_log (
 
 DROP TABLE IF EXISTS activity_log;
 CREATE TABLE activity_log (
-    id            CHAR(36)     PRIMARY KEY,  
-    chamber_id    CHAR(36)     NOT NULL,  
-    user_id       CHAR(36)     NULL,  
+    id            CHAR(36)     PRIMARY KEY, 
     timestamp     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     action        VARCHAR(255) NOT NULL,
     target        VARCHAR(255) NULL,
     metadata_json JSON         NULL,
-    ip_address    VARCHAR(45)  NULL,
+    ip_address    VARCHAR(45)  NULL,  
+    actor_chamber_id    CHAR(36)     NULL,  
+    actor_user_id       CHAR(36)     NULL, 
     created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by    CHAR(36)     NULL,  
     CONSTRAINT fk_activity_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
+        FOREIGN KEY (actor_chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
     CONSTRAINT fk_activity_user
-        FOREIGN KEY (user_id)    REFERENCES users(user_id)      ON DELETE SET NULL,
-    CONSTRAINT fk_activity_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id)      ON DELETE SET NULL
+        FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)      ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='User actions audit';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1366,7 +1359,7 @@ CREATE INDEX idx_ucl_chamber_users ON user_chamber_link(chamber_id, primary_ind,
 CREATE INDEX idx_user_roles_link_role ON user_roles(link_id, role_id, end_date);
 
 -- Activity Log
-CREATE INDEX idx_activity_chamber_time ON activity_log(chamber_id, timestamp DESC);
+CREATE INDEX idx_activity_chamber_time ON activity_log(actor_chamber_id, timestamp DESC);
 
 -- Email Log
 CREATE INDEX idx_email_log_status      ON email_log(status_code, created_date);

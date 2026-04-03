@@ -727,25 +727,31 @@ class CasesService(BaseSecuredService):
             lambda r: self.full_name(r.first_name, r.last_name),
         )
 
+        status_map = await self.refm_resolver.get_desc_map(
+            column_attr=Cases.status_code,
+            value_column=RefmCaseStatus.description,
+        )
+
+        purpose_map = await self.refm_resolver.get_desc_map(
+            column_attr=Hearings.purpose_code,
+            value_column=RefmHearingPurpose.description,
+        )
+
         return [
             HearingOut(
                 hearing_id=h.hearing_id,
                 case_id=h.case_id,
                 hearing_date=h.hearing_date,
                 status_code=h.status_code,
-                status_description=await self.refm_resolver.from_column(
-                    column_attr=Cases.status_code,
-                    code=h.status_code,
-                    value_column=RefmCaseStatus.description,
-                    default=None
+                status_description=await self.refm_resolver.get_value(
+                    desc_map=status_map,
+                    code=h.status_code
                 ),
 
                 purpose_code=h.purpose_code, 
-                purpose_description=await self.refm_resolver.from_column(
-                    column_attr=Hearings.purpose_code,
-                    code=h.purpose_code,
-                    value_column=RefmHearingPurpose.description,
-                    default=None
+                purpose_description=await self.refm_resolver.get_value(
+                    desc_map=purpose_map,
+                    code=h.status_code
                 ),
 
                 notes=h.notes,

@@ -45,7 +45,6 @@ from app.database.repositories.base.relationship_config import RELATIONSHIP_CONF
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.dtos.roles_dto import RoleOut
 from app.dtos.users_dto import UserOut
-from app.utils.logging_framework.activity_logger import log_activity
 from .model_helpers import get_writable_columns
 
 from sqlalchemy import Select
@@ -587,7 +586,7 @@ class BaseRepository(Generic[ModelType]):
                         parent_id = getattr(new_obj, rel["parent_field"], None)
                         child_id = getattr(new_obj, rel["child_field"], None)
 
-                        await log_activity(
+                        await self._log_activity(
                             action=f"{rel['entity']}_UPDATED",
                             target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
                             metadata={
@@ -600,7 +599,7 @@ class BaseRepository(Generic[ModelType]):
 
                 entity_id = self._get_entity_id(new_obj)
 
-                await log_activity(
+                await self._log_activity(
                     action=f"{self.LOG_ENTITY.upper()}_UPDATED",
                     target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
                     metadata={
@@ -806,7 +805,7 @@ class BaseRepository(Generic[ModelType]):
             parent_id = getattr(obj, rel["parent_field"], None)
             child_id = getattr(obj, rel["child_field"], None)
 
-            await log_activity(
+            await self._log_activity(
                 action=f"{rel['entity']}_LINKED",
                 target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
                 metadata={
@@ -816,7 +815,7 @@ class BaseRepository(Generic[ModelType]):
                 },
             )
 
-        await log_activity(
+        await self._log_activity(
             action=f"{self.LOG_ENTITY.upper()}_CREATED",
             target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
             metadata={
@@ -1085,12 +1084,11 @@ class BaseRepository(Generic[ModelType]):
         rel = self._get_relationship_config()
 
         if rel:
-            from app.utils.logging_framework.activity_logger import log_activity
 
             parent_id = getattr(obj, rel["parent_field"], None)
             child_id = getattr(obj, rel["child_field"], None)
 
-            await log_activity(
+            await self._log_activity(
                 action=f"{rel['entity']}_UNLINKED",
                 target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
                 metadata={
@@ -1100,7 +1098,7 @@ class BaseRepository(Generic[ModelType]):
                 },
             )
 
-        await log_activity(
+        await self._log_activity(
             action=f"{self.LOG_ENTITY.upper()}_DELETED",
             target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
             metadata={

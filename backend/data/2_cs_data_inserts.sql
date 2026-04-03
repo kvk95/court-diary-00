@@ -241,16 +241,21 @@ SET @chamber_sundar = (SELECT chamber_id FROM chamber WHERE chamber_name = 'Sund
 
 SET @pwd_hash = '$argon2id$v=19$m=65536,t=3,p=4$hfCeE0IoZay1lhLifA+BkA$3rA1GrCAkdhLzYyGi2S7lc422/W2eEPIqW3MD4u1B48';
 
-INSERT INTO users (email, password_hash, first_name, last_name, phone, created_by) VALUES
-('admin@vkchamber.in',   @pwd_hash, 'Vijay',   'Krishnan', '9876543210', NULL),
-('priya@vkchamber.in',   @pwd_hash, 'Priya',   'Natarajan','8123456789', 1),
-('karthik@vkchamber.in', @pwd_hash, 'Karthik', 'Raja',     '9001234567', 1),
-('lokesh@sundarlaw.in',  @pwd_hash, 'Lokesh',  'Mani',     '9445123456', NULL);
+INSERT INTO users (email, password_hash, first_name, last_name, phone, advocate_ind, created_by) VALUES
+('admin@vkchamber.in',   @pwd_hash, 'Vijay',   'Krishnan', '9876543210', TRUE, NULL),
+('priya@vkchamber.in',   @pwd_hash, 'Priya',   'Natarajan','8123456789', TRUE, 1),
+('karthik@vkchamber.in', @pwd_hash, 'Karthik', 'Raja',     '9001234567', TRUE, 1),
+('jerem@vkchamber.in',   @pwd_hash, 'Jerem',   'H',		   '4571547845', TRUE, 1),
+('suresh@vkchamber.in',  @pwd_hash, 'Suresh',  'Perumal',  '8123456789', FALSE, 1),
+('lokesh@sundarlaw.in',  @pwd_hash, 'Lokesh',  'Mani',     '9445123456', TRUE, NULL);
 
 SET @user_vijay   = (SELECT user_id FROM users WHERE email = 'admin@vkchamber.in');
 SET @user_priya   = (SELECT user_id FROM users WHERE email = 'priya@vkchamber.in');
 SET @user_karthik = (SELECT user_id FROM users WHERE email = 'karthik@vkchamber.in');
+SET @user_jerem   = (SELECT user_id FROM users WHERE email = 'jerem@vkchamber.in');
+SET @user_suresh   = (SELECT user_id FROM users WHERE email = 'suresh@vkchamber.in');
 SET @user_lokesh  = (SELECT user_id FROM users WHERE email = 'lokesh@sundarlaw.in');
+
 
 
 -- =============================================================================
@@ -266,7 +271,9 @@ INSERT INTO user_profiles (user_id, address, country, state, city, postal_code,
 (@user_vijay,   'No. 45, Anna Salai, Teynampet',         'IN  ', 'TN  ', 'Chennai',    '600018', '222 33% 10%', '222 40% 12%', '32.4 99% 63%',  'Nunito, sans-serif', @user_vijay),
 (@user_priya,   'Flat 3B, Greenwoods Apartment, Adyar',  'IN  ', 'TN  ', 'Chennai',    '600020', '230 20% 15%', '230 25% 18%', '215 100% 55%',  'Inter, sans-serif',  @user_vijay),
 (@user_karthik, '12/5, Gandhi Nagar, Chengalpattu',      'IN  ', 'TN  ', 'Chengalpattu','603001','0 0% 12%',    '0 0% 15%',    '262 83% 58%',   'Nunito, sans-serif', @user_vijay),
-(@user_lokesh,  'Plot 78, RS Puram',                     'IN  ', 'TN  ', 'Coimbatore', '641002', '225 30% 11%', '225 35% 14%', '142 76% 36%',   'Roboto, sans-serif', @user_lokesh);
+(@user_lokesh,  'Plot 78, RS Puram',                     'IN  ', 'TN  ', 'Coimbatore', '641002', '225 30% 11%', '225 35% 14%', '142 76% 36%',   'Roboto, sans-serif', @user_lokesh),
+(@user_jerem,   'Flat 12, Tina Apartment, Adyar',  		 'IN  ', 'TN  ', 'Chennai',    '600020', '230 20% 15%', '230 25% 18%', '215 100% 55%',  'Inter, sans-serif',  @user_vijay),
+(@user_suresh,   'No 113, Dubakoor Apartment, Adyar',    'IN  ', 'TN  ', 'Chennai',    '600020', '230 20% 15%', '230 25% 18%', '215 100% 55%',  'Inter, sans-serif',  @user_vijay);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 18.2  User ↔ Chamber Links
@@ -276,11 +283,15 @@ INSERT INTO user_chamber_link (user_id, chamber_id, primary_ind, joined_date, cr
 (@user_vijay,   @chamber_vk,     TRUE, '2024-01-15', @user_vijay),
 (@user_priya,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
 (@user_karthik, @chamber_vk,     TRUE, '2024-03-10', @user_vijay),
+(@user_jerem,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
+(@user_suresh,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
 (@user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh);
 
 SET @link_vijay_vk      = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_vijay   AND chamber_id = @chamber_vk);
 SET @link_priya_vk      = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_priya   AND chamber_id = @chamber_vk);
 SET @link_karthik_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_karthik AND chamber_id = @chamber_vk);
+SET @link_jerem_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_jerem AND chamber_id = @chamber_vk);
+SET @link_suresh_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_suresh AND chamber_id = @chamber_vk);
 SET @link_lokesh_sundar = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_lokesh  AND chamber_id = @chamber_sundar);
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -333,6 +344,7 @@ INSERT INTO security_roles (role_name, description, admin_ind, system_ind, creat
 INSERT INTO chamber_roles (chamber_id, role_name, description, admin_ind, system_ind, created_by) VALUES
 (@chamber_vk, 'Administrator',   'Full access to all modules',         TRUE, TRUE, @user_vijay),
 (@chamber_vk, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_vijay),
+(@chamber_vk, 'Clerk', 'Manages Office, hearings and clients', 		   FALSE, FALSE, @user_vijay),
 
 (@chamber_sundar, 'Administrator', 'Full access to all modules', FALSE, TRUE, @user_lokesh);
 
@@ -342,12 +354,15 @@ INSERT INTO chamber_roles (chamber_id, role_name, description, admin_ind, system
 
 SET @role_admin_vk   = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Administrator');
 SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Senior Advocate');
+SET @role_clerk_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Clerk');
 SET @role_admin_sundar = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar AND role_name = 'Administrator');
 
 INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_vijay_vk,      @role_admin_vk,   '2024-01-15', @user_vijay),
 (@link_priya_vk,      @role_senior_vk,  '2024-02-01', @user_vijay),
 (@link_karthik_vk,    @role_senior_vk,  '2024-03-10', @user_vijay),
+(@link_jerem_vk,      @role_senior_vk,  '2024-02-01', @user_vijay),
+(@link_suresh_vk,     @role_clerk_vk,   '2024-02-01', @user_vijay),
 (@link_lokesh_sundar, @role_admin_sundar, '2024-01-20', @user_lokesh);
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -393,6 +408,20 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 (@role_senior_vk, @cm_rprt, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_vijay),
 (@role_senior_vk, @cm_sett, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
 (@role_senior_vk, @cm_coll, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
+
+-- Clerk - Limited Access
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
+(@role_clerk_vk, @cm_admn, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk_vk, @cm_dash, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_case, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk_vk, @cm_hear, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk_vk, @cm_cald, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_clnt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_user, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
+(@role_clerk_vk, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
 
 
 -- =============================================================================
@@ -761,6 +790,8 @@ VALUES
 (@user_vijay,   NULL,	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiM0YzUxYzgiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjQwIiByPSIxNSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNzAiIHI9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNDUiIHk9IjUwIiB3aWR0aD0iMTAiIGhlaWdodD0iMjAiIGZpbGw9IiNmZmYiLz48cG9seWdvbiBwb2ludHM9IjUwLDMwIDU1LDQwIDQ1LDQwIiBmaWxsPSIjZmZmIi8+PC9zdmc+', 'Avatar: abstract person icon for Vijay',   @user_vijay),
 (@user_priya,   NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNmYzRlMDIiLz48Y2lyY2xlIGN4PSIzNSIgY3k9IjQwIiByPSI4IiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iNjUiIGN5PSI0MCIgcj0iOCIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0zMCA3MCBRNTAgODAgNzAgNzAiIHN0cm9rZT0iI2ZmZiIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSI2Ii8+PC9zdmc+', 'Avatar: smiley face for Priya',   @user_vijay),
 (@user_karthik, NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyMjJkMzIiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDMwIDkwLDcwIDUwLDkwIDEwLDcwIDEwLDMwIiBmaWxsPSIjZTU5YzQyIiBmaWxsLW9wYWNpdHk9IjAuOSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiPks8L3RleHQ+PC9zdmc+', 'Avatar: hexagon with initial K for Karthik', @user_vijay),
+(@user_jerem, NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyMjJkMzIiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDMwIDkwLDcwIDUwLDkwIDEwLDcwIDEwLDMwIiBmaWxsPSIjZTU5YzQyIiBmaWxsLW9wYWNpdHk9IjAuOSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiPks8L3RleHQ+PC9zdmc+', 'Avatar: hexagon with initial K for Karthik', @user_vijay),
+(@user_suresh, NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiMyMjJkMzIiLz48cG9seWdvbiBwb2ludHM9IjUwLDEwIDkwLDMwIDkwLDcwIDUwLDkwIDEwLDcwIDEwLDMwIiBmaWxsPSIjZTU5YzQyIiBmaWxsLW9wYWNpdHk9IjAuOSIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiPks8L3RleHQ+PC9zdmc+', 'Avatar: hexagon with initial K for Karthik', @user_vijay),
 (@user_lokesh,  NULL, 	'ENTU','data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCI+PGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iNTAiIGZpbGw9IiNmZjY2Y2MiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMCIgZmlsbD0iI2ZmZmZmZiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48cGF0aCBkPSJNMzUsMzUgTDY1LDY1IE02NSwzNSBMNjUsMzUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI4IiBmaWxsPSJub25lIi8+PC9zdmc+', 'Avatar: abstract cross pattern for Lokesh',  @user_vijay);
 
 -- Clients (diverse avatars)
@@ -788,17 +819,17 @@ VALUES
 -- 25.1  Activity Log (Recent Activity widget)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO activity_log (chamber_id, user_id, action, target, ip_address, metadata_json, created_date, created_by) VALUES
-(@chamber_vk, @user_priya,   'CASE_UPDATE',    'case:1', '117.192.45.12', JSON_OBJECT('case_id', 1, 'changed', 'next_hearing_date'), '2026-03-24 09:15:00', @user_priya),
-(@chamber_vk, @user_karthik, 'HEARING_CREATE', 'case:2', '49.204.123.88', JSON_OBJECT('hearing_id', 3, 'case_id', 2),                '2026-03-24 10:30:00', @user_karthik),
-(@chamber_vk, @user_vijay,   'CASE_CREATE',    'case:7', '117.192.45.12', JSON_OBJECT('case_id', 7, 'case_number', 'Crl.O.P.No.567/2026'), '2026-03-23 14:20:00', @user_vijay),
-(@chamber_vk, @user_priya,   'NOTE_CREATE',    'case:1', '117.192.45.12', JSON_OBJECT('note_id', 1, 'case_id', 1),                    '2026-03-23 16:45:00', @user_priya),
-(@chamber_vk, @user_karthik, 'CASE_UPDATE',    'case:4', '49.204.123.88', JSON_OBJECT('case_id', 4, 'changed', 'status_code'),         '2026-03-23 11:00:00', @user_karthik),
-(@chamber_vk, @user_vijay,   'USER_INVITE',    'user',   '117.192.45.12', JSON_OBJECT('email', 'newlawyer@example.com'),               '2026-03-22 09:00:00', @user_vijay),
-(@chamber_vk, @user_priya,   'HEARING_UPDATE', 'case:2', '117.192.45.12', JSON_OBJECT('hearing_id', 2, 'case_id', 2),                  '2026-03-22 15:30:00', @user_priya),
-(@chamber_sundar, @user_lokesh, 'CASE_CREATE', 'case:3', '182.76.123.45', JSON_OBJECT('case_id', 3, 'case_number', 'O.S.No.145/2024'), '2026-03-21 10:00:00', @user_lokesh),
-(@chamber_vk, @user_karthik, 'DOCUMENT_UPLOAD','case:1', '49.204.123.88', JSON_OBJECT('case_id', 1, 'doc_type', 'affidavit'),           '2026-03-21 14:15:00', @user_karthik),
-(@chamber_vk, @user_vijay,   'SETTINGS_UPDATE','chamber','117.192.45.12', JSON_OBJECT('setting', 'email_config'),                      '2026-03-20 11:30:00', @user_vijay);
+INSERT INTO activity_log (actor_chamber_id, actor_user_id, action, target, ip_address, metadata_json, created_date) VALUES
+(@chamber_vk, @user_priya,   'CASE_UPDATE',    'case:1', '117.192.45.12', JSON_OBJECT('case_id', 1, 'changed', 'next_hearing_date'), '2026-03-24 09:15:00'),
+(@chamber_vk, @user_karthik, 'HEARING_CREATE', 'case:2', '49.204.123.88', JSON_OBJECT('hearing_id', 3, 'case_id', 2),                '2026-03-24 10:30:00'),
+(@chamber_vk, @user_vijay,   'CASE_CREATE',    'case:7', '117.192.45.12', JSON_OBJECT('case_id', 7, 'case_number', 'Crl.O.P.No.567/2026'), '2026-03-23 14:20:00'),
+(@chamber_vk, @user_priya,   'NOTE_CREATE',    'case:1', '117.192.45.12', JSON_OBJECT('note_id', 1, 'case_id', 1),                    '2026-03-23 16:45:00'),
+(@chamber_vk, @user_karthik, 'CASE_UPDATE',    'case:4', '49.204.123.88', JSON_OBJECT('case_id', 4, 'changed', 'status_code'),         '2026-03-23 11:00:00'),
+(@chamber_vk, @user_vijay,   'USER_INVITE',    'user',   '117.192.45.12', JSON_OBJECT('email', 'newlawyer@example.com'),               '2026-03-22 09:00:00'),
+(@chamber_vk, @user_priya,   'HEARING_UPDATE', 'case:2', '117.192.45.12', JSON_OBJECT('hearing_id', 2, 'case_id', 2),                  '2026-03-22 15:30:00'),
+(@chamber_sundar, @user_lokesh, 'CASE_CREATE', 'case:3', '182.76.123.45', JSON_OBJECT('case_id', 3, 'case_number', 'O.S.No.145/2024'), '2026-03-21 10:00:00'),
+(@chamber_vk, @user_karthik, 'DOCUMENT_UPLOAD','case:1', '49.204.123.88', JSON_OBJECT('case_id', 1, 'doc_type', 'affidavit'),           '2026-03-21 14:15:00'),
+(@chamber_vk, @user_vijay,   'SETTINGS_UPDATE','chamber','117.192.45.12', JSON_OBJECT('setting', 'email_config'),                      '2026-03-20 11:30:00');
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 25.2  Email Log
@@ -812,7 +843,7 @@ INSERT INTO email_log (chamber_id, user_id, template_code, recipient_email, subj
 -- 25.3  Login Audit
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO login_audit (user_id, chamber_id, email, ip_address, user_agent, status_code, login_time) VALUES
+INSERT INTO login_audit (actor_user_id, actor_chamber_id, email, ip_address, user_agent, status_code, login_time) VALUES
 (@user_vijay,   @chamber_vk, 'admin@vkchamber.in',   '117.192.45.12', 'Chrome / Windows', 'LSSU', '2026-03-24 09:00:00'),
 (@user_priya,   @chamber_vk, 'priya@vkchamber.in',   '117.192.45.13', 'Chrome / Mac',     'LSSU', '2026-03-24 09:30:00'),
 (@user_karthik, @chamber_vk, 'karthik@vkchamber.in', '49.204.123.88', 'Firefox / Linux',  'LSSU', '2026-03-24 10:00:00'),

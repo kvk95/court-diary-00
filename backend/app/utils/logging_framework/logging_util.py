@@ -13,13 +13,14 @@ async def add_to_queue(log_type: LogType, payload: dict):
     payload["_ctx"] = {
         "request_id": ctx.get("request_id"),
         "user_id": ctx.get("user_id"),
-        "company_id": ctx.get("company_id"),
+        "chamber_id": ctx.get("chamber_id"),
         "ip": ctx.get("ip"),
     }
+
     payload["request_id"] = ctx.get("request_id")
-    
+
     qm = get_queue_manager()
-    await qm.enqueue(log_type= log_type, payload =  payload)
+    await qm.enqueue(log_type=log_type, payload=payload)
     
 
 def mask_sensitive(params, sensitive_keys=None):

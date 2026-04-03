@@ -78,12 +78,11 @@ def attach_listeners(async_engine: AsyncEngine):
 
             payload.update(
                 {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.utcnow(),
                     "duration_ms": round(duration_ms, 3),
                     "final_query": _reconstruct_query(statement, parameters),
                     "repo": ctx.get("repo") if ctx else None,
-                    "user_id": ctx.get("user_id") if ctx else None,
-                    "company_id": ctx.get("company_id") if ctx else None,
+                    "metadata_json":{}
                 }
             )
             
@@ -98,7 +97,7 @@ def attach_listeners(async_engine: AsyncEngine):
             ctx = get_request_context()
 
             payload = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.utcnow(),
                     "duration_ms": None,
                     "raw_query": getattr(exception_context, "statement", "") or "",
                     "params": mask_sensitive(
@@ -106,10 +105,8 @@ def attach_listeners(async_engine: AsyncEngine):
                     ),
                     "final_query": None,
                     "repo": ctx.get("repo") if ctx else None,
-                    "user_id": ctx.get("user_id") if ctx else None,
-                    "company_id": ctx.get("company_id") if ctx else None,
                     "error": str(exception_context.original_exception),
-                    "metadataz": {
+                    "metadata_json": {
                         "exception_context": str(exception_context)
                 },
             }
@@ -120,6 +117,7 @@ def attach_listeners(async_engine: AsyncEngine):
 
     def call_queue(payload):        
             loop = asyncio.get_event_loop()
+            print(f"************************* DB LOG PAYLOAD : {payload}")
             loop.create_task(add_to_queue(log_type= LogType.DB_CALL, payload =  payload))
 
         

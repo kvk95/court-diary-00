@@ -77,7 +77,7 @@ class RefmCache:
     """
 
     # 🔹 Config
-    TTL_SECONDS: int | None = 300  # Cache validity in seconds (None = no expiration)
+    TTL_SECONDS: int | None = None  # Cache validity in seconds (None = no expiration)
 
     # 🔹 Cache state
     _data: RefmData | None = None

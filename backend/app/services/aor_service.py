@@ -16,6 +16,7 @@ from app.database.repositories.profile_images_repository import ProfileImagesRep
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.aor_dto import AorCreate, AorEdit, AorOut, AorWithdraw
+from app.dtos.users_dto import UserBasicInfoOut
 from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import ErrorCodes, ValidationErrorDetail
 
@@ -68,8 +69,8 @@ class AorService(BaseSecuredService):
             case_id=aor.case_id,
             user_id=aor.user_id,
             advocate_name=advocate_name,
-            image_id=img["image_id"] if img else None,
-            image_data=img["image_data"] if img else None,
+            image_id='', #img["image_id"] if img else None,
+            image_data='', #img["image_data"] if img else None,
             primary_ind=bool(aor.primary_ind),
             status_code=aor.status_code or RefmAorStatusConstants.ACTIVE,
             status_description= await self.refm_resolver.from_column(
@@ -137,29 +138,29 @@ class AorService(BaseSecuredService):
             for a in aors
         ]
     
-    async def aors_get_by_chamber(self,search: Optional[str]) -> List[AorOut]:
-        rows = await self.aors_repo.aors_get_by_chamber(session=self.session,chamber_id=self.chamber_id, search=search)
+    async def aors_get_by_chamber(self,search: Optional[str]) -> List[UserBasicInfoOut]:
+        rows = await self.aors_repo.aors_get_by_chamber(session=self.session,
+                                                        search=search)
+
+        user_ids = [c.user_id for c in rows]
+
+        image_map = await self.profile_images_repo.get_images_by_user_ids(
+            session=self.session,
+            user_ids=user_ids,
+        )
         return [
-            AorOut(
-                case_aor_id=row.case_aor_id,
-                chamber_id=self.chamber_id,
-                case_id=row.case_id,
+            UserBasicInfoOut(
+
                 user_id=row.user_id,
-                advocate_name=self.full_name(row.first_name, row.last_name),
-                primary_ind=bool(row.primary_ind),
-                status_code=row.status_code or RefmAorStatusConstants.ACTIVE,
-                status_description=await self.refm_resolver.from_column(
-                    column_attr=CaseAors.status_code,
-                    value_column=RefmAorStatus.description,
-                    code=row.status_code,
-                    default=None,
-                ),
-                appointment_date=row.appointment_date,
-                withdrawal_date=row.withdrawal_date,
-                notes=row.notes,
-                created_date=row.created_date,    
-                image_id=row.image_id,
-                image_data=row.image_data,
+                full_name=self.full_name(row.first_name,row.last_name),
+                first_name=row.first_name,
+                last_name=row.last_name,
+                email=row.email,
+                phone=row.phone,
+                advocate_ind=row.advocate_ind,
+                active_ind=row.status_ind,
+                image_id=image_map.get(row.user_id, {}).get("image_id"),
+                image_data=image_map.get(row.user_id, {}).get("image_data"),
             )
             for row in rows
         ]

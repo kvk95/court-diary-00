@@ -242,6 +242,7 @@ class UsersService(BaseSecuredService):
             phone=user_data["phone"],
             role=role,
             active_ind=user_data["status_ind"],
+            advocate_ind=user_data["advocate_ind"],
             image_id=user_data["image_id"],
             image_data=user_data["image_data"],
             created_date=user_data["created_date"],
@@ -354,6 +355,7 @@ class UsersService(BaseSecuredService):
                     "email": payload.email.strip().lower(),
                     "first_name": payload.first_name.strip(),
                     "last_name": (payload.last_name or "").strip() or None,
+                    "advocate_ind": payload.advocate_ind,
                     "phone": payload.phone,
                     "password_hash": hash_password(payload.password),
                 },
@@ -441,6 +443,8 @@ class UsersService(BaseSecuredService):
             if payload.phone and (err := FieldValidator.validate_phone(payload.phone)):
                 raise err
             update_data["phone"] = payload.phone
+
+        update_data["advocate_ind"] = payload.advocate_ind
 
         if update_data:
             await self.users_repo.update(

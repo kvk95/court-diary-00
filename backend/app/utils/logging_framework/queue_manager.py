@@ -173,8 +173,8 @@ class LoggingQueueManager:
             if cfg.log_to_file(targets):
                 await self.file_writer.write_activity(payload)
 
-            # if cfg.log_to_db(targets):
-            #     await self.repo.insert_activity(payload)
+            if cfg.log_to_db(targets):
+                await self.repo.insert_activity(payload)
 
             if cfg.log_to_console(targets):
                 self.pretty_log_payload(payload=payload, log_type=log_type)

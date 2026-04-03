@@ -33,7 +33,7 @@ class UserProfileOut(BaseRecordData):
 # USER OUTPUT DTO (Unified for ALL endpoints)
 # =============================================================================
 
-class UserOut(ImageInfoOut):
+class UserBasicInfoOut(ImageInfoOut):
     """
     Full user output with profile, permissions, and chamber info.
     Used for login, /me, /{user_id}, and /paged endpoints.
@@ -44,10 +44,15 @@ class UserOut(ImageInfoOut):
     last_name: Optional[str] = None
     email: EmailStr
     phone: Optional[str] = None
+    advocate_ind: bool
+    active_ind: bool = True
+
+class UserOut(UserBasicInfoOut):
+    """
+    Full user output with profile, permissions, and chamber info.
+    Used for login, /me, /{user_id}, and /paged endpoints.
+    """
     role: Optional[RoleOut] = None
-    active_ind: bool = True    
-    image_id: Optional[str] = None
-    image_data: Optional[str] = None
     created_date: Optional[datetime] = None
     chamber_name: Optional[str] = None
     profile: Optional[UserProfileOut] = None
@@ -66,6 +71,7 @@ class UserCreate(BaseInData):
     phone: Optional[str] = None
     password: str
     status_ind: bool = True
+    advocate_ind: bool
     role_id: Optional[int] = None
     image_data: Optional[str]
 

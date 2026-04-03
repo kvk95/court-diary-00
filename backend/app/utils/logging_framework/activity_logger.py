@@ -1,32 +1,23 @@
 from datetime import datetime
 
-from ...core.context import get_request_context
+from app.utils.logging_framework.schemas import ActivityLogPayload, ActivityMetadata
+
 from .log_types import LogType
 from .logging_util import add_to_queue
 
-
 async def log_activity(
     action: str,
-    actor_user_id: str | None = None,
-    actor_company_id: int | None = None,
     target: str | None = None,
     metadata: dict | None = None,
-    ip_address: str | None = None,
 ):
-    """
-    Enqueue an activity log event.
-    Routing (none / console / db / file) is handled by the queue worker.
-    """
+    activity_payload = ActivityLogPayload(
+        action=action,
+        target=target,
+        metadata_json=ActivityMetadata(**metadata) if metadata else None,
+        timestamp=datetime.utcnow(),
+    )
 
-    ctx = get_request_context()
-    payload = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "action": action,
-        "actor_user_id": actor_user_id or (ctx.get("user_id") if ctx else None),
-        "actor_company_id": actor_company_id or (ctx.get("company_id") if ctx else None),
-        "target": target,
-        "metadata": metadata or {},
-        "ip_address": ip_address or (ctx.get("ip") if ctx else None),
-    }
-    
-    await add_to_queue(log_type= LogType.ACTIVITY, payload =  payload)
+    await add_to_queue(
+        log_type=LogType.ACTIVITY,
+        payload=activity_payload.model_dump(mode="json")  # ✅ important
+    )

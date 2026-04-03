@@ -8,6 +8,7 @@ from app.api.v1.routes.base.base_controller import BaseController
 from app.dependencies import get_aor_service
 from app.dtos.aor_dto import AorCreate, AorEdit, AorOut, AorWithdraw
 from app.dtos.base.base_out_dto import BaseOutDto
+from app.dtos.users_dto import UserBasicInfoOut
 from app.services.aor_service import AorService
 
 
@@ -30,14 +31,14 @@ class AorController(BaseController):
     
     @BaseController.get(
         "/chamber/",
-        summary="Get all AORs (advocates on record) for a case",
-        response_model=BaseOutDto[List[AorOut]],
+        summary="Get all advocates of a chamber",
+        response_model=BaseOutDto[List[UserBasicInfoOut]],
     )
     async def aors_get_by_chamber(
         self,
         search: Optional[str] = Query(None, description="Search by "),
         service: AorService = Depends(get_aor_service),
-    ) -> BaseOutDto[List[AorOut]]:
+    ) -> BaseOutDto[List[UserBasicInfoOut]]:
         return self.success(result=await service.aors_get_by_chamber(search=search))
 
     # ── Add AOR ───────────────────────────────────────────────────────────

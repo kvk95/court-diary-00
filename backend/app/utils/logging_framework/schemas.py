@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
@@ -18,10 +19,8 @@ class DBCallLogPayload(BaseModel):
     params: Optional[DBCallLogParams] = None
     final_query: Optional[str] = None
     repo: Optional[str] = None
-    user_id: Optional[str] = None
-    company_id: Optional[int] = None
     error: Optional[str] = None
-    metadataz: Optional[DBCallLogMeta] = None
+    metadata_json: Optional[DBCallLogMeta] = None
 
 
 class ExceptionHeaders(BaseModel):
@@ -55,12 +54,15 @@ class ExceptionLogPayload(BaseModel):
 class ActivityMetadata(BaseModel):
     changes: Optional[Dict[str, Any]] = None
 
+    class Config:
+        extra = "allow"
+
 
 class ActivityLogPayload(BaseModel):
-    timestamp: str
-    action: str
-    actor_user_id: Optional[str] = None
-    actor_company_id: Optional[int] = None
+    action: str    
     target: Optional[str] = None
-    metadataz: Optional[ActivityMetadata] = None
+    metadata_json: Optional[ActivityMetadata] = None
+    timestamp: datetime
+    actor_user_id: Optional[str] = None
+    actor_chamber_id: Optional[int] = None
     ip_address: Optional[str] = None

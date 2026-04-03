@@ -33,6 +33,9 @@ class Users(BaseModel, TimestampMixin):
     # status_ind : TINYINT
     status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # advocate_ind : TINYINT
+    advocate_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # deleted_ind : TINYINT
     deleted_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 

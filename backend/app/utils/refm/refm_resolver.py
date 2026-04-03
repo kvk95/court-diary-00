@@ -18,6 +18,7 @@ class RefmResolver:
 
     def __init__(self, session: AsyncSession):
         self._session = session
+        self._lookup_cache = {}
 
     @property
     def session(self) -> AsyncSession:
@@ -44,6 +45,45 @@ class RefmResolver:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    async def get_value(
+            self,
+            desc_map: dict,
+            code:str | None,
+            default: Any = "",
+
+    )-> str:
+        return desc_map.get(code,default)
+
+    async def get_desc_map(
+        self,
+        *,
+        column_attr: InstrumentedAttribute,
+        value_column: InstrumentedAttribute,
+    ) -> dict:
+        # Resolve table + code column
+        parent = column_attr.parent
+        model = parent.class_ if hasattr(parent, "class_") else parent
+        column_key = column_attr.key
+
+        table, code_key = RefmResolver._resolve_refm_target(model, column_key)
+        table = table.upper()
+
+        # Get cached data
+        refm_data: RefmData = await RefmCache.get(session=self.session)
+        rows = refm_data.get(table) or []
+
+        # Cache key includes value_column also
+        cache_key = (table, code_key, value_column.key)
+
+        if cache_key not in self._lookup_cache:
+            self._lookup_cache[cache_key] = {
+                row.get(code_key): row.get(value_column.key)
+                for row in rows
+            }
+
+        return self._lookup_cache[cache_key]
+
     async def from_column(
         self,
         *,
@@ -101,24 +141,12 @@ class RefmResolver:
         if not code:
             return default
 
-        # Safe extraction of model class (handles Mapped[...] generics in SQLAlchemy 2.0)
-        parent = column_attr.parent
-        model = parent.class_ if hasattr(parent, "class_") else parent
-
-        column_key = column_attr.key
-
         try:
-            table, code_key = RefmResolver._resolve_refm_target(model, column_key)
-            table=table.upper()
-        except Exception as exc:
-            # Graceful fallback during dev/startup if introspection fails
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(f"REFM target resolution failed for {model}.{column_key}: {exc}")
+            desc_map = await self.get_desc_map(
+                column_attr=column_attr,
+                value_column=value_column,
+            )
+        except Exception:
             return default
 
-        refm_data: RefmData = await RefmCache.get(session=self.session)
-        rows = refm_data.get(table) or []
-
-        lookup = {row.get(code_key): row for row in rows}
-        return lookup.get(code, {}).get(value_column.key, default)
+        return desc_map.get(code, default)
