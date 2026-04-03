@@ -133,13 +133,14 @@ class BaseRepository(Generic[ModelType]):
         metadata: dict | None = None,
     ):
 
-        await log_activity(
-            action=action,
-            actor_user_id=self.user_id,
-            actor_chamber_id=self.chamber_id,
-            target=target,
-            metadata=metadata,
-        )
+        # await log_activity(
+        #     action=action,
+        #     actor_user_id=self.user_id,
+        #     actor_chamber_id=self.chamber_id,
+        #     target=target,
+        #     metadata=metadata,
+        # )
+        pass
 
     def _get_relationship_config(self):
         return RELATIONSHIP_CONFIG.get(self.model)

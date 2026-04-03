@@ -3,7 +3,7 @@
 from datetime import date
 from typing import List, Optional
 
-from sqlalchemy import and_, func, select, or_, case
+from sqlalchemy import func, select, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_aors import CaseAors
@@ -23,40 +23,31 @@ class CasesRepository(BaseRepository[Cases]):
     def __init__(self):
         super().__init__(Cases)
 
-    async def get_case_summary_stats(
-        self,
-        session: AsyncSession,
-        today: date,
-    ) -> dict:
-        """All four stat-card counts in minimal DB round trips."""
-        def _base():
-            stmt = select(func.count(Cases.case_id))
-            return stmt
-
-        stmt = _base()
-        
-        total = await self.execute_scalar(session=session, stmt=stmt, default=0)
-        
-        stmt = (stmt.where(Cases.status_code == RefmCaseStatusConstants.ACTIVE))
-        active = await self.execute_scalar(session=session, stmt=stmt, default=0)
-
-        stmt = (stmt.where(Cases.status_code == RefmCaseStatusConstants.ADJOURNED))
-        adjourned = await self.execute_scalar(session=session, stmt=stmt, default=0)
-
-        stmt = (
-            stmt.where(
-                Cases.status_code == RefmCaseStatusConstants.ACTIVE,
-                Cases.next_hearing_date < today,
-            )
+    async def get_case_summary_stats(self, session: AsyncSession, today: date) -> dict:
+        row = await self.execute(
+            session=session,
+            stmt=select(
+                func.count(Cases.case_id).label("total"),
+                func.count(
+                    case((Cases.status_code == RefmCaseStatusConstants.ACTIVE, Cases.case_id))
+                ).label("active"),
+                func.count(
+                    case((Cases.status_code == RefmCaseStatusConstants.ADJOURNED, Cases.case_id))
+                ).label("adjourned"),
+                func.count(
+                    case(
+                        (
+                            (Cases.status_code == RefmCaseStatusConstants.ACTIVE)
+                            & (Cases.next_hearing_date < today),
+                            Cases.case_id,
+                        )
+                    )
+                ).label("overdue"),
+            ),
         )
-        overdue = self.execute_scalar(session=session, stmt=stmt, default=0)
 
-        return {
-            "total": total,
-            "active": active,
-            "adjourned": adjourned,
-            "overdue": overdue,
-        }
+        r = row.one()
+        return dict(r._mapping)
     
     async def get_case_summary(self,
         session: AsyncSession, 
@@ -91,44 +82,49 @@ class CasesRepository(BaseRepository[Cases]):
         self, session: AsyncSession
     ) -> List[dict]:
         """Cases grouped by status with descriptions and colors."""
-        stmt = (select(
+        stmt = (
+            select(
                 Cases.status_code,
-                func.count(Cases.case_id).label("cnt"),
+                RefmCaseStatus.description,
+                RefmCaseStatus.color_code,
+                func.count(Cases.case_id).label("count"),
             )
-            .group_by(Cases.status_code))
-        
-        rows =  (await self.execute( session=session, stmt=stmt)).all()
-        status_data = {r.status_code: r.cnt for r in rows}
-        if not status_data:
-            return []
-
-        refm_rows = await self.execute(
-            session=session,
-            stmt=select(RefmCaseStatus.code, RefmCaseStatus.description, RefmCaseStatus.color_code)
-            .where(RefmCaseStatus.code.in_(list(status_data.keys())))
+            .join(RefmCaseStatus, Cases.status_code == RefmCaseStatus.code)
+            .group_by(
+                Cases.status_code,
+                RefmCaseStatus.description,
+                RefmCaseStatus.color_code,
+            )
         )
+
+        rows = await self.execute(session=session, stmt=stmt)
+
         return [
             {
-                "status_code": r.code,
+                "status_code": r.status_code,
                 "status_description": r.description,
                 "color_code": r.color_code,
-                "count": status_data.get(r.code, 0),
+                "count": r.count,
             }
-            for r in refm_rows
+            for r in rows
         ]
 
     async def get_cases_by_court(
         self, session: AsyncSession, limit: int = 10
     ) -> List[dict]:
-        stmt = (select(
+        count_expr = func.count(Cases.case_id)
+
+        stmt = (
+            select(
                 Cases.court_id,
                 RefmCourts.court_name,
-                func.count(Cases.case_id).label("cnt"),
+                count_expr.label("cnt"),
             )
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
             .group_by(Cases.court_id, RefmCourts.court_name)
-            .order_by(func.count(Cases.case_id).desc())
-            .limit(limit))
+            .order_by(count_expr.desc())
+            .limit(limit)
+        )
         
         rows = await self.execute(
             session=session,
@@ -138,10 +134,14 @@ class CasesRepository(BaseRepository[Cases]):
     async def get_cases_by_type(
         self, session: AsyncSession
     ) -> List[dict]:
+        
+        count_expr = func.count(Cases.case_id)
+
         stmt = (select(
             Cases.case_type_code,
             RefmCaseTypes.description,
-            func.count(Cases.case_id).label("cnt"),
+            
+            count_expr.label("cnt"),
         )
         .join(RefmCaseTypes, Cases.case_type_code == RefmCaseTypes.code)
         .where(
@@ -192,7 +192,9 @@ class CasesRepository(BaseRepository[Cases]):
         court_id: Optional[int] = None,
         sort_by: str = "updated_date",
     ):
-        # Latest hearing status per case
+        # ------------------------------------------------
+        # 🔹 Latest Hearing (1 row per case)
+        # ------------------------------------------------
         latest_hearing = (
             select(
                 Hearings.case_id,
@@ -210,22 +212,93 @@ class CasesRepository(BaseRepository[Cases]):
         )
 
         latest_hearing = (
-            select(latest_hearing.c.case_id, latest_hearing.c.status_code)
+            select(
+                latest_hearing.c.case_id,
+                latest_hearing.c.status_code,
+            )
             .where(latest_hearing.c.rn == 1)
             .subquery()
         )
 
-        # Primary client party role per case
+        # ------------------------------------------------
+        # 🔹 Primary Client Role (1 row per case)
+        # ------------------------------------------------
         primary_role = (
-            select(CaseClients.case_id, CaseClients.party_role_code,CaseClients.case_client_id)
-            .where(
-                CaseClients.chamber_id == chamber_id,
-                CaseClients.primary_ind.is_(True),
+            select(
+                CaseClients.case_id,
+                CaseClients.party_role_code,
+                CaseClients.case_client_id,
+                func.row_number().over(
+                    partition_by=CaseClients.case_id,
+                    order_by=CaseClients.primary_ind.desc(),
+                ).label("rn"),
             )
-            .distinct(CaseClients.case_id)
+            .where(CaseClients.chamber_id == chamber_id)
             .subquery()
         )
 
+        primary_role = (
+            select(
+                primary_role.c.case_id,
+                primary_role.c.party_role_code,
+                primary_role.c.case_client_id,
+            )
+            .where(primary_role.c.rn == 1)
+            .subquery()
+        )
+
+        # ------------------------------------------------
+        # 🔹 Primary AOR (1 row per case)
+        # ------------------------------------------------
+        aor_subq = (
+            select(
+                CaseAors.case_id,
+                CaseAors.user_id,
+                func.row_number().over(
+                    partition_by=CaseAors.case_id,
+                    order_by=CaseAors.appointment_date.asc(),
+                ).label("rn"),
+            )
+            .where(
+                CaseAors.primary_ind.is_(True),
+                CaseAors.withdrawal_date.is_(None),
+            )
+            .subquery()
+        )
+
+        aor_subq = (
+            select(aor_subq.c.case_id, aor_subq.c.user_id)
+            .where(aor_subq.c.rn == 1)
+            .subquery()
+        )
+
+        # ------------------------------------------------
+        # 🔹 BASE QUERY (shared filters)
+        # ------------------------------------------------
+        base_filters = [
+            Cases.deleted_ind.is_(False),
+            Cases.chamber_id == chamber_id,
+        ]
+
+        if status_code and status_code.upper() != "ALL":
+            base_filters.append(Cases.status_code == status_code.upper())
+
+        if court_id:
+            base_filters.append(Cases.court_id == court_id)
+
+        if search and search.strip():
+            kw = f"%{search.strip()}%"
+            base_filters.append(
+                or_(
+                    Cases.case_number.ilike(kw),
+                    Cases.petitioner.ilike(kw),
+                    Cases.respondent.ilike(kw),
+                )
+            )
+
+        # ------------------------------------------------
+        # 🔹 RECORDS QUERY
+        # ------------------------------------------------
         stmt = (
             select(
                 Cases,
@@ -234,39 +307,16 @@ class CasesRepository(BaseRepository[Cases]):
                 latest_hearing.c.status_code.label("hearing_status_code"),
                 primary_role.c.party_role_code,
                 primary_role.c.case_client_id,
-                CaseAors.user_id.label("aor_user_id"),
+                aor_subq.c.user_id.label("aor_user_id"),
             )
-            .outerjoin(
-                CaseAors,
-                and_(
-                    CaseAors.case_id == Cases.case_id,
-                    CaseAors.primary_ind.is_(True),
-                    CaseAors.withdrawal_date.is_(None),
-                ),
-            )
-            .outerjoin(
-                Users,
-                Users.user_id == CaseAors.user_id,
-            )
+            .outerjoin(aor_subq, Cases.case_id == aor_subq.c.case_id)
+            .outerjoin(Users, Users.user_id == aor_subq.c.user_id)
             .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)
             .outerjoin(primary_role, Cases.case_id == primary_role.c.case_id)
-            .where(Cases.deleted_ind.is_(False))
+            .where(*base_filters)
         )
 
-        if status_code and status_code.upper() != "ALL":
-            stmt = stmt.where(Cases.status_code == status_code.upper())
-        if court_id:
-            stmt = stmt.where(Cases.court_id == court_id)
-        if search and search.strip():
-            kw = f"%{search.strip()}%"
-            stmt = stmt.where(
-                or_(
-                    Cases.case_number.ilike(kw),
-                    Cases.petitioner.ilike(kw),
-                    Cases.respondent.ilike(kw),
-                )
-            )
-
+        # Sorting
         if sort_by == "hearing_date":
             stmt = stmt.order_by(Cases.next_hearing_date.asc())
         elif sort_by == "case_number":
@@ -274,16 +324,30 @@ class CasesRepository(BaseRepository[Cases]):
         else:
             stmt = stmt.order_by(Cases.updated_date.desc())
 
+        # Pagination
         stmt = stmt.limit(limit).offset((page - 1) * limit)
-        stmt = stmt.distinct()
+
         rows = (await self.execute(stmt=stmt, session=session)).all()
 
-        count_stmt = (
-            select(func.count())
-            .select_from(Cases)
-            .where(Cases.deleted_ind.is_(False), Cases.chamber_id == chamber_id)
+        # ------------------------------------------------
+        # 🔹 COUNT QUERY (FIXED - EXACT MATCH)
+        # ------------------------------------------------
+        count_subq = (
+            select(Cases.case_id)
+            .outerjoin(aor_subq, Cases.case_id == aor_subq.c.case_id)
+            .outerjoin(latest_hearing, Cases.case_id == latest_hearing.c.case_id)
+            .outerjoin(primary_role, Cases.case_id == primary_role.c.case_id)
+            .where(*base_filters)
+            .subquery()
         )
-        total = await self.execute_scalar(session=session, stmt=count_stmt, default=0)
+
+        count_stmt = select(func.count()).select_from(count_subq)
+
+        total = await self.execute_scalar(
+            session=session,
+            stmt=count_stmt,
+            default=0,
+        )
 
         return rows, total
     
@@ -310,27 +374,42 @@ class CasesRepository(BaseRepository[Cases]):
         primary_aor = (
             select(
                 CaseAors.case_id,
-                func.min(CaseAors.user_id).label("aor_user_id"),
+                CaseAors.user_id,
+                func.row_number().over(
+                    partition_by=CaseAors.case_id,
+                    order_by=CaseAors.appointment_date.asc(),
+                ).label("rn"),
             )
             .where(
                 CaseAors.chamber_id == chamber_id,
                 CaseAors.primary_ind.is_(True),
                 CaseAors.withdrawal_date.is_(None),
             )
-            .group_by(CaseAors.case_id)
+            .subquery()
+        )
+
+        primary_aor = (
+            select(primary_aor.c.case_id, primary_aor.c.user_id.label("aor_user_id"))
+            .where(primary_aor.c.rn == 1)
             .subquery()
         )
 
         primary_role = (
             select(
                 CaseClients.case_id,
-                func.min(CaseClients.party_role_code).label("party_role_code"),
+                CaseClients.party_role_code,
+                func.row_number().over(
+                    partition_by=CaseClients.case_id,
+                    order_by=CaseClients.primary_ind.desc(),
+                ).label("rn"),
             )
-            .where(
-                CaseClients.chamber_id == chamber_id,
-                CaseClients.primary_ind.is_(True),
-            )
-            .group_by(CaseClients.case_id)
+            .where(CaseClients.chamber_id == chamber_id)
+            .subquery()
+        )
+
+        primary_role = (
+            select(primary_role.c.case_id, primary_role.c.party_role_code)
+            .where(primary_role.c.rn == 1)
             .subquery()
         )
 
@@ -363,6 +442,5 @@ class CasesRepository(BaseRepository[Cases]):
 
         stmt = stmt.order_by(Cases.updated_date.desc()).limit(limit)
         
-        stmt = stmt.distinct()
         result = await session.execute(stmt)
         return result.unique().all()
