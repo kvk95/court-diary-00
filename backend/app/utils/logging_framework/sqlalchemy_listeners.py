@@ -117,7 +117,6 @@ def attach_listeners(async_engine: AsyncEngine):
 
     def call_queue(payload):        
             loop = asyncio.get_event_loop()
-            print(f"************************* DB LOG PAYLOAD : {payload}")
             loop.create_task(add_to_queue(log_type= LogType.DB_CALL, payload =  payload))
 
         

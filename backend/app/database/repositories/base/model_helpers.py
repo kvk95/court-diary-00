@@ -20,7 +20,7 @@ def get_writable_columns(model: Type[Any]) -> Set[str]:
 
     # Define fields that should NEVER be updated by user
     protected_fields = {
-        "user_id",  # PK
+        # "user_id",  # PK
         "created_date",
         "updated_date",
         "created_by",

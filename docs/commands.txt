@@ -67,6 +67,7 @@ exit
 sudo systemctl restart api.casdia.service
 # To check logs
 journalctl -u api.casdia.service -n 50 --no-pager
+journalctl -u nginx -n 50 --no-pager
 
 # run DB
 su - myuser
