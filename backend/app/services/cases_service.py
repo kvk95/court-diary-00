@@ -648,7 +648,7 @@ class CasesService(BaseSecuredService):
         return await self._enrich_case_detail(case)
 
     async def cases_edit(self, payload: CaseEdit) -> CaseDetailOut:
-        case,_ = await self._get_case_details(payload.case_id)
+        case = await self._get_case_details(payload.case_id)
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data.pop("case_id", None)
         if data:

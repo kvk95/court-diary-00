@@ -6,7 +6,7 @@ from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
 from app.dependencies import get_aor_service
-from app.dtos.aor_dto import AorCreate, AorEdit, AorOut, AorWithdraw
+from app.dtos.aor_dto import AorCreate, AorEdit, AorOut
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.users_dto import UserBasicInfoOut
 from app.services.aor_service import AorService
@@ -68,21 +68,6 @@ class AorController(BaseController):
         service: AorService = Depends(get_aor_service),
     ) -> BaseOutDto[AorOut]:
         return self.success(result=await service.aors_edit(payload=payload))
-
-    # ── Withdraw AOR ──────────────────────────────────────────────────────
-
-    @BaseController.put(
-        "/withdraw",
-        summary="Withdraw an AOR (sets status=WD and withdrawal_date)",
-        response_model=BaseOutDto[AorOut],
-    )
-    async def aors_withdraw(
-        self,
-        payload: AorWithdraw = Body(...),
-        service: AorService = Depends(get_aor_service),
-    ) -> BaseOutDto[AorOut]:
-        return self.success(result=await service.aors_withdraw(payload=payload))
-
     # ── Remove AOR ────────────────────────────────────────────────────────
 
     @BaseController.delete(

@@ -528,7 +528,7 @@ class BaseRepository(Generic[ModelType]):
             if hasattr(self.model, "updated_by"):
                 result["updated_by"] = self.user_id
 
-            if hasattr(self.model, "user_id") and "user_id" not in result:
+            if not is_update and hasattr(self.model, "user_id") and "user_id" not in result:
                 result["user_id"] = self.user_id
 
         # chamber_id (insert only usually)

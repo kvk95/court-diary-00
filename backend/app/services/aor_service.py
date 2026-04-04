@@ -15,7 +15,7 @@ from app.database.repositories.cases_repository import CasesRepository
 from app.database.repositories.profile_images_repository import ProfileImagesRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.users_repository import UsersRepository
-from app.dtos.aor_dto import AorCreate, AorEdit, AorOut, AorWithdraw
+from app.dtos.aor_dto import AorCreate, AorEdit, AorOut
 from app.dtos.users_dto import UserBasicInfoOut
 from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import ErrorCodes, ValidationErrorDetail
@@ -84,20 +84,6 @@ class AorService(BaseSecuredService):
             notes=aor.notes,
             created_date=aor.created_date,
         )
-    
-    async def _assign_new_primary(self, case_id: str):
-        next_aor = await self.aors_repo.get_first(
-            session=self.session,
-            where = (
-                CaseAors.case_id == case_id,
-                CaseAors.chamber_id == self.chamber_id,
-                CaseAors.status_code == RefmAorStatusConstants.ACTIVE,
-            ),
-            order_by=[CaseAors.appointment_date.asc()],
-        )
-
-        if next_aor:
-            next_aor.primary_ind = True
 
     # ─────────────────────────────────────────────────────────────────────
     # LIST
@@ -239,11 +225,12 @@ class AorService(BaseSecuredService):
         if payload.primary_ind is True and not aor.primary_ind:
             await self._demote_existing_primary(aor.case_id)
 
-        data = payload.model_dump(exclude_unset=True, exclude_none=True)
-
-        data.pop("case_aor_id", None)
-        data.pop("status_code", None)
-        data.pop("withdrawal_date", None)
+        data = payload.model_dump(
+            exclude_unset=True,
+            exclude_none=True,
+            exclude={"case_aor_id", "status_code", "withdrawal_date"}
+        )
+        data["user_id"] = aor.user_id
 
         if data:
             aor = await self.aors_repo.update(
@@ -257,38 +244,6 @@ class AorService(BaseSecuredService):
             user_ids=[aor.user_id],
         )
         return await self._to_out(aor, await self._user_name(aor.user_id), image_map)
-
-    # ─────────────────────────────────────────────────────────────────────
-    # WITHDRAW
-    # ─────────────────────────────────────────────────────────────────────
-
-    async def aors_withdraw(self, payload: AorWithdraw) -> AorOut:
-        aor = await self._get_aor_case_detail(payload.case_aor_id)
-        if aor.status_code != RefmAorStatusConstants.ACTIVE:
-            raise ValidationErrorDetail(
-                code=ErrorCodes.VALIDATION_ERROR,
-                message=f"AOR is already '{aor.status_code}', cannot withdraw",
-            )
-        
-        if aor.primary_ind:
-            await self._assign_new_primary(aor.case_id)
-
-        updated = await self.aors_repo.update(
-            session=self.session,
-            id_values=payload.case_aor_id,
-            data={
-                "status_code": RefmAorStatusConstants.WITHDRAWN,
-                "withdrawal_date": payload.withdrawal_date or date.today(),
-                "primary_ind": False,
-                "notes": payload.notes or aor.notes,
-            },
-        )        
-
-        image_map = await self.profile_images_repo.get_images_by_user_ids(
-            session=self.session,
-            user_ids=[updated.user_id],
-        )
-        return await self._to_out(aor, await self._user_name(updated.user_id), image_map)
 
     # ─────────────────────────────────────────────────────────────────────
     # REMOVE

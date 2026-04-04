@@ -3,7 +3,6 @@
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import field_validator
 
 from app.dtos.base.base_data import BaseInData
 from app.dtos.users_dto import ImageInfoOut
@@ -43,13 +42,6 @@ class AorEdit(BaseInData):
     appointment_date: Optional[date] = None
     withdrawal_date: Optional[date] = None
     notes: Optional[str] = None
-
-    @field_validator("status_code")
-    @classmethod
-    def valid_status(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in ("AC", "WD", "SU"):
-            raise ValueError("status_code must be AC, WD, or SU")
-        return v
 
 
 class AorWithdraw(BaseInData):
