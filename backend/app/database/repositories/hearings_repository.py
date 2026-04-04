@@ -1,15 +1,14 @@
 """hearings_repository.py — All DB operations for Hearings"""
 
 from datetime import date, timedelta
-from typing import Optional, Tuple
+from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.cases import Cases
 from app.database.models.hearings import Hearings
-from app.database.models.refm_courts import RefmCourts
-from app.database.models.refm_hearing_status import RefmHearingStatus
+from app.database.models.refm_hearing_status import RefmHearingStatusConstants
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
@@ -38,26 +37,24 @@ class HearingsRepository(BaseRepository[Hearings]):
         stmt = _base()
         total = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
-        stmt = stmt.where(Hearings.status_code.in_(["UP", "SC"]))
+        stmt = stmt.where(Hearings.status_code.in_([RefmHearingStatusConstants.UPCOMING, RefmHearingStatusConstants.SCHEDULED]))
         upcoming = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
-        stmt = stmt.where(Hearings.status_code == "CMP")
+        stmt = stmt.where(Hearings.status_code == RefmHearingStatusConstants.COMPLETED)
         completed = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
-        stmt = stmt.where(Hearings.status_code == "ADJ")
+        stmt = stmt.where(Hearings.status_code == RefmHearingStatusConstants.ADJOURNED)
         adjourned = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
         stmt =  stmt.where(
-                Hearings.status_code.in_(["UP", "SC"]),
-                Hearings.hearing_date >= today,
-                Hearings.hearing_date <= week_end,
+                Hearings.status_code.in_([RefmHearingStatusConstants.UPCOMING, RefmHearingStatusConstants.SCHEDULED]),
+                Hearings.hearing_date.between(today, week_end),
             )
         this_week = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
         stmt =  stmt.where(
-                Hearings.status_code.in_(["UP", "SC"]),
-                Hearings.hearing_date >= today,
-                Hearings.hearing_date <= month_end,
+                Hearings.status_code.in_([RefmHearingStatusConstants.UPCOMING, RefmHearingStatusConstants.SCHEDULED]),
+                Hearings.hearing_date.between(today, week_end),
             )
         this_month = await self.execute_scalar(session=session, stmt=stmt, default=0)
 
@@ -81,105 +78,69 @@ class HearingsRepository(BaseRepository[Hearings]):
         conditions = [
             Hearings.chamber_id == chamber_id,
             Hearings.deleted_ind.is_(False),
-            Hearings.hearing_date >= month_start,
-            Hearings.hearing_date < month_end,
+            Hearings.hearing_date.between(month_start, month_end)
         ]
         if status_code:
             conditions.append(Hearings.status_code == status_code)
         return await self.execute_scalar( session=session, stmt=
             select(func.count(Hearings.hearing_id)).where(*conditions)
         )
+    
+    def _base_hearing_query(self):
+        return select(
+            Hearings.hearing_id,
+            Hearings.case_id,
+            Hearings.hearing_date,
+            Hearings.status_code,
+            Hearings.purpose_code,
+            Hearings.notes,
+            Cases.case_number,
+            Cases.petitioner,
+            Cases.respondent,
+            Cases.court_id,
+        ).join(Cases, Hearings.case_id == Cases.case_id)
 
     async def get_calendar_events(
         self,
         session: AsyncSession,
-        chamber_id: str,
         date_from: date,
         date_to: date,
+        status_code: Optional[str] = None,
     ) -> list:
         """
         All hearings in a date range with case + status info.
         Returns list of row objects with named attributes.
         """
-        result = await self.execute( session=session, stmt=
-            select(
-                Hearings.hearing_id,
-                Hearings.case_id,
-                Hearings.hearing_date,
-                Hearings.status_code,
-                Hearings.purpose,
-                Hearings.notes,
-                Cases.case_number,
-                Cases.petitioner,
-                Cases.respondent,
-                Cases.court_id,
-            )
-            .join(Cases, Hearings.case_id == Cases.case_id)
-            .where(
-                Hearings.chamber_id == chamber_id,
-                Hearings.deleted_ind.is_(False),
-                Cases.deleted_ind.is_(False),
-                Hearings.hearing_date >= date_from,
-                Hearings.hearing_date <= date_to,
-            )
-            .order_by(Hearings.hearing_date.asc())
-        )
+        stmt= self._base_hearing_query().where(
+            Hearings.chamber_id == self.chamber_id,
+            Hearings.deleted_ind.is_(False),
+            Cases.deleted_ind.is_(False),
+            Hearings.hearing_date.between(date_from, date_to),
+            ).order_by(Hearings.hearing_date.asc())        
+        
+        if status_code:
+            stmt = stmt.where(Hearings.status_code == status_code)
+        
+        result = await self.execute( session=session, stmt=stmt);
         return list(result.all())
 
     async def get_upcoming_hearings(
         self,
         session: AsyncSession,
-        chamber_id: str,
         date_to: date,
         limit: int = 20,
     ) -> list:
         """Upcoming (UP/SC status) hearings up to date_to for sidebar widget."""
         result = await self.execute( session=session, stmt=
-            select(
-                Hearings.hearing_id,
-                Hearings.case_id,
-                Hearings.hearing_date,
-                Hearings.status_code,
-                Hearings.purpose,
-                Cases.case_number,
-                Cases.petitioner,
-                Cases.respondent,
-                Cases.court_id,
-            )
-            .join(Cases, Hearings.case_id == Cases.case_id)
+            self._base_hearing_query()
             .where(
-                Hearings.chamber_id == chamber_id,
+                Hearings.chamber_id == self.chamber_id,
                 Hearings.deleted_ind.is_(False),
                 Cases.deleted_ind.is_(False),
-                Hearings.status_code.in_(["UP", "SC"]),
+                Hearings.status_code.in_([RefmHearingStatusConstants.UPCOMING, RefmHearingStatusConstants.SCHEDULED]),
                 Hearings.hearing_date <= date_to,
             )
             .order_by(Hearings.hearing_date.asc())
             .limit(limit)
         )
         return list(result.all())
-
-    async def get_status_map(self, session: AsyncSession) -> Tuple[dict, dict]:
-        """Returns (description_map, color_map) keyed by status_code."""
-        rows = await self.execute( session=session, stmt=
-            select(
-                RefmHearingStatus.code,
-                RefmHearingStatus.description,
-                RefmHearingStatus.color_code,
-            )
-        )
-        desc_map: dict = {}
-        color_map: dict = {}
-        for r in rows:
-            desc_map[r.code] = r.description
-            color_map[r.code] = r.color_code
-        return desc_map, color_map
-
-    async def get_court_map(self, session: AsyncSession, court_ids: list) -> dict:
-        if not court_ids:
-            return {}
-        rows = await self.execute( session=session, stmt=
-            select(RefmCourts.court_id, RefmCourts.court_name)
-            .where(RefmCourts.court_id.in_(court_ids))
-        )
-        return {r.court_id: r.court_name for r in rows}

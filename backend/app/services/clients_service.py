@@ -233,24 +233,15 @@ class ClientsService(BaseSecuredService):
             limit=limit,
         )
 
-        used_client_types = {c.client_type_code for c in clients if c.client_type_code}
-        used_party_types  = {c.party_type_code  for c in clients if c.party_type_code}
+        client_type_map = await self.refm_resolver.get_desc_map(
+            column_attr=Clients.client_type_code,
+            value_column=RefmClientType.description
+        );
 
-        client_type_map = {}
-        if used_client_types:
-            q = await self.session.execute(
-                select(RefmClientType.code, RefmClientType.description)
-                .where(RefmClientType.code.in_(used_client_types))
-            )
-            client_type_map = {r.code: r.description for r in q}
-
-        party_type_map = {}
-        if used_party_types:
-            q = await self.session.execute(
-                select(RefmPartyType.code, RefmPartyType.description)
-                .where(RefmPartyType.code.in_(used_party_types))
-            )
-            party_type_map = {r.code: r.description for r in q}
+        party_type_map = await self.refm_resolver.get_desc_map(
+            column_attr=Clients.party_type_code,
+            value_column=RefmPartyType.description
+        );
 
         client_ids = [c.client_id for c in clients]
         image_map = await self.profile_images_repo.get_images_by_client_ids(

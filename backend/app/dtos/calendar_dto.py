@@ -20,7 +20,8 @@ class CalendarEventOut(BaseRecordData):
     respondent: Optional[str] = None
     status_code: Optional[str] = None
     status_description: Optional[str] = None
-    purpose: Optional[str] = None
+    purpose_code: Optional[str] = None  
+    purpose_description: Optional[str] = None
     notes: Optional[str] = None
     color: Optional[str] = None          # hex from refm_hearing_status.color_code
 
@@ -33,18 +34,3 @@ class CalendarMonthOut(BaseRecordData):
     total_hearings: int = 0
     upcoming_count: int = 0
     completed_count: int = 0
-
-
-class CalendarUpcomingOut(BaseRecordData):
-    """Slim row for the upcoming-hearings widget / dashboard sidebar."""
-    hearing_id: str
-    case_id: str
-    case_number: str
-    petitioner: str
-    respondent: str
-    court_name: Optional[str] = None
-    hearing_date: date
-    days_until: int                      # 0 = today, negative = overdue
-    purpose: Optional[str] = None
-    status_code: Optional[str] = None
-    color: Optional[str] = None
