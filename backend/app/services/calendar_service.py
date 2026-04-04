@@ -2,7 +2,6 @@
 
 from calendar import monthrange
 from datetime import date, timedelta
-from functools import lru_cache
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,7 +33,7 @@ class CalendarService(BaseSecuredService):
         return CalendarEventOut(
             event_id=f"hearing:{r.hearing_id}",
             event_type="hearing",
-            title=self._make_title(r.case_number, desc_map.get(r.status_code) if r.status_code else None),
+            title=self._make_title(r.case_number, purpose_map.get(r.purpose_code) if r.purpose_code else None),
             case_id=r.case_id,
             case_number=r.case_number,
             hearing_id=r.hearing_id,
@@ -50,7 +49,6 @@ class CalendarService(BaseSecuredService):
             color=color_map.get(r.status_code) if r.status_code else None,
         )
     
-    @lru_cache(maxsize=256)
     async def _load_maps(self):
         if hasattr(self, "_maps_cache"):
             return self._maps_cache
