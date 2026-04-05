@@ -777,6 +777,7 @@ class UsersService(BaseSecuredService):
                     "user_id": user_id,
                     "chamber_id": self.chamber_id,
                     "primary_ind": False,
+                    "status_ind": True,
                 },
             )
 
