@@ -120,7 +120,7 @@ class UsersController(BaseController):
 
     @BaseController.put(
         "/{user_id}/changepassword",
-        summary="Edit user",
+        summary="Change password for user",
         response_model=BaseOutDto[UserOut],
     )
     async def change_password(

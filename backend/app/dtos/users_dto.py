@@ -79,7 +79,7 @@ class UserCreate(UserPasswordIn):
 
 
 class UserEdit(UserCreate):
-    image_id: Optional[str]
+    pass
 
 
 class UserStatusToggle(BaseInData):

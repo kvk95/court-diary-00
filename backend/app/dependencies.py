@@ -8,6 +8,7 @@ from app.auth.deps import get_current_user
 from app.database.models.base.session import get_session
 from app.services.anonymous_service import AnonymousService
 from app.services.auth_service import AuthService
+from app.services.chamber_service import ChamberService
 from app.services.image_service import ImageService
 from app.services.billing_service import BillingService
 from app.services.calendar_service import CalendarService
@@ -28,6 +29,12 @@ def get_anonymous_service(session: AsyncSession = Depends(get_session)) -> Anony
 
 def get_auth_service(session: AsyncSession = Depends(get_session)) -> AuthService:
     return AuthService(session)
+
+async def get_chamber_service(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(get_current_user),
+) -> ChamberService:
+    return ChamberService(session=session)
 
 def get_image_service(session: AsyncSession = Depends(get_session), 
                       _=Depends(get_current_user)) -> ImageService:
