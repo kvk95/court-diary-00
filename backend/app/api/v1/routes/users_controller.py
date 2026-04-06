@@ -6,7 +6,8 @@ from app.database.models.refm_user_deletion_status import RefmUserDeletionStatus
 from app.dtos.users_dto import (
     UserOut, 
     UserCreate, 
-    UserEdit, 
+    UserEdit,
+    UserPasswordIn, 
     UserStatusToggle, 
     DeletionRejectPayload,
     DeletionRequestOut,
@@ -115,6 +116,20 @@ class UsersController(BaseController):
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[UserOut]:
         result = await service.users_edit(user_id=user_id, payload=payload)
+        return self.success(result=result)  
+
+    @BaseController.put(
+        "/{user_id}/changepassword",
+        summary="Edit user",
+        response_model=BaseOutDto[UserOut],
+    )
+    async def change_password(
+        self,
+        user_id: str = Path(..., min_length=36, max_length=36),
+        payload: UserPasswordIn = Body(..., description="Fields to update"),
+        service: UsersService = Depends(get_users_service),
+    ) -> BaseOutDto[UserOut]:
+        result = await service.change_password(user_id=user_id, payload=payload)
         return self.success(result=result)
 
     # ── Status Toggle ─────────────────────────────────────────────────────────

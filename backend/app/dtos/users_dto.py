@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import EmailStr, field_validator
+from pydantic import EmailStr
 from app.dtos.base.base_data import BaseInData, BaseRecordData
 from app.dtos.roles_dto import RoleOut
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
@@ -64,30 +64,18 @@ class UserOut(UserBasicInfoOut):
 # USER INPUT DTOs
 # =============================================================================
 
-class UserCreate(BaseInData):
-    email: str
-    first_name: str
+class UserPasswordIn(BaseInData):
+    password: Optional[str] = None
+
+class UserCreate(UserPasswordIn):
+    email: Optional[str] = None
+    first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
-    password: str
     status_ind: bool = True
     advocate_ind: bool
     role_id: Optional[int] = None
     image_data: Optional[str]
-
-    @field_validator("email")
-    @classmethod
-    def email_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Email is required")
-        return v.strip().lower()
-
-    @field_validator("first_name")
-    @classmethod
-    def first_name_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("First name is required")
-        return v.strip()
 
 
 class UserEdit(UserCreate):

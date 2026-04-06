@@ -26,6 +26,7 @@ from app.dtos.users_dto import (
     UserCreate,
     UserEdit,
     UserOut,
+    UserPasswordIn,
     UserStatusToggle,
     UserProfileOut,
     UserFullThemeOut,
@@ -312,8 +313,18 @@ class UsersService(BaseSecuredService):
         # ─────────────────────────────────────────────
         # 1. VALIDATION
         # ─────────────────────────────────────────────
+        email:str = payload.email if payload.email else ''
+        first_name:str = payload.first_name if payload.first_name else ''
+        password:str = payload.password if payload.password else ''
+
         if err := FieldValidator.validate_email(payload.email):
             errors.append(err)
+
+        if not payload.first_name:
+            errors.append( ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="first_name is required"
+            ))
 
         if err := FieldValidator.validate_password(payload.password):
             errors.append(err)
@@ -322,7 +333,7 @@ class UsersService(BaseSecuredService):
             if err := FieldValidator.validate_phone(payload.phone):
                 errors.append(err)
 
-        if payload.role_id:
+        if payload.role_id and payload.role_id != 0:
             role = await self.security_roles_repo.get_by_id(
                 session=self.session,
                 id_values=payload.role_id,
@@ -341,7 +352,7 @@ class UsersService(BaseSecuredService):
         # ─────────────────────────────────────────────
         # 2. CHECK USER
         # ─────────────────────────────────────────────
-        membership = await self._check_user_chamber_membership(payload.email)
+        membership = await self._check_user_chamber_membership(email)
 
         # ─────────────────────────────────────────────
         # 3. CREATE OR REACTIVATE USER
@@ -352,12 +363,12 @@ class UsersService(BaseSecuredService):
             user = await self.users_repo.create(
                 session=self.session,
                 data={
-                    "email": payload.email.strip().lower(),
-                    "first_name": payload.first_name.strip(),
+                    "email": email.lower(),
+                    "first_name": first_name.strip(),
                     "last_name": (payload.last_name or "").strip() or None,
                     "advocate_ind": payload.advocate_ind,
                     "phone": payload.phone,
-                    "password_hash": hash_password(payload.password),
+                    "password_hash": hash_password(password),
                 },
             )
 
@@ -425,24 +436,51 @@ class UsersService(BaseSecuredService):
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
-                message=f"User {user_id} not found in this chamber",
+                message=f"User not found in this chamber",
             )
 
         # ─────────────────────────────────────────────
         # 2. UPDATE USER (GLOBAL DATA)
         # ─────────────────────────────────────────────
+        
+        errors = []
+
+        if payload.password and (err := FieldValidator.validate_password(payload.password)):
+            errors.append(err)
+
+        if payload.phone and (payload.phone):
+            if err := FieldValidator.validate_phone(payload.phone):
+                errors.append(err)
+
+        if payload.role_id and (payload.role_id):
+            role = await self.security_roles_repo.get_by_id(
+                session=self.session,
+                id_values=payload.role_id,
+            )
+            if not role:
+                errors.append(
+                    ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message="Role not found",
+                    )
+                )
+
+        if errors:
+            aggregate_errors(errors=errors)
+            
         update_data: dict = {}
 
-        if payload.first_name is not None:
+        if payload.first_name:
             update_data["first_name"] = payload.first_name.strip()
 
-        if payload.last_name is not None:
+        if payload.last_name:
             update_data["last_name"] = payload.last_name.strip() or None
 
-        if payload.phone is not None:
-            if payload.phone and (err := FieldValidator.validate_phone(payload.phone)):
-                raise err
+        if payload.phone:
             update_data["phone"] = payload.phone
+
+        if payload.password:
+            update_data["password_hash"] = hash_password(payload.password)
 
         update_data["advocate_ind"] = payload.advocate_ind
 
@@ -466,18 +504,53 @@ class UsersService(BaseSecuredService):
         # ─────────────────────────────────────────────
         # 4. ROLE UPDATE
         # ─────────────────────────────────────────────
-        if payload.role_id is not None:
-            role = await self.security_roles_repo.get_by_id(
-                session=self.session,
-                id_values=payload.role_id,
-            )
-            if not role:
-                raise ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message="Role not found",
-                )
-
+        if payload.role_id:
             await self._set_user_role(link.link_id, payload.role_id)
+
+        # ─────────────────────────────────────────────
+        # 5. RETURN
+        # ─────────────────────────────────────────────
+        return await self.get_user_full_details(user_id=user_id)
+
+    async def change_password(self, user_id: str, payload: UserPasswordIn) -> UserOut:
+        # ─────────────────────────────────────────────
+        # 1. GET LINK (SCOPED TO CHAMBER)
+        # ─────────────────────────────────────────────
+        link = await self.user_chamber_link_repo.get_first(
+            session=self.session,
+            filters={
+                UserChamberLink.user_id: user_id,
+                UserChamberLink.chamber_id: self.chamber_id,
+                UserChamberLink.left_date: None,
+            },
+        )
+
+        if not link:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message=f"User not found in this chamber",
+            )
+
+        # ─────────────────────────────────────────────
+        # 2. UPDATE USER (GLOBAL DATA)
+        # ─────────────────────────────────────────────
+        
+        errors = []
+
+        if payload.password and (err := FieldValidator.validate_password(payload.password)):
+            raise err
+            
+        update_data: dict = {}
+
+        if payload.password:
+            update_data["password_hash"] = hash_password(payload.password)
+
+        if update_data:
+            await self.users_repo.update(
+                session=self.session,
+                id_values=user_id,
+                data=update_data,
+            )
 
         # ─────────────────────────────────────────────
         # 5. RETURN
@@ -537,7 +610,7 @@ class UsersService(BaseSecuredService):
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
-                message=f"User {user_id} not found in this chamber",
+                message=f"User not found in this chamber",
             )
 
         user = await self.users_repo.get_by_id(session=self.session, id_values=user_id)
