@@ -2,11 +2,11 @@
 
 import re
 from typing import Optional
+
+from app.utils.utilities import PASSWORD_POLICY
 from .error_codes import ErrorCodes
 from .validation_errors import ValidationErrorDetail
-from .password_policy_helper import PasswordPolicy
 
-from app.validators.password_policy_helper import PasswordPolicy
 
 
 class FieldValidator:
@@ -38,9 +38,8 @@ class FieldValidator:
         Validate password using PasswordPolicy helper.
         Returns None if valid, or ValidationErrorDetail if invalid.
         """
-        policy = PasswordPolicy(min_length=8, max_length=20, allowed_specials="@#$%")
         try:
-            policy.validate(password)
+            PASSWORD_POLICY.validate(password)
         except ValidationErrorDetail as e:
             return e
         return None

@@ -1,4 +1,4 @@
-# app/services/users_service.py
+ # app/services/users_service.py
 
 from datetime import date, datetime
 from typing import Optional, List
@@ -36,6 +36,7 @@ from app.dtos.roles_dto import RoleOut
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.services.image_service import ImageService
 from app.utils.security import hash_password
+from app.utils.utilities import generate_password
 from app.validators import (
     ErrorCodes,
     FieldValidator,
@@ -69,38 +70,13 @@ class UsersService(BaseSecuredService):
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
         self.image_service = image_service or ImageService(session)
 
-    async def get_user_stats(self) -> UserStatsOut:
-        """
-        Get user management statistics for current chamber.
-        """
-        stats = await self.users_repo.get_user_stats(
-            session=self.session,
-            chamber_id=self.chamber_id,
-        )
-        
-        return UserStatsOut(
-            total_users=stats["total_users"],
-            active_users=stats["active_users"],
-            total_roles=stats["total_roles"],
-            pending_invites=stats["pending_invites"],
-        )
-
     # ─────────────────────────────────────────────────────────────────────────
     # HELPERS (Now Just Call Repository Methods - No Query Logic)
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def _get_active_link(self, user_id: str) -> Optional[UserChamberLink]:
-        """Get the active user_chamber_link for this user in the current chamber."""
-        return await self.user_chamber_link_repo.get_active_link(
-            session=self.session,
-            user_id=user_id,
-            chamber_id=self.chamber_id,
-        )
-
     async def _set_user_role(self, link_id: str, role_id: int) -> None:
         """
         Replace the current active role for a link with a new one.
-        ✅ FIXED: Now delegates to repository method (no query logic in service).
         """
         await self.user_roles_repo.set_user_role(
             session=self.session,
@@ -109,28 +85,9 @@ class UsersService(BaseSecuredService):
             current_user_id=self.user_id,
         )
 
-    async def unlink_user_from_all_chambers(
-        self,
-        session: AsyncSession,
-        user_id: str,
-    ) -> None:
-        await self.user_chamber_link_repo.bulk_update(
-            session=session,
-            where=[
-                UserChamberLink.user_id == user_id,
-                UserChamberLink.left_date.is_(None),
-                UserChamberLink.status_ind.is_(True),
-            ],
-            data={
-                "left_date": date.today(),
-                "status_ind": False,
-            },
-        )
-
     async def _check_user_chamber_membership(self, email: str) -> dict:
         """
         Check user's chamber membership status.
-        ✅ FIXED: Uses raw SELECT to include deleted users.
         """
         # Get user INCLUDING deleted (use raw query, not get_first)
         stmt = select(Users).where(Users.email == email.lower())
@@ -162,34 +119,88 @@ class UsersService(BaseSecuredService):
             session=self.session,
             user_id=user_id,
         )
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # GET USER FULL DETAILS
-    # ─────────────────────────────────────────────────────────────────────────
-
-    async def get_user_full_details(
+ 
+    async def _validate_user_payload(
         self,
-        user_id: Optional[str] = None,
-        email: Optional[str] = None,
-        chamber_id: Optional[str] = None,
-    ) -> UserOut:
-        """Get complete user output with profile, permissions, and chamber info."""
-        chamber_id = chamber_id if chamber_id else self.chamber_id
-        
-        user_data = await self.users_repo.get_user_full_details(
-            session=self.session,
-            user_id=user_id,
-            email=email,
-            chamber_id=chamber_id,
-        )
-
-        if not user_data:
-            raise ValidationErrorDetail(
-                code=ErrorCodes.NOT_FOUND,
-                message=f"User not found in this chamber",
+        payload,
+        *,
+        is_edit: bool = False,
+    ) -> None:
+        """
+        Shared field-level validation for UserCreate and UserEdit.
+ 
+        For add  (is_edit=False): email, first_name, and password are required.
+        For edit (is_edit=True) : all three are optional; only validated when present.
+        Raises via aggregate_errors so the caller gets one consolidated error response.
+        """
+        errors = []
+ 
+        # ── email ──────────────────────────────────────────────────────────
+        if not is_edit:
+            if err := FieldValidator.validate_email(payload.email):
+                errors.append(err)
+ 
+        # ── first_name ─────────────────────────────────────────────────────
+        if not is_edit and not payload.first_name:
+            errors.append(
+                ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message="first_name is required",
+                )
             )
-
-        return self._build_user_dto(user_data, chamber_id)
+ 
+        # ── password ───────────────────────────────────────────────────────
+        if not is_edit:
+            if err := FieldValidator.validate_password(payload.password):
+                errors.append(err)
+        elif payload.password:
+            if err := FieldValidator.validate_password(payload.password):
+                errors.append(err)
+ 
+        # ── phone ──────────────────────────────────────────────────────────
+        if payload.phone:
+            if err := FieldValidator.validate_phone(payload.phone):
+                errors.append(err)
+ 
+        # ── role ───────────────────────────────────────────────────────────
+        if payload.role_id:
+            role = await self.security_roles_repo.get_by_id(
+                session=self.session,
+                id_values=payload.role_id,
+            )
+            if not role:
+                errors.append(
+                    ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message="Role not found",
+                    )
+                )
+ 
+        if errors:
+            aggregate_errors(errors=errors)
+ 
+    async def _handle_role_and_image(
+        self,
+        payload,
+        *,
+        user_id: str,
+        link_id: str,
+    ) -> None:
+        """
+        Shared post-save steps for both add and edit:
+          - Assign role to the chamber link (when role_id is provided)
+          - Upsert profile image (when image_data is provided)
+        """
+        if payload.role_id and link_id:
+            await self._set_user_role(link_id, payload.role_id)
+ 
+        await self.image_service.handle_image(
+            session=self.session,
+            payload=payload,
+            entity_id=user_id,
+            image_upload_code=RefmImgUploadForEnum.USER,
+            description="User profile image",
+        )
 
     def _build_user_dto(self, user_data: dict, chamber_id: str) -> UserOut:
         """Transform repository dict output to UserOut DTO."""
@@ -254,6 +265,54 @@ class UsersService(BaseSecuredService):
         )
 
     # ─────────────────────────────────────────────────────────────────────────
+    # GET USER STATS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def get_user_stats(self) -> UserStatsOut:
+        """
+        Get user management statistics for current chamber.
+        """
+        stats = await self.users_repo.get_user_stats(
+            session=self.session,
+            chamber_id=self.chamber_id,
+        )
+        
+        return UserStatsOut(
+            total_users=stats["total_users"],
+            active_users=stats["active_users"],
+            total_roles=stats["total_roles"],
+            pending_invites=stats["pending_invites"],
+        )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # GET USER FULL DETAILS
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def get_user_full_details(
+        self,
+        user_id: Optional[str] = None,
+        email: Optional[str] = None,
+        chamber_id: Optional[str] = None,
+    ) -> UserOut:
+        """Get complete user output with profile, permissions, and chamber info."""
+        chamber_id = chamber_id if chamber_id else self.chamber_id
+        
+        user_data = await self.users_repo.get_user_full_details(
+            session=self.session,
+            user_id=user_id,
+            email=email,
+            chamber_id=chamber_id,
+        )
+
+        if not user_data:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message=f"User not found in this chamber",
+            )
+
+        return self._build_user_dto(user_data, chamber_id)
+
+    # ─────────────────────────────────────────────────────────────────────────
     # LIST / PAGED
     # ─────────────────────────────────────────────────────────────────────────
 
@@ -302,64 +361,32 @@ class UsersService(BaseSecuredService):
     async def users_get_by_email(self, email: str) -> UserOut:
         """Get full user output by email."""
         return await self.get_user_full_details(email=email)
-
+ 
     # ─────────────────────────────────────────────────────────────────────────
     # ADD
     # ─────────────────────────────────────────────────────────────────────────
-
+ 
     async def users_add(self, payload: UserCreate) -> UserOut:
-        errors = []
-
+        email:str = payload.email if payload.email else ''
+        first_name:str = payload.first_name if payload.first_name else ''
+        password:str = payload.password if payload.password else generate_password()
+        payload.password = password
         # ─────────────────────────────────────────────
         # 1. VALIDATION
         # ─────────────────────────────────────────────
-        email:str = payload.email if payload.email else ''
-        first_name:str = payload.first_name if payload.first_name else ''
-        password:str = payload.password if payload.password else ''
-
-        if err := FieldValidator.validate_email(payload.email):
-            errors.append(err)
-
-        if not payload.first_name:
-            errors.append( ValidationErrorDetail(
-                code=ErrorCodes.VALIDATION_ERROR,
-                message="first_name is required"
-            ))
-
-        if err := FieldValidator.validate_password(payload.password):
-            errors.append(err)
-
-        if payload.phone:
-            if err := FieldValidator.validate_phone(payload.phone):
-                errors.append(err)
-
-        if payload.role_id and payload.role_id != 0:
-            role = await self.security_roles_repo.get_by_id(
-                session=self.session,
-                id_values=payload.role_id,
-            )
-            if not role:
-                errors.append(
-                    ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message="Role not found",
-                    )
-                )
-
-        if errors:
-            aggregate_errors(errors=errors)
-
+        await self._validate_user_payload(payload, is_edit=False)
+ 
         # ─────────────────────────────────────────────
-        # 2. CHECK USER
+        # 2. CHECK MEMBERSHIP
         # ─────────────────────────────────────────────
+        # Note: active_links is intentionally not fetched here — we only need
+        # exists / deleted_ind to decide create-vs-reactivate.
         membership = await self._check_user_chamber_membership(email)
-
+ 
         # ─────────────────────────────────────────────
         # 3. CREATE OR REACTIVATE USER
         # ─────────────────────────────────────────────
-
         if not membership["exists"]:
-            # New user
             user = await self.users_repo.create(
                 session=self.session,
                 data={
@@ -371,18 +398,14 @@ class UsersService(BaseSecuredService):
                     "password_hash": hash_password(password),
                 },
             )
-
         else:
             user = membership["user"]
-
-            # Reactivate if deleted
             if membership["deleted_ind"]:
                 await self._reactivate_user(user.user_id)
-
+ 
         # ─────────────────────────────────────────────
-        # 4. UPSERT CHAMBER LINK (CORE CHANGE)
+        # 4. UPSERT CHAMBER LINK
         # ─────────────────────────────────────────────
-        print(f"************\n\n\n\n\n {user.user_id}\n\n\n*************")
         link = await self.user_chamber_link_repo.upsert(
             session=self.session,
             filters={
@@ -393,33 +416,28 @@ class UsersService(BaseSecuredService):
                 "user_id": user.user_id,
                 "left_date": None,
                 "status_ind": True,
-                "primary_ind": True,  # optional
+                "primary_ind": True,
             },
         )
-
+ 
         # ─────────────────────────────────────────────
-        # 5. ROLE ASSIGNMENT
+        # 5. ROLE + IMAGE
         # ─────────────────────────────────────────────
-        if payload.role_id and link:
-            await self._set_user_role(link.link_id, payload.role_id)
-
-        # ─────────────────────────────────────────────
-        # 6. IMAGE
-        # ─────────────────────────────────────────────
-
-        await self.image_service.handle_image(
-            session=self.session,
-            payload=payload,
-            entity_id=user.user_id,
-            image_upload_code=RefmImgUploadForEnum.USER,
-            description="Client image uploaded"
+        await self._handle_role_and_image(
+            payload,
+            user_id=user.user_id,
+            link_id=link.link_id,
         )
+ 
+        # ─────────────────────────────────────────────
+        # 6. RETURN
+        # ─────────────────────────────────────────────
         return await self.get_user_full_details(user_id=user.user_id)
-
+ 
     # ─────────────────────────────────────────────────────────────────────────
     # EDIT
     # ─────────────────────────────────────────────────────────────────────────
-
+ 
     async def users_edit(self, user_id: str, payload: UserEdit) -> UserOut:
         # ─────────────────────────────────────────────
         # 1. GET LINK (SCOPED TO CHAMBER)
@@ -432,67 +450,48 @@ class UsersService(BaseSecuredService):
                 UserChamberLink.left_date: None,
             },
         )
-
+ 
         if not link:
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
-                message=f"User not found in this chamber",
+                message="User not found in this chamber",
             )
-
+ 
         # ─────────────────────────────────────────────
-        # 2. UPDATE USER (GLOBAL DATA)
+        # 2. VALIDATION
         # ─────────────────────────────────────────────
-        
-        errors = []
-
-        if payload.password and (err := FieldValidator.validate_password(payload.password)):
-            errors.append(err)
-
-        if payload.phone and (payload.phone):
-            if err := FieldValidator.validate_phone(payload.phone):
-                errors.append(err)
-
-        if payload.role_id and (payload.role_id):
-            role = await self.security_roles_repo.get_by_id(
-                session=self.session,
-                id_values=payload.role_id,
-            )
-            if not role:
-                errors.append(
-                    ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message="Role not found",
-                    )
-                )
-
-        if errors:
-            aggregate_errors(errors=errors)
-            
+        await self._validate_user_payload(payload, is_edit=True)
+ 
+        # ─────────────────────────────────────────────
+        # 3. UPDATE USER (GLOBAL DATA)
+        # ─────────────────────────────────────────────
         update_data: dict = {}
-
+ 
         if payload.first_name:
             update_data["first_name"] = payload.first_name.strip()
-
+ 
         if payload.last_name:
             update_data["last_name"] = payload.last_name.strip() or None
-
+ 
         if payload.phone:
             update_data["phone"] = payload.phone
-
-        if payload.password:
+ 
+        if payload.password and user_id == self.user_id:
             update_data["password_hash"] = hash_password(payload.password)
-
-        update_data["advocate_ind"] = payload.advocate_ind
-
+ 
+        # Guard: only update advocate_ind when the client explicitly sent it
+        if payload.advocate_ind is not None:
+            update_data["advocate_ind"] = payload.advocate_ind
+ 
         if update_data:
             await self.users_repo.update(
                 session=self.session,
                 id_values=user_id,
                 data=update_data,
             )
-
+ 
         # ─────────────────────────────────────────────
-        # 3. UPDATE CHAMBER LINK (STATUS)
+        # 4. UPDATE CHAMBER LINK (STATUS)
         # ─────────────────────────────────────────────
         if payload.status_ind is not None and link.status_ind != payload.status_ind:
             await self.user_chamber_link_repo.update(
@@ -500,15 +499,18 @@ class UsersService(BaseSecuredService):
                 id_values=link.link_id,
                 data={"status_ind": payload.status_ind},
             )
-
+ 
         # ─────────────────────────────────────────────
-        # 4. ROLE UPDATE
+        # 5. ROLE + IMAGE
         # ─────────────────────────────────────────────
-        if payload.role_id:
-            await self._set_user_role(link.link_id, payload.role_id)
-
+        await self._handle_role_and_image(
+            payload,
+            user_id=user_id,
+            link_id=link.link_id,
+        )
+ 
         # ─────────────────────────────────────────────
-        # 5. RETURN
+        # 6. RETURN
         # ─────────────────────────────────────────────
         return await self.get_user_full_details(user_id=user_id)
 
