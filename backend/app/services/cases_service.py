@@ -1220,12 +1220,12 @@ class CasesService(BaseSecuredService):
             rows = await self.session.execute(
                 select(
                     ActivityLog.action,
-                    ActivityLog.user_id,
+                    ActivityLog.actor_user_id,
                     ActivityLog.created_date,
-                    ActivityLog.metadata,   # 🔥 IMPORTANT
+                    ActivityLog.metadata_json,   # 🔥 IMPORTANT
                 )
                 .where(
-                    ActivityLog.chamber_id == self.chamber_id,
+                    ActivityLog.actor_chamber_id == self.chamber_id,
                     ActivityLog.target.like(f"case:{case_id}%"),
                 )
                 .order_by(ActivityLog.created_date.desc())

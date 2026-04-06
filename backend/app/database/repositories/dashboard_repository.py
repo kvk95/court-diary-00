@@ -432,8 +432,8 @@ class DashboardRepository(BaseRepository[Cases]):
                 Users.first_name,
                 Users.last_name,
             )
-            .outerjoin(Users, ActivityLog.user_id == Users.user_id)
-            .where(ActivityLog.chamber_id == chamber_id)
+            .outerjoin(Users, ActivityLog.actor_user_id == Users.user_id)
+            .where(ActivityLog.actor_chamber_id == chamber_id)
             .order_by(ActivityLog.created_date.desc())
             .limit(limit)
         )
