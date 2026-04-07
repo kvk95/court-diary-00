@@ -518,7 +518,8 @@ class BaseRepository(Generic[ModelType]):
         # ─────────────────────────────────────────────
         # 🔹 AUDIT FIELDS
         # ─────────────────────────────────────────────
-        if self.user_id:
+        print(f"******************************* anonymous : {self.anonymous}")
+        if not self.anonymous and self.user_id:
             # created_by → only on insert
             if not is_update:
                 if hasattr(self.model, "created_by") and "created_by" not in result:

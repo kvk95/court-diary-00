@@ -369,7 +369,7 @@ class UsersService(BaseSecuredService):
     async def users_add(self, payload: UserCreate) -> UserOut:
         email:str = payload.email if payload.email else ''
         first_name:str = payload.first_name if payload.first_name else ''
-        password:str = payload.password if payload.password else generate_password()
+        password:str = generate_password()
         payload.password = password
         # ─────────────────────────────────────────────
         # 1. VALIDATION

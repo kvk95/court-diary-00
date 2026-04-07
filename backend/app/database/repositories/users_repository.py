@@ -358,7 +358,7 @@ class UsersRepository(BaseRepository[Users]):
                 "deleted_ind": False,
                 "deleted_date": None,
                 "deleted_by": None,
-                "status_ind": True,
+                "status_ind": False, # Activate user using email
             },
         )
 
