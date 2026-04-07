@@ -303,7 +303,7 @@ CREATE TABLE chamber (
     state_code         CHAR(2)      DEFAULT 'TN',
     postal_code        VARCHAR(12)  NULL,
     country_code       CHAR(2)      DEFAULT 'IN',
-    plan_code          CHAR(4)      DEFAULT 'FREE',
+    plan_code          CHAR(4)      DEFAULT 'PTFR',
     subscription_start DATE         NULL,
     subscription_end   DATE         NULL,
     status_ind         BOOLEAN      NOT NULL DEFAULT TRUE,

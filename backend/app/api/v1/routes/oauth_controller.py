@@ -39,7 +39,7 @@ class OAuthController(BaseController):
         )
 
         try:
-            token_out: TokenOut = await service.login(login_request)
+            token_out: TokenOut = await service.login(login_request, is_regular=False)
         except ValidationErrorDetail as e:
             raise ValidationErrorDetail(
                 code=ErrorCodes.PERMISSION_DENIED,

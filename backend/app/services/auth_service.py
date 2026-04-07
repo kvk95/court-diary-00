@@ -1,12 +1,17 @@
 # app/services/auth_service.py
 
+from typing import Optional
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import create_access_token, create_refresh_token, decode_token
+from app.database.models.chamber import Chamber
+from app.database.repositories.chamber_repository import ChamberRepository
+from app.dtos.chamber_dto import ChamberOut
 from app.validators import ErrorCodes, ValidationErrorDetail
 from app.database.models.user_chamber_link import UserChamberLink
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from app.database.repositories.login_audit_repository import LoginAuditRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.user_profiles_repository import UserProfilesRepository
@@ -29,17 +34,67 @@ class AuthService(BaseService):
         users_repo: UsersRepository | None = None,
         audit_repo: LoginAuditRepository | None = None,
         user_profiles_repo: UserProfilesRepository | None = None,
-        role_permissions_repo: RolePermissionsRepository | None = None,
+        role_permissions_repo: RolePermissionsRepository | None = None,                 
+        chamber_repo: Optional[ChamberRepository] = None,
         users_service: UsersService | None = None,  # ← Inject UsersService
     ):
-        super().__init__(session)
+        super().__init__(session)        
+        self.chamber_repo = chamber_repo or ChamberRepository()
         self.users_repo = users_repo or UsersRepository()
         self.audit_repo = audit_repo or LoginAuditRepository()
         self.user_profiles_repo = user_profiles_repo or UserProfilesRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.users_service = users_service  # ← Use for get_user_full_details
 
-    async def login(self, loginRequest: LoginRequest) -> TokenOut:
+    
+    
+    def _to_out(self, chamber: Chamber) -> ChamberOut:
+        return ChamberOut(
+            chamber_id=chamber.chamber_id,
+            chamber_name=chamber.chamber_name,
+            email=chamber.email,
+            phone=chamber.phone,
+            address_line1=chamber.address_line1,
+            address_line2=chamber.address_line2,
+            city=chamber.city,
+            state_code=chamber.state_code,
+            postal_code=chamber.postal_code,
+            country_code=chamber.country_code,
+            plan_code=chamber.plan_code,
+            subscription_start=chamber.subscription_start,
+            subscription_end=chamber.subscription_end,
+            status_ind=chamber.status_ind,
+            created_date=chamber.created_date,
+            updated_date=chamber.updated_date,
+        )
+    
+    async def _get_chamber(self, chamber_id:str) -> Chamber:
+        """Fetch chamber scoped to the authenticated chamber_id."""
+        chamber = await self.chamber_repo.get_by_id(
+            session=self.session,
+            filters={Chamber.chamber_id: chamber_id},
+        )
+        if not chamber:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Chamber not found",
+            )
+        return chamber
+
+    async def _get_chambers(self, chamber_ids: list[str]) -> list[Chamber]:
+        stmt = select(Chamber).where(Chamber.chamber_id.in_(chamber_ids))
+        result = await self.session.execute(stmt)
+        chambers = result.scalars().all()
+
+        if not chambers:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="No chambers found",
+            )
+
+        return list(chambers)
+
+    async def login(self, loginRequest: LoginRequest, is_regular: bool = False) -> TokenOut:
         """
         Authenticate user and return access/refresh tokens with user context.
         """
@@ -75,18 +130,31 @@ class AuthService(BaseService):
 
         # 3. Resolve user's PRIMARY chamber
         chamber_id = loginRequest.chamber_id
-        if not chamber_id:
+
+        if chamber_id:
+            chamber_rows = [await self._get_chamber(chamber_id=chamber_id)]
+        else:
             stmt = select(UserChamberLink.chamber_id).where(
                 UserChamberLink.user_id == user.user_id,
-                UserChamberLink.primary_ind == True,
-                UserChamberLink.left_date == None,
+                UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind == True,
-            )
+            ).order_by(desc(UserChamberLink.primary_ind))
+
             result = await self.session.execute(stmt)
-            row = result.first()
-            if not row:
-                raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="User has no active chamber membership")
-            chamber_id = row.chamber_id
+            
+            chamber_ids = [row.chamber_id for row in result]
+
+            if not chamber_ids:
+                raise ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message="User has no active chamber membership"
+                )
+
+            # ✅ fetch ALL chambers using IN clause
+            chamber_rows = await self._get_chambers(chamber_ids)
+
+            # optional: keep primary first
+            chamber_id = chamber_ids[0]
 
         # 4. Success audit
         await self.audit_repo.log_login(
@@ -98,10 +166,15 @@ class AuthService(BaseService):
             chamber_id=chamber_id,
         )
 
+        temp_claim = ""
+        if is_regular:
+            temp_claim = "Y"
+
         # 5. Create tokens
         extra_claims = {
             "chamber_id": chamber_id,
             "user_id": user.user_id,
+            "temp_claim": temp_claim,
         }
 
         access_token = create_access_token(subject=str(user.user_id), extra_claims=extra_claims)
@@ -114,12 +187,19 @@ class AuthService(BaseService):
         )
         user_details = await users_service.get_user_full_details(user_id=user.user_id,
                                                                  chamber_id=chamber_id)
+        chamber_details = []
+
+        if is_regular:        
+            chamber_details =  [ self._to_out(chamber=row)
+                for row in chamber_rows
+            ]
 
         return TokenOut(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
             user_details=user_details,
+            chamber_details=chamber_details,
         )
 
     async def refresh(
@@ -156,4 +236,5 @@ class AuthService(BaseService):
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
+            chamber_details=[],
         )

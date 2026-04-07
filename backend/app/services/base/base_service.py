@@ -15,4 +15,18 @@ class BaseService:
     
     def full_name(self, first: Optional[str], last: Optional[str]) ->str:
         parts = [p for p in [first, last] if p]
-        return " ".join(parts) if parts else ""
+        return " ".join(parts) if parts else ""   
+    
+    
+    def get_initials(
+        self,
+        first: Optional[str],
+        last: Optional[str],
+        concat_str: str = ""
+    ) -> str:
+        first_initial = first.strip()[0].upper() if first and first.strip() else ""
+        last_initial = last.strip()[0].upper() if last and last.strip() else ""
+
+        if first_initial and last_initial:
+            return f"{first_initial}{concat_str}{last_initial}"
+        return first_initial or last_initial

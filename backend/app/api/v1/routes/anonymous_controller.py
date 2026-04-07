@@ -9,7 +9,7 @@ from app.dependencies import (
 )
 from app.dtos.anonymous_dtos import ServerDateTimeOut
 from app.dtos.base.base_out_dto import BaseOutDto
-from app.dtos.users_dto import UserCreateBasic, UserPasswordIn
+from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
 from app.services.anonymous_service import AnonymousService
 
 
@@ -57,7 +57,7 @@ class AnonymousController(BaseController):
 
     @BaseController.put(
         "/reactivateuser",
-        summary="create user",
+        summary="Reactivate the inactive or deleted user",
         response_model=BaseOutDto[str],
     )
     async def users_reset(
@@ -74,16 +74,16 @@ class AnonymousController(BaseController):
         response_model=BaseOutDto[str],
     )
     async def users_password_reset(
-        self,
-        email: str = Query(None, description="User Email"),
+        self,        
+        payload: UserEmailIn = Body(..., description="User Email"),
         service: AnonymousService = Depends(get_anonymous_service),
     ) -> BaseOutDto[str]:
-        result: str = await service.users_password_reset(email)
+        result: str = await service.users_password_reset(payload=payload)
         return self.success(result=result)
 
     @BaseController.put(
         "/new_password",
-        summary="create user",
+        summary="set new password",
         response_model=BaseOutDto[str],
     )
     async def users_new_password(

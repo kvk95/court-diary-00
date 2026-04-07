@@ -413,10 +413,11 @@ class UsersService(BaseSecuredService):
                 UserChamberLink.chamber_id: self.chamber_id,
             },
             data={
+                "chamber_id": self.chamber_id,
                 "user_id": user.user_id,
                 "left_date": None,
                 "status_ind": True,
-                "primary_ind": True,
+                "primary_ind": False,
             },
         )
  

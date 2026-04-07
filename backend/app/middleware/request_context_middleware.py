@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Scope, Receive, Send
 from app.core.context import (
     clear_request_context,
     get_request_context,
+    set_request_context,
 )
 from app.core.config import settings
 from app.utils.logging_framework.log_types import LogType
@@ -74,6 +75,14 @@ class RequestContextMiddleware:
         # --------------------------------------------------
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         ip = request.client.host if request.client else None
+        
+        ctx = get_request_context() or {}
+        set_request_context(
+            request_id = request_id,
+            ip = ip,
+            method = scope.get("method", "UNKNOWN"),
+            path = scope["path"],
+        )
 
         start_time = time.perf_counter()
 
@@ -138,7 +147,6 @@ class RequestContextMiddleware:
             # --------------------------------------------------
             if LogTarget.NONE not in settings.LOGGING.LOG_REQ_RESP:
                 duration_ms = (time.perf_counter() - start_time) * 1000
-                ctx = get_request_context() or {}
 
                 # Decode request body
                 request_body: Any = None

@@ -34,10 +34,10 @@ class ChamberOut(BaseRecordData):
 
 
 # ---------------------------------------------------------------------------
-# IN — Edit
+# IN — Add
 # ---------------------------------------------------------------------------
 
-class ChamberEdit(BaseInData):
+class ChamberAdd(BaseInData):
     """
     Payload accepted by PUT /settings/chamber/{chamber_id}/edit.
 
@@ -67,3 +67,6 @@ class ChamberEdit(BaseInData):
     @classmethod
     def phone_stripped(cls, v: Optional[str]) -> Optional[str]:
         return v.strip() if v else v
+    
+class ChamberEdit(ChamberAdd):
+    pass

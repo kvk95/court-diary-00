@@ -67,8 +67,10 @@ class UserOut(UserBasicInfoOut):
 class UserPasswordIn(BaseInData):
     password: Optional[str] = None
 
-class UserCreateBasic(UserPasswordIn):
+class UserEmailIn(BaseInData):    
     email: Optional[str] = None
+
+class UserCreateBasic(UserEmailIn,UserPasswordIn):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 

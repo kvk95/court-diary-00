@@ -6,11 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.cache.refm_cache import RefmCache, RefmData
+from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.users import Users
+from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
-from app.dtos.users_dto import UserCreateBasic, UserPasswordIn
+from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
 from app.utils.security import hash_password
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
@@ -24,13 +26,15 @@ class AnonymousService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
+        chamber_repo: Optional[ChamberRepository] = None,
         users_repo: Optional[UsersRepository] = None,
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
             
     ):
         super().__init__(session)
-        self.users_repo = users_repo or UsersRepository()
-        self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
+        self.chamber_repo:ChamberRepository = chamber_repo or ChamberRepository()
+        self.users_repo:UsersRepository = users_repo or UsersRepository()
+        self.user_chamber_link_repo:UserChamberLinkRepository = user_chamber_link_repo or UserChamberLinkRepository()
 
     async def _check_user_chamber_membership(self, email: str) -> dict:
         """
@@ -44,12 +48,21 @@ class AnonymousService(BaseService):
         if not user:
             return {"exists": False}
         
+        # Check all chamber links
+        all_links = await self.user_chamber_link_repo.get_all_active_links_for_user(
+            session=self.session,
+            user_id=user.user_id,
+        )
+        
         return {
             "exists": True,
             "user": user,
             "user_id": user.user_id,
             "deleted_ind": user.deleted_ind,
             "status_ind": user.status_ind,
+            "active_links": all_links,
+            "active_chambers_count": len(all_links),
+            "active_chamber_ids": [link.chamber_id for link in all_links],
         }    
  
     async def _validate_user_payload(
@@ -105,6 +118,7 @@ class AnonymousService(BaseService):
     async def users_add(self, payload: UserCreateBasic) -> str:
         email:str = payload.email if payload.email else ''
         first_name:str = payload.first_name if payload.first_name else ''
+        laset_name: str|None = (payload.last_name or "").strip() or None
         password:str = generate_password()
         payload.password = password
         # ─────────────────────────────────────────────
@@ -130,8 +144,6 @@ class AnonymousService(BaseService):
                         code=ErrorCodes.VALIDATION_ERROR,
                         message="Email already registered, if you forgoot your password try forgot password"
                     )
-
-
  
         # ─────────────────────────────────────────────
         # 3. CREATE USER
@@ -141,9 +153,36 @@ class AnonymousService(BaseService):
             data={
                 "email": email.lower(),
                 "first_name": first_name.strip(),
-                "last_name": (payload.last_name or "").strip() or None,
+                "last_name": laset_name,
                 "password_hash": hash_password(password),
                 "status_ind": False,
+            },
+        )        
+ 
+        # ─────────────────────────────────────────────
+        # 4. Create chamber for User
+        # ─────────────────────────────────────────────
+        updated_chamber = await self.chamber_repo.create(
+            session=self.session,
+            data = {
+                "chamber_name":self.get_initials(first_name,laset_name ),
+                "email": email.lower(),
+                "plan_code": RefmPlanTypesConstants.FREE
+            }
+        )
+        chamber_id = updated_chamber.chamber_id
+ 
+        # ─────────────────────────────────────────────
+        # 5. CREATE CHAMBER LINK
+        # ─────────────────────────────────────────────
+        await self.user_chamber_link_repo.create(
+            session=self.session,
+            data={
+                "user_id": user.user_id,
+                "chamber_id": chamber_id,
+                "left_date": None,
+                "status_ind": True,
+                "primary_ind": True,
             },
         )
 
@@ -176,10 +215,11 @@ class AnonymousService(BaseService):
         #TODO: send email link
         return "Check email for Activation"
  
-    async def users_password_reset(self, email:str) -> str:
+    async def users_password_reset(self, payload:UserEmailIn) -> str:
         # ─────────────────────────────────────────────
         # 1. VALIDATION
         # ─────────────────────────────────────────────
+        email:str = payload.email or ""
         if err := FieldValidator.validate_email(email):
             raise err
  

@@ -1,12 +1,18 @@
 """chamber_service.py — Business logic for the Chamber / Settings module"""
 
+from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.jwt import create_access_token, create_refresh_token
 from app.database.models.chamber import Chamber
 from app.database.models.refm_modules import RefmModulesConstants
 from app.database.repositories.chamber_repository import ChamberRepository
+from app.database.repositories.users_repository import UsersRepository
 from app.dtos.chamber_dto import ChamberEdit, ChamberOut
+from app.dtos.oauth_dtos import LoginRequest, TokenOut
 from app.services.base.secured_base_service import BaseSecuredService
+from app.services.users_service import UsersService
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
 from app.validators.field_validations import FieldValidator
@@ -15,9 +21,15 @@ from app.validators.validation_errors import ValidationErrorDetail
 class ChamberService(BaseSecuredService):
     """Service for reading and editing the authenticated user's chamber."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+            self, 
+            session: AsyncSession,                 
+            chamber_repo: Optional[ChamberRepository] = None,
+            users_repo: UsersRepository | None = None,
+        ) -> None:
         super().__init__(session=session)
-        self.chamber_repo = ChamberRepository()
+        self.chamber_repo = chamber_repo or ChamberRepository()
+        self.users_repo = users_repo or UsersRepository()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -68,9 +80,8 @@ class ChamberService(BaseSecuredService):
                 message="Chamber not found",
             )
         return chamber
-
-    @staticmethod
-    def _to_out(chamber: Chamber) -> ChamberOut:
+    
+    def _to_out(self, chamber: Chamber) -> ChamberOut:
         return ChamberOut(
             chamber_id=chamber.chamber_id,
             chamber_name=chamber.chamber_name,
@@ -93,6 +104,53 @@ class ChamberService(BaseSecuredService):
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    async def login(self,chamber_id:str) -> TokenOut:
+        """
+        Authenticate user and return access/refresh tokens with user context.
+        """
+
+        loginRequest =LoginRequest (
+            email= self.userDetails.email,
+            password="",
+            chamber_id=chamber_id
+        )
+        print(f"LoginRequest: {loginRequest}")
+
+        # 1. Find user by email
+        user = await self.users_repo.get_first(
+            self.session,
+            filters={self.users_repo.model.email: loginRequest.email},
+            where=[self.users_repo.model.status_ind == True],
+        )
+
+        if not user:
+            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="User not found")
+
+        # 5. Create tokens
+        extra_claims = {
+            "chamber_id": chamber_id,
+            "user_id": user.user_id,
+        }
+
+        access_token = create_access_token(subject=str(user.user_id), extra_claims=extra_claims)
+        refresh_token = create_refresh_token(subject=str(user.user_id), extra_claims=extra_claims)
+
+        # 6. Get user details via UsersService (single source of truth)
+        # Create temporary UsersService with the resolved chamber_id
+        users_service = UsersService(
+            session=self.session
+        )
+        user_details = await users_service.get_user_full_details(user_id=user.user_id,
+                                                                 chamber_id=chamber_id)
+
+        return TokenOut(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            user_details=user_details,
+            chamber_details=[],
+        )
 
     async def chamber_get_by_id(self) -> ChamberOut:
         """

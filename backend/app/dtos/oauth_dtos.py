@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, EmailStr
+from app.dtos.chamber_dto import ChamberOut
 from app.dtos.users_dto import (
     UserOut
 )
@@ -36,6 +37,7 @@ class TokenOut(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user_details: Optional[UserOut] = None
+    chamber_details: List[ChamberOut]
     expires_in: int = 3600  # seconds
 
 

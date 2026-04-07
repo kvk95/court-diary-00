@@ -22,37 +22,60 @@ async def get_current_user(
     Returns authenticated user, caches in request context to avoid repeated DB hits.
     Returns None if no valid token.
     """
+    
+    ctx = get_request_context() or {}
+
+    # ✅ cache first
+    if ctx.get("current_user"):
+        return cast(CurrentUserContext, ctx["current_user"])
 
     # No token → anonymous
     if not token:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 0")
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="Invalid token payload 0"
+        )
 
-    payload = decode_token(token)
-    
+    # ✅ reuse decoded token if available
+    payload = ctx.get("token_payload")
+    if not payload:
+        payload = decode_token(token)
+        set_request_context(**ctx, token_payload=payload)
+        ctx = get_request_context() or {} 
+
     if not payload or payload.get("type") != "access":
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 1")
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="Invalid token payload 1"
+        )
+    temp_claim = payload.get("temp_claim", "")
+    path = (ctx.get("path") or "").lower()
+    method = (ctx.get("method") or "").lower()
 
+    is_login = (
+        method == "post"
+        and path.startswith("/api/chamber/login/")
+    )
+
+    # ❌ Temp user → only login allowed
+    if (temp_claim == "Y") != is_login:
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="Invalid access for token type"
+        )
+    
     user_id = payload.get("sub")
-    chamber_id = payload.get("chamber_id") 
-    
+    chamber_id = payload.get("chamber_id")
     if not user_id:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 2")
-
-    try:
-        user_id_val = user_id
-    except ValueError:
-        raise ValidationErrorDetail(code=ErrorCodes.PERMISSION_DENIED, message="Invalid token payload 3")    
-    
-    ctx = get_request_context()
-
-    # If already resolved and cached → return it
-    if "current_user" in ctx:
-        return cast(CurrentUserContext, ctx["current_user"])
+        raise ValidationErrorDetail(
+            code=ErrorCodes.PERMISSION_DENIED,
+            message="Invalid token payload 2"
+        )
 
     # Fetch user from DB
     user = await UsersRepository().get_by_id(
         session=session,
-        id_values=user_id_val
+        id_values=user_id
     )
 
     if not user or user.deleted_ind:
@@ -64,19 +87,12 @@ async def get_current_user(
     # ✅ Build context DTO (fixed field names)
     user_context = CurrentUserContext(
         user_id=user.user_id,
-        chamber_id=chamber_id if chamber_id!=None else "",  # ✅ Changed from company_id
+        chamber_id=chamber_id if chamber_id!=None else "",
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
         status_ind=user.status_ind,
-        is_email_verified=bool(user.email_verified_ind),  # ✅ Fixed field name
-    )    
-
-    # CACHE in context for future calls in same request
-    set_request_context(
-        user_id=user_context.user_id,
-        chamber_id=user_context.chamber_id,  # ✅ Changed from company_id
-        current_user=user_context,
+        is_email_verified=bool(user.email_verified_ind),
     )
 
     user_service = UsersService(session=session)
@@ -86,6 +102,7 @@ async def get_current_user(
 
     # reset CACHE in context with user_details for future calls in same request
     set_request_context(
+        **ctx,
         user_id=user_context.user_id,
         chamber_id=user_context.chamber_id,
         current_user=user_context,
