@@ -94,7 +94,7 @@ class AuthService(BaseService):
 
         return list(chambers)
 
-    async def login(self, loginRequest: LoginRequest, is_regular: bool = False) -> TokenOut:
+    async def login(self, loginRequest: LoginRequest, is_regular: bool = True) -> TokenOut:
         """
         Authenticate user and return access/refresh tokens with user context.
         """
@@ -166,9 +166,13 @@ class AuthService(BaseService):
             chamber_id=chamber_id,
         )
 
-        temp_claim = ""
-        if is_regular:
-            temp_claim = "Y"
+        is_temp = (
+            is_regular
+            and not loginRequest.chamber_id
+            and len(chamber_rows) != 1
+        )
+
+        temp_claim = "Y" if is_temp else ""
 
         # 5. Create tokens
         extra_claims = {
