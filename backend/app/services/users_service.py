@@ -12,10 +12,10 @@ from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.users import Users
+from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
 from app.database.repositories.delete_account_requests_repository import DeleteAccountRequestsRepository
 from app.database.repositories.profile_images_repository import ProfileImagesRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
-from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
@@ -51,7 +51,7 @@ class UsersService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
-        security_roles_repo: Optional[SecurityRolesRepository] = None,
+        chamber_roles_repo: Optional[ChamberRolesRepository] = None,
         users_repo: Optional[UsersRepository] = None,
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
         user_roles_repo: Optional[UserRolesRepository] = None,
@@ -61,7 +61,7 @@ class UsersService(BaseSecuredService):
         image_service: Optional[ImageService] = None,
     ):
         super().__init__(session)
-        self.security_roles_repo = security_roles_repo or SecurityRolesRepository()
+        self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
         self.users_repo = users_repo or UsersRepository()
         self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
         self.user_roles_repo = user_roles_repo or UserRolesRepository()
@@ -164,7 +164,7 @@ class UsersService(BaseSecuredService):
  
         # ── role ───────────────────────────────────────────────────────────
         if payload.role_id:
-            role = await self.security_roles_repo.get_by_id(
+            role = await self.chamber_roles_repo.get_by_id(
                 session=self.session,
                 id_values=payload.role_id,
             )
