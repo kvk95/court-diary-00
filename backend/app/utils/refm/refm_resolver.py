@@ -12,20 +12,19 @@ from app.database.cache.refm_cache import RefmCache, RefmData
 class RefmResolver:
     """
     Dedicated Service for resolving REFM (reference master) values using ForeignKey metadata.
-    This allows you to dynamically look up descriptive values (like names, symbols, etc.)
-    from reference tables without hardcoding table or column names.
+    Supports both simple description lookups and full row mapping.
     """
 
     def __init__(self, session: AsyncSession):
         self._session = session
-        self._lookup_cache = {}
+        self._lookup_cache: dict = {}
 
     @property
     def session(self) -> AsyncSession:
         return self._session
 
     # ------------------------------------------------------------------
-    # Cached FK → (table, code_column) resolver
+    # Internal: Resolve FK → (table, code_column)
     # ------------------------------------------------------------------
     @staticmethod
     @lru_cache(maxsize=256)
@@ -43,25 +42,19 @@ class RefmResolver:
         return fk.column.table.name, fk.column.key
 
     # ------------------------------------------------------------------
-    # Public API
+    # Core Method: Get Full Reference Map (NEW + RECOMMENDED)
     # ------------------------------------------------------------------
-
-    async def get_value(
-            self,
-            desc_map: dict,
-            code:str | None,
-            default: Any = "",
-
-    )-> str:
-        return desc_map.get(code,default)
-
-    async def get_desc_map(
+    async def get_refm_map(
         self,
         *,
         column_attr: InstrumentedAttribute,
-        value_column: InstrumentedAttribute,
     ) -> dict:
-        # Resolve table + code column
+        """
+        Returns a mapping:  code → full_row_dict (containing ALL columns from the REFM table)
+        
+        This is the most flexible method. Use this when you need more than one column.
+        """
+        # Resolve table and code column using FK metadata
         parent = column_attr.parent
         model = parent.class_ if hasattr(parent, "class_") else parent
         column_key = column_attr.key
@@ -69,20 +62,61 @@ class RefmResolver:
         table, code_key = RefmResolver._resolve_refm_target(model, column_key)
         table = table.upper()
 
-        # Get cached data
+        # Get reference data from cache
         refm_data: RefmData = await RefmCache.get(session=self.session)
         rows = refm_data.get(table) or []
 
-        # Cache key includes value_column also
-        cache_key = (table, code_key, value_column.key)
+        # Cache key (we return full rows, so value_column is not needed)
+        cache_key = (table, code_key, "__full_row__")
 
         if cache_key not in self._lookup_cache:
-            self._lookup_cache[cache_key] = {
-                row.get(code_key): row.get(value_column.key)
-                for row in rows
-            }
+            lookup: dict = {}
+            for row in rows:
+                code = row.get(code_key)
+                if code is not None:        # Skip rows with null code
+                    # Convert to plain dict with all columns (safe for different row types)
+                    full_row = dict(row) if hasattr(row, 'keys') else {**row}
+                    lookup[code] = full_row
+
+            self._lookup_cache[cache_key] = lookup
 
         return self._lookup_cache[cache_key]
+
+    # ------------------------------------------------------------------
+    # Legacy Method: Simple code → single value (kept for backward compatibility)
+    # ------------------------------------------------------------------
+    async def get_desc_map(
+        self,
+        *,
+        column_attr: InstrumentedAttribute,
+        value_column: InstrumentedAttribute,
+    ) -> dict:
+        """
+        Returns a simple mapping: code → value (from a single column)
+        Uses get_refm_map internally to avoid duplication.
+        """
+        full_map = await self.get_refm_map(column_attr=column_attr)
+
+        value_key = value_column.key
+
+        return {
+            code: row.get(value_key)
+            for code, row in full_map.items()
+        }
+
+    # ------------------------------------------------------------------
+    # Convenience Method
+    # ------------------------------------------------------------------
+    async def get_value(
+        self,
+        desc_map: dict,
+        code: str | None,
+        default: Any = "",
+    ) -> str:
+        """Simple helper to safely get value from a desc_map."""
+        if code is None:
+            return default
+        return desc_map.get(code, default)
 
     async def from_column(
         self,
@@ -93,50 +127,7 @@ class RefmResolver:
         default: Any = "",
     ) -> Any:
         """
-        Resolve a descriptive value from a REFM (reference master) table.
-
-        Parameters
-        ----------
-        column_attr : InstrumentedAttribute
-            The SQLAlchemy model attribute that holds the foreign key reference.
-            Example: `RefmCaseStatus.code` (points to a currency code FK).
-
-        code : str | None
-            The code value you want to look up in the REFM table.
-            Example: `c.status_code`. If `None`, the `default` is returned.
-
-        value_column : InstrumentedAttribute
-            The target column in the REFM table whose value you want to retrieve.
-            Example: `RefmCaseStatus.description`.
-
-        default : Any, optional
-            Fallback value if the lookup fails or the code is missing.
-            Defaults to empty string `""`.
-
-        Returns
-        -------
-        Any
-            The resolved value from the REFM table, or the `default` if not found.
-
-        Examples
-        --------
-        # Example 1: Currency symbol lookup
-        symbol = await resolver.from_column(
-            column_attr=LocalizationSettings.currency,
-            code="INR",
-            value_column=RefmCurrency.symbol,
-            default="?"
-        )
-        # Returns: "₹"
-
-        # Example 2: Case status description lookup
-        status_description = await resolver.from_column(
-            column_attr=RefmCaseStatus.code,
-            code=c.status_code,
-            value_column=RefmCaseStatus.description,
-            default="Unknown"
-        )
-        # Returns: "Closed" or "Pending", depending on c.status_code
+        Resolve a descriptive value from a REFM table using ForeignKey metadata.
         """
         if not code:
             return default
@@ -146,7 +137,6 @@ class RefmResolver:
                 column_attr=column_attr,
                 value_column=value_column,
             )
+            return desc_map.get(code, default)
         except Exception:
             return default
-
-        return desc_map.get(code, default)

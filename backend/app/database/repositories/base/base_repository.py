@@ -968,6 +968,27 @@ class BaseRepository(Generic[ModelType]):
         await session.refresh(obj)
         return obj
     
+    async def bulk_create(
+        self,
+        session: AsyncSession,
+        *,
+        data_list: List[Dict[str, Any]],
+    ) -> List[ModelType]:
+        objects = []
+        for data in data_list:
+            create_data = self._set_audit_fields(data)
+            if hasattr(self.model, "deleted_ind") and "deleted_ind" not in create_data:
+                create_data["deleted_ind"] = False
+            objects.append(self.model(**create_data))
+        
+        session.add_all(objects)
+        await session.flush()
+        
+        for obj in objects:
+            await session.refresh(obj)
+        
+        return objects
+    
     async def bulk_update(
         self,
         session: AsyncSession,

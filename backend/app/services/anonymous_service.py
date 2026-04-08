@@ -1,16 +1,23 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from passlib.utils import generate_password
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.cache.refm_cache import RefmCache, RefmData
+from app.database.models.chamber_modules import ChamberModules
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
+from app.database.models.refm_modules import RefmModulesConstants
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.users import Users
+from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
 from app.database.repositories.chamber_repository import ChamberRepository
+from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
+from app.database.repositories.role_permissions_repository import RolePermissionsRepository
+from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
+from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
 from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
@@ -30,14 +37,213 @@ class AnonymousService(BaseService):
         session: AsyncSession,
         chamber_repo: Optional[ChamberRepository] = None,
         users_repo: Optional[UsersRepository] = None,
-        user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,            
+        user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
+        chamber_module_repo: Optional[ChamberModulesRepository] = None,
+        security_role_repo: Optional[SecurityRolesRepository] = None,
+        chamber_role_repo: Optional[ChamberRolesRepository] = None,
+        user_role_repo: Optional[UserRolesRepository] = None,
+        role_permission_repo: Optional[RolePermissionsRepository] = None,
+        email_link_service: Optional[EmailLinkService] = None,
     ):
         super().__init__(session)
-        self.chamber_repo:ChamberRepository = chamber_repo or ChamberRepository()
-        self.users_repo:UsersRepository = users_repo or UsersRepository()
-        self.user_chamber_link_repo:UserChamberLinkRepository = user_chamber_link_repo or UserChamberLinkRepository()
-        
-        self.email_link_service = EmailLinkService( session=self.session )
+        self.chamber_repo: ChamberRepository = chamber_repo or ChamberRepository()
+        self.users_repo: UsersRepository = users_repo or UsersRepository()
+        self.user_chamber_link_repo: UserChamberLinkRepository = user_chamber_link_repo or UserChamberLinkRepository()
+        self.chamber_module_repo: ChamberModulesRepository = chamber_module_repo or ChamberModulesRepository()
+        self.security_role_repo: SecurityRolesRepository = security_role_repo or SecurityRolesRepository()
+        self.chamber_role_repo: ChamberRolesRepository = chamber_role_repo or ChamberRolesRepository()
+        self.user_role_repo: UserRolesRepository = user_role_repo or UserRolesRepository()
+        self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
+        self.email_link_service = email_link_service or EmailLinkService(session=self.session)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # PERMISSION MATRIX  ·  data-driven, no hard-coded role names in loops
+    # ─────────────────────────────────────────────────────────────────────────
+
+    _ROLE_PERMISSION_MATRIX: dict[str, dict[str, dict[str, bool]]] = {
+        "Administrator": {
+            # sentinel → full access on every module
+            "__all__": dict(
+                allow_all_ind=True,
+                read_ind=True,
+                write_ind=True,
+                create_ind=True,
+                delete_ind=True,
+                import_ind=True,
+                export_ind=True,
+            )
+        },
+        "Senior Advocate": {
+            RefmModulesConstants.ADMIN: dict(
+                allow_all_ind=False, read_ind=False, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.DASHBOARD: dict(
+                allow_all_ind=False, read_ind=True, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.CASES: dict(
+                allow_all_ind=False, read_ind=True, write_ind=True,
+                create_ind=True, delete_ind=False, import_ind=True, export_ind=True,
+            ),
+            RefmModulesConstants.HEARINGS: dict(
+                allow_all_ind=False, read_ind=True, write_ind=True,
+                create_ind=True, delete_ind=False, import_ind=True, export_ind=True,
+            ),
+            RefmModulesConstants.CALENDAR: dict(
+                allow_all_ind=False, read_ind=True, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.CLIENTS: dict(
+                allow_all_ind=False, read_ind=True, write_ind=True,
+                create_ind=True, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.BILLING: dict(
+                allow_all_ind=False, read_ind=True, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.USER_MANAGEMENT: dict(
+                allow_all_ind=False, read_ind=False, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.REPORTS: dict(
+                allow_all_ind=False, read_ind=True, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=True,
+            ),
+            RefmModulesConstants.SETTINGS: dict(
+                allow_all_ind=False, read_ind=True, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+            RefmModulesConstants.COLLABORATIONS: dict(
+                allow_all_ind=False, read_ind=False, write_ind=False,
+                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
+            ),
+        },
+    }
+
+    _DEFAULT_PERMISSION: dict[str, bool] = dict(
+        allow_all_ind=False,
+        read_ind=True,
+        write_ind=False,
+        create_ind=False,
+        delete_ind=False,
+        import_ind=False,
+        export_ind=False,
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SETUP CHAMBER SECURITY  (steps 3 → 6)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def _setup_chamber_security(
+        self,
+        *,
+        chamber_id: str,
+        user_id: str,
+        user_chamber_link_id: str,
+    ) -> None:
+        """
+        3. Add all refm_modules → chamber_modules
+        4. Copy security_roles  → chamber_roles
+        5. Link user            → Administrator chamber_role
+        6. Set role_permissions for every role × module (bulk insert)
+        """
+
+        # ── 3. MODULES ────────────────────────────────────────────────────────
+        # Fix #1: correct resolver call — column_attr=ChamberModules.module_code
+        modules: dict[str, Any] = await self.refm_resolver.get_refm_map(
+            column_attr=ChamberModules.module_code
+        )
+
+        created_modules: list[Any] = await self.chamber_module_repo.bulk_create(
+            session=self.session,
+            data_list=[
+                {
+                    "chamber_id": chamber_id,
+                    "module_code": module_code,
+                    "active_ind": True,
+                    "created_by": user_id,
+                }
+                for module_code in modules
+            ],
+        )
+
+        # Fix #2: correct Any import and type hint
+        chamber_modules_map: dict[str, Any] = {
+            cm.module_code: cm for cm in created_modules
+        }
+
+        # ── 4. ROLES ──────────────────────────────────────────────────────────
+        security_roles = await self.security_role_repo.list_all(session=self.session)
+
+        created_roles: list[Any] = await self.chamber_role_repo.bulk_create(
+            session=self.session,
+            data_list=[
+                {
+                    "chamber_id": chamber_id,
+                    "role_name": role.role_name,
+                    "description": role.description,
+                    "admin_ind": role.admin_ind,
+                    "system_ind": role.system_ind,
+                    "created_by": user_id,
+                }
+                for role in security_roles
+            ],
+        )
+
+        # Fix #2: correct Any import and type hint
+        chamber_roles_map: dict[str, Any] = {
+            cr.role_name: cr for cr in created_roles
+        }
+
+        # ── 5. ASSIGN ADMINISTRATOR ROLE TO USER ──────────────────────────────
+        # Fix #4: safer lookup + improved error message
+        admin_role = chamber_roles_map.get("Administrator")
+        if not admin_role:
+            raise ValueError(
+                "Administrator role not found in security_roles. Ensure seed data exists."
+            )
+
+        await self.user_role_repo.create(
+            session=self.session,
+            data={
+                "link_id": user_chamber_link_id,
+                "role_id": admin_role.role_id,
+                "created_by": user_id,
+            },
+        )
+
+        # ── 6. ROLE PERMISSIONS  (bulk) ───────────────────────────────────────
+        # Fix #3: collect all permission rows first, then single bulk_create
+        permission_rows: list[dict[str, Any]] = []
+
+        for role_name, chamber_role in chamber_roles_map.items():
+
+            # Fix #5: cleaner .get() + truthiness check
+            role_matrix = self._ROLE_PERMISSION_MATRIX.get(role_name)
+
+            for module_code, chamber_module in chamber_modules_map.items():
+
+                # Fix #6: cleaner permission resolution
+                if not role_matrix:
+                    perm = self._DEFAULT_PERMISSION
+                elif "__all__" in role_matrix:
+                    perm = role_matrix["__all__"]
+                else:
+                    perm = role_matrix.get(module_code, self._DEFAULT_PERMISSION)
+
+                permission_rows.append({
+                    "role_id": chamber_role.role_id,
+                    "chamber_module_id": chamber_module.chamber_module_id,
+                    "created_by": user_id,
+                    **perm,
+                })
+
+        # Single flush for all Roles × Modules rows
+        await self.role_permission_repo.bulk_create(
+            session=self.session,
+            data_list=permission_rows,
+        )    
 
     async def _check_user_chamber_membership(self, email: str) -> dict:
         """
@@ -118,84 +324,83 @@ class AnonymousService(BaseService):
     async def get_all_refm(self) -> RefmData:
         return await RefmCache.get(session=self.session)
  
+    # ─────────────────────────────────────────────────────────────────────────
+    # USERS ADD
+    # ─────────────────────────────────────────────────────────────────────────
+
     async def users_add(self, payload: UserCreateBasic) -> str:
-        email:str = payload.email if payload.email else ''
-        first_name:str = payload.first_name if payload.first_name else ''
-        laset_name: str|None = (payload.last_name or "").strip() or None
-        password:str = generate_password()
+        email: str = payload.email or ""
+        first_name: str = payload.first_name or ""
+        last_name: str | None = (payload.last_name or "").strip() or None
+        password: str = generate_password()
         payload.password = password
-        # ─────────────────────────────────────────────
-        # 1. VALIDATION
-        # ─────────────────────────────────────────────
+
+        # ── 1. VALIDATION ─────────────────────────────────────────────────────
         await self._validate_user_payload(payload, is_edit=False)
- 
-        # ─────────────────────────────────────────────
-        # 2. CHECK MEMBERSHIP
-        # ─────────────────────────────────────────────
-        # Note: active_links is intentionally not fetched here — we only need
-        # exists / deleted_ind to decide create-vs-reactivate.
+
+        # ── 2. CHECK MEMBERSHIP ───────────────────────────────────────────────
         membership = await self._check_user_chamber_membership(email)
 
         if membership["exists"]:
             if membership["deleted_ind"] or not membership["status_ind"]:
                 raise ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message="Email already registered, but not active, try Reset Profile to activate User "
-                    )
-            else:
-                raise ValidationErrorDetail(
-                        code=ErrorCodes.VALIDATION_ERROR,
-                        message="Email already registered, if you forgoot your password try forgot password"
-                    )
- 
-        # ─────────────────────────────────────────────
-        # 3. CREATE USER
-        # ─────────────────────────────────────────────
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message="Email already registered but not active. Try Reset Profile to activate the user.",
+                )
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Email already registered. If you forgot your password, try Forgot Password.",
+            )
+
+        # ── 3. CREATE USER ────────────────────────────────────────────────────
         user = await self.users_repo.create(
             session=self.session,
             data={
                 "email": email.lower(),
                 "first_name": first_name.strip(),
-                "last_name": laset_name,
+                "last_name": last_name,
                 "password_hash": hash_password(password),
                 "status_ind": False,
             },
         )
- 
-        # ─────────────────────────────────────────────
-        # 4. Create chamber for User
-        # ─────────────────────────────────────────────
-        updated_chamber = await self.chamber_repo.create(
+
+        # ── 4. CREATE CHAMBER ─────────────────────────────────────────────────
+        chamber = await self.chamber_repo.create(
             session=self.session,
-            data = {
-                "chamber_name":self.get_initials(first_name,laset_name ),
+            data={
+                "chamber_name": self.get_initials(first_name, last_name),
                 "email": email.lower(),
-                "plan_code": RefmPlanTypesConstants.FREE
-            }
+                "plan_code": RefmPlanTypesConstants.FREE,
+            },
         )
-        chamber_id = updated_chamber.chamber_id
- 
-        # ─────────────────────────────────────────────
-        # 5. CREATE CHAMBER LINK
-        # ─────────────────────────────────────────────
-        await self.user_chamber_link_repo.create(
+
+        # ── 5. CREATE CHAMBER LINK ────────────────────────────────────────────
+        link = await self.user_chamber_link_repo.create(
             session=self.session,
             data={
                 "user_id": user.user_id,
-                "chamber_id": chamber_id,
+                "chamber_id": chamber.chamber_id,
                 "left_date": None,
                 "status_ind": True,
                 "primary_ind": True,
             },
         )
 
+        # ── 6-9. MODULES / ROLES / PERMISSIONS ───────────────────────────────
+        await self._setup_chamber_security(
+            chamber_id=chamber.chamber_id,
+            user_id=user.user_id,
+            user_chamber_link_id=link.link_id,
+        )
+
+        # ── 10. ACTIVATION EMAIL ──────────────────────────────────────────────
         link_url = await self.email_link_service.generate_link(
             user_id=user.user_id,
             email=user.email,
-            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION
+            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION,
         )
 
-        return f"User created Successfully, check email for Activation link {link_url}"
+        return f"User created successfully. Check email for activation link: {link_url}"
  
     async def resendactivationlink(self, payload:UserEmailIn) -> str:
 
