@@ -290,11 +290,11 @@ class AnonymousService(BaseService):
                         code=ErrorCodes.VALIDATION_ERROR,
                         message="Email not active, try Reset Profile to activate User "
                     )
-            else:
-                raise ValidationErrorDetail(
-                        code=ErrorCodes.NOT_FOUND,
-                        message="Email not Found",
-                    )
+        else:
+            raise ValidationErrorDetail(
+                    code=ErrorCodes.NOT_FOUND,
+                    message="Email not Found",
+                )
 
         user = membership["user"]
         link_url = await self.email_link_service.generate_link(

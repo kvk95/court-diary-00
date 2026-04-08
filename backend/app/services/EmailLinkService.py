@@ -65,7 +65,7 @@ class EmailLinkService(BaseService):
         encrypted_id = generate_lid(link.link_id)
 
         # 4. BUILD URL
-        link_url = f"{self.ui_url}?lid={encrypted_id}"
+        link_url = f"{self.ui_url}?lid={encrypted_id}?code={template_code.value}"
 
         # 5. OPTIONAL: STORE URL
         await self.email_link_repo.update(
