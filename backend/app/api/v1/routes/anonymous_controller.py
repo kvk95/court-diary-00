@@ -70,7 +70,7 @@ class AnonymousController(BaseController):
     @BaseController.put(
         "/activateuser",
         summary="Activate the inactive or deleted user",
-        response_model=BaseOutDto[str],
+        response_model=BaseOutDto[dict[str, str]],
     )    
     async def users_reset(
         self,
@@ -96,7 +96,7 @@ class AnonymousController(BaseController):
     @BaseController.put(
         "/new_password",
         summary="set new password",
-        response_model=BaseOutDto[str],
+        response_model=BaseOutDto[dict[str, str]],
     )
     async def users_new_password(
         self,
