@@ -121,15 +121,32 @@ INSERT IGNORE INTO refm_email_status (code, description, color_code, sort_order)
 ('ESFL', 'Failed',    '#ef4444', 50),
 ('ESBN', 'Bounced',   '#991b1b', 60);
 
-INSERT IGNORE INTO refm_email_templates (code, subject, content, category, sort_order) VALUES
-('hearing_tomorrow',
- 'Hearing Tomorrow – {Case Number}',
- '<p>Dear {Advocate},</p><p>Hearing tomorrow: <strong>{Case Number}</strong><br>Court: {Court Name}<br>Purpose: {Purpose}</p>',
- 'REMINDER', 100),
-('welcome_user',
- 'Welcome to {Chamber Name}',
- '<p>Hello {FirstName},</p><p>Your account is active.<br>Login: {Email}</p>',
- 'WELCOME', 10);
+INSERT IGNORE INTO refm_email_templates (code, subject, content, category, description, sort_order, status_ind) VALUES
+('activate_account',
+ 'Activate Your Account',
+ '<p class="primarycolor bolder">Greetings!,</p> 
+  <p>We’re excited to have you join us!</p> 
+  <p>Click the <a href="{activation_link}" target="_blank">link</a> below to activate your account and start exploring.</p>
+  <p><a href="{activation_link}" target="_blank" style="font-size:14px;">{activation_link}</a></p>
+  <p>{default_password_message}</p>
+  <p class="primarycolor smaller textcenter"><br/>Welcome aboard! If you have any questions, feel free to reach out.</p>',
+ 'account',
+ 'Template for new user account activation',
+ 1,
+ TRUE),
+
+('reset_password',
+ 'Reset Password',
+ '<p class="primarycolor bolder">Hi !,</p>  
+  <p>We received a request to reset your password.</p>  
+  <p>To proceed, click the link below:</p>  
+  <p><a href="{reset_link}" target="_blank">{reset_link}</a></p>  
+  <p>If you didn’t request a password reset, you can safely ignore this email.</p>  
+  <p class="primarycolor smaller textcenter"><br/>Stay secure, and let us know if you need any help.</p>',
+ 'account',
+ 'Template for password reset requests',
+ 2,
+ TRUE);
 
 INSERT IGNORE INTO refm_comm_status (code, description, color_code, sort_order) VALUES
 ('CSPN', 'Pending',   '#f97316', 10),
@@ -285,7 +302,9 @@ INSERT INTO user_chamber_link (user_id, chamber_id, primary_ind, joined_date, cr
 (@user_karthik, @chamber_vk,     TRUE, '2024-03-10', @user_vijay),
 (@user_jerem,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
 (@user_suresh,   @chamber_vk,     TRUE, '2024-02-01', @user_vijay),
-(@user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh);
+
+(@user_lokesh,  @chamber_sundar, TRUE, '2024-01-20', @user_lokesh),
+(@user_priya,   @chamber_sundar,     FALSE, '2024-02-01', @user_lokesh);
 
 SET @link_vijay_vk      = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_vijay   AND chamber_id = @chamber_vk);
 SET @link_priya_vk      = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_priya   AND chamber_id = @chamber_vk);
@@ -293,6 +312,7 @@ SET @link_karthik_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id =
 SET @link_jerem_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_jerem AND chamber_id = @chamber_vk);
 SET @link_suresh_vk    = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_suresh AND chamber_id = @chamber_vk);
 SET @link_lokesh_sundar = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_lokesh  AND chamber_id = @chamber_sundar);
+SET @link_priya_sundar = (SELECT link_id FROM user_chamber_link WHERE user_id = @user_lokesh  AND chamber_id = @chamber_sundar);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 18.3  Chamber Modules
@@ -346,7 +366,8 @@ INSERT INTO chamber_roles (chamber_id, role_name, description, admin_ind, system
 (@chamber_vk, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_vijay),
 (@chamber_vk, 'Clerk', 'Manages Office, hearings and clients', 		   FALSE, FALSE, @user_vijay),
 
-(@chamber_sundar, 'Administrator', 'Full access to all modules', FALSE, TRUE, @user_lokesh);
+(@chamber_sundar, 'Administrator', 'Full access to all modules', FALSE, TRUE, @user_lokesh),
+(@chamber_sundar, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_lokesh);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 19.3  User Roles (link to chamber_roles)
@@ -356,6 +377,7 @@ SET @role_admin_vk   = (SELECT role_id FROM chamber_roles WHERE chamber_id = @ch
 SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Senior Advocate');
 SET @role_clerk_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Clerk');
 SET @role_admin_sundar = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar AND role_name = 'Administrator');
+SET @role_senior_sundar  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar   AND role_name = 'Senior Advocate');
 
 INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_vijay_vk,      @role_admin_vk,   '2024-01-15', @user_vijay),
@@ -363,7 +385,8 @@ INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_karthik_vk,    @role_senior_vk,  '2024-03-10', @user_vijay),
 (@link_jerem_vk,      @role_senior_vk,  '2024-02-01', @user_vijay),
 (@link_suresh_vk,     @role_clerk_vk,   '2024-02-01', @user_vijay),
-(@link_lokesh_sundar, @role_admin_sundar, '2024-01-20', @user_lokesh);
+(@link_lokesh_sundar, @role_admin_sundar, '2024-01-20', @user_lokesh),
+(@link_priya_sundar,  @role_senior_sundar,  '2024-02-01', @user_lokesh);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 19.4  Role Permissions (per chamber role)
@@ -408,6 +431,32 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 (@role_senior_vk, @cm_rprt, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_vijay),
 (@role_senior_vk, @cm_sett, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
 (@role_senior_vk, @cm_coll, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
+(@role_admin_sundar, @cm_admn, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_dash, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_case, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_hear, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_cald, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_clnt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_user, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
+(@role_admin_sundar, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh);
+
+INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
+(@role_senior_sundar, @cm_admn, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_dash, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_case, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_lokesh),
+(@role_senior_sundar, @cm_hear, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_lokesh),
+(@role_senior_sundar, @cm_cald, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_clnt, FALSE, TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_bill, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_user, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_rprt, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_lokesh),
+(@role_senior_sundar, @cm_sett, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
+(@role_senior_sundar, @cm_coll, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh);
 
 -- Clerk - Limited Access
 INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
@@ -499,7 +548,7 @@ INSERT INTO cases (chamber_id, case_number, court_id, case_type_code, filing_yea
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- =============================================================================
--- FETCH CASE IDS (VK CHAMBER ONLY)
+-- FETCH CASE IDS
 -- =============================================================================
 
 SELECT case_id INTO @case1 FROM cases WHERE case_number = 'Crl.O.P.No.234/2025' AND chamber_id = @chamber_vk LIMIT 1;
@@ -511,6 +560,8 @@ SELECT case_id INTO @case6 FROM cases WHERE case_number = 'L.C.No.78/2025' AND c
 SELECT case_id INTO @case7 FROM cases WHERE case_number = 'Crl.O.P.No.567/2026' AND chamber_id = @chamber_vk LIMIT 1;
 SELECT case_id INTO @case8 FROM cases WHERE case_number = 'W.P.No.9012/2026' AND chamber_id = @chamber_vk LIMIT 1;
 SELECT case_id INTO @case9 FROM cases WHERE case_number = 'O.S.No.789/2024' AND chamber_id = @chamber_vk LIMIT 1;
+SELECT case_id INTO @case1_sundar FROM cases WHERE case_number = 'O.S.No.145/2024' AND chamber_id = @chamber_sundar LIMIT 1;
+SELECT case_id INTO @case2_sundar FROM cases WHERE case_number = 'Crl.O.P.No.88/2025' AND chamber_id = @chamber_sundar LIMIT 1;
 
 -- =============================================================================
 -- HEARINGS (ALL 9 CASES)
@@ -674,16 +725,23 @@ INSERT INTO case_clients (chamber_id, case_id, client_id, party_role_code,
 (@chamber_vk, @case5, @client_subramanian, 'PRRE', FALSE, @user_priya),
 														  
 (@chamber_vk, @case6, @client_workmen,     'PRPE', TRUE,  @user_vijay),
-(@chamber_vk, @case6, @client_bluesky,     'PRRE', FALSE, @user_vijay),
+(@chamber_vk, @case6, @client_ramesh,     'PRRE', FALSE, @user_vijay),
 														  
 (@chamber_vk, @case7, @client_murugan,     'PRPE', TRUE,  @user_priya),
 (@chamber_vk, @case7, @client_anand,       'PRRE', FALSE, @user_priya),
 														  
 (@chamber_vk, @case8, @client_chennai_dev, 'PRPE', TRUE,  @user_vijay),
-(@chamber_vk, @case8, @client_ganesh,      'PRRE', FALSE, @user_vijay),
+(@chamber_vk, @case8, @client_murugan,      'PRRE', FALSE, @user_vijay),
 														  
 (@chamber_vk, @case9, @client_subramanian, 'PRPE', TRUE,  @user_vijay),
-(@chamber_vk, @case9, @client_priya_cust,  'PRRE', FALSE, @user_vijay);
+(@chamber_vk, @case9, @client_priya_cust,  'PRRE', FALSE, @user_vijay),
+
+--
+(@chamber_vk, @case1_sundar, @client_bluesky,     'PRPE', TRUE,  @user_priya),
+(@chamber_vk, @case1_sundar, @client_ganesh, 'PRRE', FALSE, @user_priya),
+														  
+(@chamber_vk, @case2_sundar, @client_ganesh,     'PRPE', TRUE,  @user_vijay),
+(@chamber_vk, @case2_sundar, @client_bluesky,     'PRRE', FALSE, @user_vijay);
 
 
 -- -----------------------------------------------------------------------------
@@ -752,7 +810,9 @@ INSERT INTO case_aors (case_id, user_id, chamber_id, primary_ind, appointment_da
 (@case2, @user_priya, @chamber_vk,     TRUE,  '2025-03-05', 'ASAC', @user_vijay),
 (@case3, @user_lokesh, @chamber_sundar, TRUE, '2024-08-12', 'ASAC', @user_lokesh),
 (@case4, @user_priya, @chamber_vk,     TRUE,  '2025-06-15', 'ASAC', @user_vijay),
-(@case5, @user_priya, @chamber_vk,     TRUE,  '2025-07-20', 'ASAC', @user_vijay);
+(@case5, @user_priya, @chamber_vk,     TRUE,  '2025-07-20', 'ASAC', @user_vijay),
+(@case1_sundar, @user_priya, @chamber_sundar,     TRUE,  '2025-07-20', 'ASAC', @user_lokesh),
+(@case2_sundar, @user_priya, @chamber_sundar,     TRUE,  '2025-07-20', 'ASAC', @user_lokesh);
 
 -- =============================================================================
 -- 23. SEED DATA — TIER 9  (Config: Email Settings & Templates)
@@ -761,9 +821,6 @@ INSERT INTO case_aors (case_id, user_id, chamber_id, primary_ind, appointment_da
 INSERT INTO email_settings (chamber_id, from_email, smtp_host, smtp_port, smtp_user, smtp_password, encryption_code, default_ind, status_ind, created_by) VALUES
 (@chamber_vk, 'no-reply@vkchamber.in', 'smtp.gmail.com', 587, 'no-reply@vkchamber.in', 'app-password-placeholder', 'EETL', TRUE,  TRUE, @user_vijay),
 (@chamber_vk, 'office@vkchamber.in',   'smtp.zoho.com',  587, 'office@vkchamber.in',   'zoho-password-placeholder', 'EETL', FALSE, TRUE, @user_vijay);
-
-INSERT INTO email_templates (chamber_id, code, subject, content, customized_ind, enabled_ind, created_by) VALUES
-(@chamber_vk, 'hearing_tomorrow', 'Court Hearing Tomorrow – Urgent: {Case Number}', '<p>Dear Advocate,</p><p><strong>Tomorrow</strong> hearing:<br>Case: <b>{Case Number}</b></p>', TRUE, TRUE, @user_vijay);
 -- =============================================================================
 -- 24. SEED DATA — TIER 10  (Collaboration & Invitations)
 -- =============================================================================
@@ -831,12 +888,6 @@ INSERT INTO activity_log (actor_chamber_id, actor_user_id, action, target, ip_ad
 (@chamber_vk, @user_karthik, 'DOCUMENT_UPLOAD','case:1', '49.204.123.88', JSON_OBJECT('case_id', 1, 'doc_type', 'affidavit'),           '2026-03-21 14:15:00'),
 (@chamber_vk, @user_vijay,   'SETTINGS_UPDATE','chamber','117.192.45.12', JSON_OBJECT('setting', 'email_config'),                      '2026-03-20 11:30:00');
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 25.2  Email Log
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO email_log (chamber_id, user_id, template_code, recipient_email, subject, status_code, sent_at, metadata_json, created_by) VALUES
-(@chamber_vk, @user_priya, 'hearing_tomorrow', 'priya@vkchamber.in', 'Court Hearing Tomorrow – Urgent: Crl.O.P.No.234/2025', 'ESDL', '2026-03-23 17:02:15', JSON_OBJECT('case_id', 1, 'hearing_date', '2026-03-24'), @user_karthik);
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

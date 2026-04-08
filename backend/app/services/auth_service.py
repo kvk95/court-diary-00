@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.jwt import create_access_token, create_refresh_token, decode_token
 from app.database.models.chamber import Chamber
 from app.database.repositories.chamber_repository import ChamberRepository
-from app.dtos.chamber_dto import ChamberOut
+from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.validators import ErrorCodes, ValidationErrorDetail
 from app.database.models.user_chamber_link import UserChamberLink
 from sqlalchemy import desc, select
@@ -16,7 +16,7 @@ from app.database.repositories.login_audit_repository import LoginAuditRepositor
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.user_profiles_repository import UserProfilesRepository
 from app.database.repositories.users_repository import UsersRepository
-from app.dtos.oauth_dtos import LoginRequest, RefreshRequest, TokenOut
+from app.dtos.oauth_dtos import ChamberDetails, LoginRequest, RefreshRequest, TokenOut
 from app.utils.security import verify_password
 from app.database.models.refm_login_status import RefmLoginStatusConstants
 from app.services.users_service import UsersService  # ← Import UsersService
@@ -34,12 +34,14 @@ class AuthService(BaseService):
         users_repo: UsersRepository | None = None,
         audit_repo: LoginAuditRepository | None = None,
         user_profiles_repo: UserProfilesRepository | None = None,
-        role_permissions_repo: RolePermissionsRepository | None = None,                 
+        role_permissions_repo: RolePermissionsRepository | None = None,
+        user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,              
         chamber_repo: Optional[ChamberRepository] = None,
         users_service: UsersService | None = None,  # ← Inject UsersService
     ):
         super().__init__(session)        
         self.chamber_repo = chamber_repo or ChamberRepository()
+        self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
         self.users_repo = users_repo or UsersRepository()
         self.audit_repo = audit_repo or LoginAuditRepository()
         self.user_profiles_repo = user_profiles_repo or UserProfilesRepository()
@@ -48,10 +50,11 @@ class AuthService(BaseService):
 
     
     
-    def _to_out(self, chamber: Chamber) -> ChamberOut:
-        return ChamberOut(
+    def _to_out(self, chamber: Chamber, chamber_link_data) -> ChamberDetails:
+        return ChamberDetails(
             chamber_id=chamber.chamber_id,
             chamber_name=chamber.chamber_name,
+            primary_ind = chamber_link_data[chamber.chamber_id].primary_ind,
             email=chamber.email,
             phone=chamber.phone,
             address_line1=chamber.address_line1,
@@ -129,32 +132,37 @@ class AuthService(BaseService):
             raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Invalid credentials")
 
         # 3. Resolve user's PRIMARY chamber
-        chamber_id = loginRequest.chamber_id
+        stmt = select(UserChamberLink).where(
+            UserChamberLink.user_id == user.user_id,
+            UserChamberLink.left_date.is_(None),
+            UserChamberLink.status_ind == True,
+        ).order_by(desc(UserChamberLink.primary_ind))
 
-        if chamber_id:
-            chamber_rows = [await self._get_chamber(chamber_id=chamber_id)]
-        else:
-            stmt = select(UserChamberLink.chamber_id).where(
+        chamber_link_rows = await self.user_chamber_link_repo.list_all(
+            session=self.session,
+            where=[
                 UserChamberLink.user_id == user.user_id,
                 UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind == True,
-            ).order_by(desc(UserChamberLink.primary_ind))
+            ],
+            order_by=[UserChamberLink.primary_ind.desc()]
+        )
 
-            result = await self.session.execute(stmt)
-            
-            chamber_ids = [row.chamber_id for row in result]
+        # ✅ fetch ALL chambers using IN clause
+        chamber_link_data = {row.chamber_id: row for row in chamber_link_rows}
+        chamber_ids = list(chamber_link_data.keys())
 
-            if not chamber_ids:
-                raise ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message="User has no active chamber membership"
-                )
+        if not chamber_ids:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="User has no active chamber membership"
+            )
 
-            # ✅ fetch ALL chambers using IN clause
-            chamber_rows = await self._get_chambers(chamber_ids)
+        # ✅ fetch ALL chambers using IN clause
+        chamber_rows = await self._get_chambers(chamber_ids)
 
-            # optional: keep primary first
-            chamber_id = chamber_ids[0]
+        # optional: keep primary first
+        chamber_id = loginRequest.chamber_id or chamber_ids[0]
 
         # 4. Success audit
         await self.audit_repo.log_login(
@@ -192,9 +200,10 @@ class AuthService(BaseService):
         user_details = await users_service.get_user_full_details(user_id=user.user_id,
                                                                  chamber_id=chamber_id)
         chamber_details = []
+        
 
         if is_regular:        
-            chamber_details =  [ self._to_out(chamber=row)
+            chamber_details =  [ self._to_out(chamber=row,chamber_link_data=chamber_link_data)
                 for row in chamber_rows
             ]
 

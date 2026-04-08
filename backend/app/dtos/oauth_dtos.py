@@ -30,6 +30,9 @@ class RefreshRequest(BaseModel):
     """Refresh token request."""
     refresh_token: str
 
+class ChamberDetails(ChamberOut):
+    primary_ind: bool
+
 
 class TokenOut(BaseModel):
     """Token response with user context."""
@@ -37,7 +40,7 @@ class TokenOut(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user_details: Optional[UserOut] = None
-    chamber_details: List[ChamberOut]
+    chamber_details: List[ChamberDetails]
     expires_in: int = 3600  # seconds
 
 
