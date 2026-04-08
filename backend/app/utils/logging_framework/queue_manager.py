@@ -3,6 +3,7 @@ import logging
 from typing import Optional, cast
 
 from app.core.config import settings
+from app.utils.logging_framework.audit_worker import audit_worker
 from .file_writer import FileWriter
 from .logging_repo import LoggingRepo
 from .log_types import LogType
@@ -30,6 +31,9 @@ class LoggingQueueManager:
         for _ in range(self._logging_cfg.LOG_WORKER_COUNT):
             self.workers.append(asyncio.create_task(self._worker()))
 
+        # start audit worker ONLY once
+        asyncio.create_task(audit_worker())
+
         self._started = True
 
     async def stop(self):
@@ -46,7 +50,7 @@ class LoggingQueueManager:
         """
         item = {"type": log_type, "payload": payload}
         try:
-            await self.queue.put(item)
+            self.queue.put_nowait(item)
         except asyncio.QueueFull:
             _logger.warning("Queue full. Dropping log item.")
 

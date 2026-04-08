@@ -44,7 +44,7 @@ class Chamber(BaseModel, TimestampMixin):
     country_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_countries.code", ondelete="RESTRICT"), default='IN')
 
     # plan_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    plan_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_plan_types.code", ondelete="RESTRICT"), default='FREE')
+    plan_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_plan_types.code", ondelete="RESTRICT"), default='PTFR')
 
     # subscription_start : DATE
     subscription_start: Mapped[Optional[date]] = mapped_column(Date)

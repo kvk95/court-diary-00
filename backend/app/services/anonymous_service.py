@@ -2,10 +2,11 @@ from datetime import datetime
 from typing import Optional
 
 from passlib.utils import generate_password
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.cache.refm_cache import RefmCache, RefmData
+from app.database.models.email_link import EmailLink
+from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.users import Users
 from app.database.repositories.chamber_repository import ChamberRepository
@@ -13,6 +14,7 @@ from app.database.repositories.user_chamber_link_repository import UserChamberLi
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
 from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
+from app.services.EmailLinkService import EmailLinkService
 from app.utils.security import hash_password
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
@@ -28,22 +30,22 @@ class AnonymousService(BaseService):
         session: AsyncSession,
         chamber_repo: Optional[ChamberRepository] = None,
         users_repo: Optional[UsersRepository] = None,
-        user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
-            
+        user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,            
     ):
         super().__init__(session)
         self.chamber_repo:ChamberRepository = chamber_repo or ChamberRepository()
         self.users_repo:UsersRepository = users_repo or UsersRepository()
         self.user_chamber_link_repo:UserChamberLinkRepository = user_chamber_link_repo or UserChamberLinkRepository()
+        
+        self.email_link_service = EmailLinkService( session=self.session )
 
     async def _check_user_chamber_membership(self, email: str) -> dict:
         """
         Check user's chamber membership status.
         """
         # Get user INCLUDING deleted (use raw query, not get_first)
-        stmt = select(Users).where(Users.email == email.lower())
-        result = await self.session.execute(stmt)
-        user = result.scalars().first()
+        user = await self.users_repo.get_first(session=self.session,
+                                                 where = [Users.email == email.lower()])
         
         if not user:
             return {"exists": False}
@@ -102,6 +104,7 @@ class AnonymousService(BaseService):
         await self.users_repo.reactivate_deleted_user(
             session=self.session,
             user_id=user_id,
+            status_ind=True,
         )
 
     async def get_server_datetime(self) -> ServerDateTimeOut:
@@ -186,15 +189,67 @@ class AnonymousService(BaseService):
             },
         )
 
-        #TODO: send email link
-        return "User created Successfully, check email for Activation"
+        link_url = await self.email_link_service.generate_link(
+            user_id=user.user_id,
+            email=user.email,
+            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION
+        )
+
+        return f"User created Successfully, check email for Activation link {link_url}"
  
-    async def users_reset(self, email:str) -> str:
+    async def resendactivationlink(self, payload:UserEmailIn) -> str:
+
+        email:Optional[str] = payload.email
         # ─────────────────────────────────────────────
         # 1. VALIDATION
         # ─────────────────────────────────────────────
         if err := FieldValidator.validate_email(email):
             raise err
+        
+        email = email or "" # just to avoid compilation error
+ 
+        # ─────────────────────────────────────────────
+        # 2. CHECK MEMBERSHIP
+        # ─────────────────────────────────────────────
+        # Note: active_links is intentionally not fetched here — we only need
+        # exists / deleted_ind to decide create-vs-reactivate.
+        membership = await self._check_user_chamber_membership(email)
+
+        if membership["exists"]:
+            user:Users = membership["user"]
+            if membership["deleted_ind"] or not membership["status_ind"]:
+                link_url = await self.email_link_service.generate_link(
+                    user_id=user.user_id,
+                    email=user.email,
+                    template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION
+                )
+            else:
+                raise ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message="Email already activte, if you forgoot your password try forgot password"
+                    )
+           
+        return f"Check email for Activation link {link_url}"
+ 
+    async def users_reset(self, link_id: str) -> str:
+
+        email_link_row:EmailLink = await self.email_link_service.verify_link(encrypted_id=link_id)
+
+        if not email_link_row:
+            raise ValidationErrorDetail(
+                    code=ErrorCodes.NOT_FOUND,
+                    message="Invalid link",
+                )        
+
+        user_row:Users = await self.users_repo.get_first(session=self.session,
+                                                 where = [Users.user_id == email_link_row.user_id])
+        if not user_row:
+            raise ValidationErrorDetail(
+                    code=ErrorCodes.NOT_FOUND,
+                    message="Invalid link",
+                )     
+
+        email:str = user_row.email
  
         # ─────────────────────────────────────────────
         # 2. CHECK MEMBERSHIP
@@ -211,9 +266,8 @@ class AnonymousService(BaseService):
                     code=ErrorCodes.NOT_FOUND,
                     message="Email not Found",
                 )
-
-        #TODO: send email link
-        return "Check email for Activation"
+        
+        return "User Activated successfully relogin"
  
     async def users_password_reset(self, payload:UserEmailIn) -> str:
         # ─────────────────────────────────────────────
@@ -242,17 +296,33 @@ class AnonymousService(BaseService):
                         message="Email not Found",
                     )
 
-        #TODO: send email link
-        return "Check email to reset password"
-    
-    
+        user = membership["user"]
+        link_url = await self.email_link_service.generate_link(
+            user_id=user.user_id,
+            email=user.email,
+            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION
+        )
+        return f"Check email to reset password : {link_url}"
  
-    async def users_new_password(self, email:str, payload: UserPasswordIn) -> str:
-        # ─────────────────────────────────────────────
-        # 1. VALIDATION
-        # ─────────────────────────────────────────────
-        if err := FieldValidator.validate_email(email):
-            raise err
+    async def users_new_password(self, link_id: str,payload: UserPasswordIn) -> str:
+
+        email_link_row:EmailLink = await self.email_link_service.verify_link(encrypted_id=link_id)
+
+        if not email_link_row:
+            raise ValidationErrorDetail(
+                    code=ErrorCodes.NOT_FOUND,
+                    message="Invalid link",
+                )        
+
+        user_row:Users = await self.users_repo.get_first(session=self.session,
+                                                 where = [Users.user_id == email_link_row.user_id])
+        if not user_row:
+            raise ValidationErrorDetail(
+                    code=ErrorCodes.NOT_FOUND,
+                    message="Invalid link",
+                )     
+
+        email:str = user_row.email
  
         # ─────────────────────────────────────────────
         # 2. CHECK MEMBERSHIP

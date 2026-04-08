@@ -13,8 +13,8 @@ from app.database.models.base.timestampmixin import TimestampMixin
 class RefmEmailTemplates(BaseModel, TimestampMixin):
     __tablename__ = 'refm_email_templates'
 
-    # code : CHAR(30) COLLATE "utf8mb4_unicode_ci"
-    code: Mapped[str] = mapped_column(CHAR(30), primary_key=True, nullable=False)
+    # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
 
     # subject : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -41,3 +41,11 @@ class RefmEmailTemplates(BaseModel, TimestampMixin):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
+
+class RefmEmailTemplatesConstants:
+    TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION = 'LTUA'
+    TEMPLATE_FOR_PASSWORD_RESET_REQUESTS = 'LTRP'
+
+class RefmEmailTemplatesEnum(str, PyEnum):
+    TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION = RefmEmailTemplatesConstants.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION
+    TEMPLATE_FOR_PASSWORD_RESET_REQUESTS = RefmEmailTemplatesConstants.TEMPLATE_FOR_PASSWORD_RESET_REQUESTS

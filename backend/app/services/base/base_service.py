@@ -2,12 +2,14 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession    
 
+from app.core.config import Settings
 from app.utils.refm.refm_resolver import RefmResolver
 
 class BaseService:
     def __init__(self, session: AsyncSession):
         self._session: AsyncSession = session
         self.refm_resolver:RefmResolver = RefmResolver(session=self.session)
+        self.settings = Settings()
 
     @property
     def session(self) -> AsyncSession:
@@ -30,3 +32,7 @@ class BaseService:
         if first_initial and last_initial:
             return f"{first_initial}{concat_str}{last_initial}"
         return first_initial or last_initial
+    
+    @property
+    def ui_url(self)->str:
+        return self.settings.UI_URL

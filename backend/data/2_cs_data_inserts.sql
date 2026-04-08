@@ -113,16 +113,8 @@ INSERT IGNORE INTO refm_email_encryption (code, description, sort_order) VALUES
 ('EESS', 'SSL',  30),
 ('EEBT', 'Both', 40);
 
-INSERT IGNORE INTO refm_email_status (code, description, color_code, sort_order) VALUES
-('ESPN', 'Pending',   '#f97316', 10),
-('ESSN', 'Sent',      '#3b82f6', 20),
-('ESDL', 'Delivered', '#22c55e', 30),
-('ESOP', 'Opened',    '#a855f7', 40),
-('ESFL', 'Failed',    '#ef4444', 50),
-('ESBN', 'Bounced',   '#991b1b', 60);
-
 INSERT IGNORE INTO refm_email_templates (code, subject, content, category, description, sort_order, status_ind) VALUES
-('activate_account',
+('LTUA',
  'Activate Your Account',
  '<p class="primarycolor bolder">Greetings!,</p> 
   <p>We’re excited to have you join us!</p> 
@@ -135,7 +127,7 @@ INSERT IGNORE INTO refm_email_templates (code, subject, content, category, descr
  1,
  TRUE),
 
-('reset_password',
+('LTRP',
  'Reset Password',
  '<p class="primarycolor bolder">Hi !,</p>  
   <p>We received a request to reset your password.</p>  

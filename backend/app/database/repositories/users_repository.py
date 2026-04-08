@@ -347,6 +347,7 @@ class UsersRepository(BaseRepository[Users]):
         self,
         session: AsyncSession,
         user_id: str,
+        status_ind:bool = False
     ) -> None:
         await self.bulk_update(
             session=session,
@@ -358,7 +359,7 @@ class UsersRepository(BaseRepository[Users]):
                 "deleted_ind": False,
                 "deleted_date": None,
                 "deleted_by": None,
-                "status_ind": False, # Activate user using email
+                "status_ind": status_ind, # Activate user using email
             },
         )
 

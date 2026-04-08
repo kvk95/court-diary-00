@@ -324,15 +324,15 @@ BEGIN
 END$$
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Email Log
+-- email_link
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TRIGGER trg_email_log_before_insert
-BEFORE INSERT ON email_log
+CREATE TRIGGER trg_email_link_before_insert
+BEFORE INSERT ON email_link
 FOR EACH ROW
 BEGIN
-    IF NEW.email_id IS NULL OR NEW.email_id = '' THEN
-        SET NEW.email_id = generate_uuid_v7();
+    IF NEW.link_id IS NULL OR NEW.link_id = '' THEN
+        SET NEW.link_id = generate_uuid_v7();
     END IF;
 END$$
 

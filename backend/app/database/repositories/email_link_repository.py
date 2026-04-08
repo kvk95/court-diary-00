@@ -5,9 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.repositories.base.repo_context import apply_repo_context
 from app.database.repositories.base.base_repository import BaseRepository
-from app.database.models.email_templates import EmailTemplates
+from app.database.models.email_link import EmailLink
 
 @apply_repo_context
-class EmailTemplatesRepository(BaseRepository[EmailTemplates]):
+class EmailLinkRepository(BaseRepository[EmailLink]):
     def __init__(self):
-        super().__init__(EmailTemplates)
+        super().__init__(EmailLink)

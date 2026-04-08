@@ -127,17 +127,9 @@ CREATE TABLE refm_email_encryption (
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Email encryption methods';
 
-DROP TABLE IF EXISTS refm_email_status;
-CREATE TABLE refm_email_status (
-    code          CHAR(4)     PRIMARY KEY,
-    description   VARCHAR(40) NOT NULL,
-    color_code    CHAR(7)     DEFAULT '#64748b',
-    sort_order    INT         NOT NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Email delivery status codes';
-
 DROP TABLE IF EXISTS refm_email_templates;
 CREATE TABLE refm_email_templates (
-    code          CHAR(30)     PRIMARY KEY,
+    code          CHAR(4)     PRIMARY KEY,
     subject       VARCHAR(255) NOT NULL,
     content       LONGTEXT     NOT NULL,
     category      VARCHAR(50)  NULL,
@@ -1046,36 +1038,6 @@ CREATE TABLE email_settings (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='SMTP settings per chamber';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 9.2  Email Templates (Custom)  →  chamber, refm_email_templates, users
--- ─────────────────────────────────────────────────────────────────────────────
-
-DROP TABLE IF EXISTS email_templates;
-CREATE TABLE email_templates (
-    id            INT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id    CHAR(36)  NOT NULL,  
-    code          CHAR(30)  NOT NULL,
-    subject       VARCHAR(255) NOT NULL,
-    content       LONGTEXT  NOT NULL,
-    customized_ind BOOLEAN   DEFAULT FALSE,
-    enabled_ind   BOOLEAN   DEFAULT TRUE,
-    version       SMALLINT UNSIGNED DEFAULT 1,
-    created_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by    CHAR(36)  NULL,  
-    updated_date  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by    CHAR(36)  NULL,  
-    CONSTRAINT uk_chamber_template_version
-        UNIQUE KEY (chamber_id, code, version),
-    CONSTRAINT fk_email_templates_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)         ON DELETE CASCADE,
-    CONSTRAINT fk_email_templates_code
-        FOREIGN KEY (code)       REFERENCES refm_email_templates(code)  ON DELETE RESTRICT,
-    CONSTRAINT fk_email_templates_created_by
-        FOREIGN KEY (created_by) REFERENCES users(user_id)             ON DELETE SET NULL,
-    CONSTRAINT fk_email_templates_updated_by
-        FOREIGN KEY (updated_by) REFERENCES users(user_id)             ON DELETE SET NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Custom email templates per chamber';
-
--- ─────────────────────────────────────────────────────────────────────────────
 -- 9.3  Delete Account Requests  →  chamber, users, refm_user_deletion_status
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -1187,7 +1149,7 @@ CREATE TABLE user_invitations (
 
 -- =============================================================================
 -- 11. TIER 11  —  Logging & Audit
---     →  chamber, users, refm_login_status, refm_email_templates, refm_email_status
+--     →  chamber, users, audit
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1288,38 +1250,38 @@ CREATE TABLE activity_log (
 ) ENGINE=InnoDB COMMENT='User actions audit';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 11.5  Email Log
+-- 11.5  Email link
 -- ─────────────────────────────────────────────────────────────────────────────
 
-DROP TABLE IF EXISTS email_log;
-CREATE TABLE email_log (
-    email_id        CHAR(36)     PRIMARY KEY,  
-    chamber_id      CHAR(36)     NOT NULL,  
-    user_id         CHAR(36)     NULL,  
-    template_code   CHAR(30)     NULL,
-    recipient_email VARCHAR(255) NOT NULL,
-    recipient_name  VARCHAR(120) NULL,
-    subject         VARCHAR(500) NULL,
-    body_preview    TEXT         NULL,
-    status_code     CHAR(4)      DEFAULT 'ESPN',
-    sent_at         DATETIME(6)  NULL,
-    delivered_at    DATETIME(6)  NULL,
-    opened_at       DATETIME(6)  NULL,
-    error_message   TEXT         NULL,
-    retry_count     TINYINT UNSIGNED DEFAULT 0,
-    next_retry_at   DATETIME     NULL,
-    metadata_json   JSON         NULL,
-    created_date    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by      CHAR(36)     NULL,  
-    CONSTRAINT fk_email_log_chamber
-        FOREIGN KEY (chamber_id)    REFERENCES chamber(chamber_id)           ON DELETE CASCADE,
-    CONSTRAINT fk_email_log_user
-        FOREIGN KEY (user_id)       REFERENCES users(user_id)               ON DELETE SET NULL,
-    CONSTRAINT fk_email_log_template
-        FOREIGN KEY (template_code) REFERENCES refm_email_templates(code)  ON DELETE SET NULL,
-    CONSTRAINT fk_email_log_status
-        FOREIGN KEY (status_code)   REFERENCES refm_email_status(code)     ON DELETE SET NULL
-) ENGINE=InnoDB COMMENT='Email delivery log';
+DROP TABLE IF EXISTS email_link;
+
+CREATE TABLE email_link (
+    link_id          CHAR(36) PRIMARY KEY,
+
+    user_id          CHAR(36) NOT NULL,
+    recipient_email  VARCHAR(120) NOT NULL,
+
+    template_code    CHAR(4) NOT NULL,
+
+    link_url         VARCHAR(1000),
+
+    is_used          BOOLEAN DEFAULT FALSE,
+    expiry_date      TIMESTAMP NULL,
+
+    created_date     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_email_link_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_email_link_template
+        FOREIGN KEY (template_code)
+        REFERENCES refm_email_templates(code)
+        ON DELETE RESTRICT
+
+) ENGINE=InnoDB;
+
 
 -- =============================================================================
 -- 12.  —  Deferred Foreign Keys & Performance Indexes
@@ -1361,8 +1323,6 @@ CREATE INDEX idx_user_roles_link_role ON user_roles(link_id, role_id, end_date);
 -- Activity Log
 CREATE INDEX idx_activity_chamber_time ON activity_log(actor_chamber_id, timestamp DESC);
 
--- Email Log
-CREATE INDEX idx_email_log_status      ON email_log(status_code, created_date);
 
 SELECT '✅ Court Diary schema with UUID v7 created successfully!' AS status_message;
 

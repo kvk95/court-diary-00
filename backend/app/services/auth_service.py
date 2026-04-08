@@ -1,5 +1,7 @@
 # app/services/auth_service.py
 
+import asyncio
+import logging
 from typing import Optional
 
 from fastapi import HTTPException
@@ -9,10 +11,10 @@ from app.auth.jwt import create_access_token, create_refresh_token, decode_token
 from app.database.models.chamber import Chamber
 from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
+from app.utils.logging_framework.audit_queue  import audit_queue
 from app.validators import ErrorCodes, ValidationErrorDetail
 from app.database.models.user_chamber_link import UserChamberLink
 from sqlalchemy import desc, select
-from app.database.repositories.login_audit_repository import LoginAuditRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.user_profiles_repository import UserProfilesRepository
 from app.database.repositories.users_repository import UsersRepository
@@ -22,7 +24,7 @@ from app.database.models.refm_login_status import RefmLoginStatusConstants
 from app.services.users_service import UsersService  # ← Import UsersService
 from .base.base_service import BaseService
 
-
+_logger = logging.getLogger(__name__)
 class AuthService(BaseService):
     """
     Authentication service that orchestrates login, refresh, and user context retrieval.
@@ -32,7 +34,6 @@ class AuthService(BaseService):
         self,
         session: AsyncSession,
         users_repo: UsersRepository | None = None,
-        audit_repo: LoginAuditRepository | None = None,
         user_profiles_repo: UserProfilesRepository | None = None,
         role_permissions_repo: RolePermissionsRepository | None = None,
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,              
@@ -43,7 +44,6 @@ class AuthService(BaseService):
         self.chamber_repo = chamber_repo or ChamberRepository()
         self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
         self.users_repo = users_repo or UsersRepository()
-        self.audit_repo = audit_repo or LoginAuditRepository()
         self.user_profiles_repo = user_profiles_repo or UserProfilesRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.users_service = users_service  # ← Use for get_user_full_details
@@ -96,6 +96,27 @@ class AuthService(BaseService):
             )
 
         return list(chambers)
+    
+    async def log_login(
+            self,
+            *,
+            user_id: Optional[str] = None,
+            loginRequest: LoginRequest,
+            status_code: str,  # 'S' = Success, 'F' = Failed
+            failure_reason: Optional[str] = None,
+            chamber_id: Optional[str] = None):
+        
+        
+        try:
+            audit_queue.put_nowait({
+            "user_id": user_id,
+            "loginRequest": loginRequest,
+            "status_code": status_code,
+            "failure_reason": failure_reason,
+            "chamber_id": chamber_id,
+        })
+        except asyncio.QueueFull:
+            _logger.warning("Queue full. Dropping login audit log item.")
 
     async def login(self, loginRequest: LoginRequest, is_regular: bool = True) -> TokenOut:
         """
@@ -111,8 +132,7 @@ class AuthService(BaseService):
         )
 
         if not user:
-            await self.audit_repo.log_login(
-                self.session,
+            await self.log_login(
                 user_id=None,
                 loginRequest=loginRequest,
                 status_code=RefmLoginStatusConstants.FAILED,
@@ -122,8 +142,7 @@ class AuthService(BaseService):
 
         # 2. Verify password
         if not verify_password(loginRequest.password, user.password_hash):
-            await self.audit_repo.log_login(
-                self.session,
+            await self.log_login(
                 user_id=user.user_id,
                 loginRequest=loginRequest,
                 status_code=RefmLoginStatusConstants.FAILED,
@@ -154,8 +173,7 @@ class AuthService(BaseService):
 
         if not chamber_ids:
             loginRequest.chamber_id=None
-            await self.audit_repo.log_login(
-                self.session,
+            await self.log_login(
                 user_id=user.user_id,
                 loginRequest=loginRequest,
                 status_code=RefmLoginStatusConstants.FAILED,
@@ -201,8 +219,7 @@ class AuthService(BaseService):
         except ValidationErrorDetail as ve:
             failure_reason = f"User not available in given chamber: {chamber_id}" if loginRequest.chamber_id else ve.message
             loginRequest.chamber_id=None
-            await self.audit_repo.log_login(
-                self.session,
+            await self.log_login(
                 user_id=user.user_id,
                 loginRequest=loginRequest,
                 status_code=RefmLoginStatusConstants.FAILED,
@@ -211,8 +228,7 @@ class AuthService(BaseService):
             raise ve
 
         # 4. Success audit
-        await self.audit_repo.log_login(
-            self.session,
+        await self.log_login(
             user_id=user.user_id,
             loginRequest=loginRequest,
             status_code=RefmLoginStatusConstants.SUCCESS,

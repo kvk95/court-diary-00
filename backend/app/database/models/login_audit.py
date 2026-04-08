@@ -31,10 +31,10 @@ class LoginAudit(BaseModel):
     user_agent: Mapped[Optional[str]] = mapped_column(Text)
 
     # actor_user_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
-    actor_user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
+    actor_user_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="CASCADE"))
 
     # actor_chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
-    actor_chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
+    actor_chamber_id: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"))
 
     # ip_address : VARCHAR(45) COLLATE "utf8mb4_unicode_ci"
     ip_address: Mapped[Optional[str]] = mapped_column(String(45))

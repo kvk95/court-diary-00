@@ -22,7 +22,6 @@ interface ConstantData {
   REFM_COUNTRIES: { code: string; description: string; phone_code: string; status_ind: boolean }[];
   REFM_COURTS: { court_id: string; court_name: string; state_code: string; court_type: string; address: string; status_ind: boolean }[];
   REFM_EMAIL_ENCRYPTION: { code: string; description: string; status_ind: boolean }[];
-  REFM_EMAIL_STATUS: { code: string; description: string; color_code: string }[];
   REFM_EMAIL_TEMPLATES: { code: string; subject: string; content: string; category: string; description: string; status_ind: boolean }[];
   REFM_HEARING_PURPOSE: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_HEARING_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
@@ -50,7 +49,6 @@ const initialConstants: ConstantData = {
   REFM_COUNTRIES: [],
   REFM_COURTS: [],
   REFM_EMAIL_ENCRYPTION: [],
-  REFM_EMAIL_STATUS: [],
   REFM_EMAIL_TEMPLATES: [],
   REFM_HEARING_PURPOSE: [],
   REFM_HEARING_STATUS: [],

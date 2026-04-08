@@ -54,18 +54,30 @@ class AnonymousController(BaseController):
     ) -> BaseOutDto[str]:
         result: str = await service.users_add(payload)
         return self.success(result=result) 
-
     @BaseController.put(
-        "/reactivateuser",
+        "/resendactivationlink",
         summary="Reactivate the inactive or deleted user",
         response_model=BaseOutDto[str],
     )
-    async def users_reset(
+    async def resend_activation_linkn(
         self,
-        email: str = Query(None, description="User Email"),
+        payload: UserEmailIn = Body(..., description="User Email"),
         service: AnonymousService = Depends(get_anonymous_service),
     ) -> BaseOutDto[str]:
-        result: str = await service.users_reset(email)
+        result: str = await service.resendactivationlink(payload=payload)
+        return self.success(result=result)
+
+    @BaseController.put(
+        "/activateuser",
+        summary="Activate the inactive or deleted user",
+        response_model=BaseOutDto[str],
+    )    
+    async def users_reset(
+        self,
+        link_id: str = Query(None, description="Link id"),
+        service: AnonymousService = Depends(get_anonymous_service),
+    ) -> BaseOutDto[str]:
+        result: str = await service.users_reset(link_id)
         return self.success(result=result)
 
     @BaseController.put(
@@ -88,9 +100,9 @@ class AnonymousController(BaseController):
     )
     async def users_new_password(
         self,
-        email: str = Query(None, description="User Email"),
+        link_id: str = Query(None, description="Link id"),
         payload: UserPasswordIn = Body(..., description="New user data"),
         service: AnonymousService = Depends(get_anonymous_service),
     ) -> BaseOutDto[str]:
-        result: str = await service.users_new_password(email=email, payload=payload)
+        result: str = await service.users_new_password(link_id=link_id, payload=payload)
         return self.success(result=result)

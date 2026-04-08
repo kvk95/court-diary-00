@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # Security / Secrets
     # -------------------------------------------------------------------------
     SECRET_KEY: Optional[str] = None
+    CIPHER_SECRET_KEY: Optional[str] = None
     JWT_SECRET_KEY: Optional[str] = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -57,7 +58,7 @@ class Settings(BaseSettings):
     DB_PORT: Optional[int] = None
     DB_DRIVER: Optional[str] = None  # e.g., postgresql+asyncpg
 
-    UI_URL:Optional[str] = None 
+    UI_URL:str = "http://localhost:8080/"
 
     # -------------------------------------------------------------------------
     # CORS
