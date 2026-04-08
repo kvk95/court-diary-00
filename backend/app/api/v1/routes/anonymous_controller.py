@@ -82,7 +82,7 @@ class AnonymousController(BaseController):
 
     @BaseController.put(
         "/resetpassword",
-        summary="create user",
+        summary="Forgot password",
         response_model=BaseOutDto[str],
     )
     async def users_password_reset(

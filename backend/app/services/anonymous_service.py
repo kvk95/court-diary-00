@@ -160,7 +160,7 @@ class AnonymousService(BaseService):
                 "password_hash": hash_password(password),
                 "status_ind": False,
             },
-        )        
+        )
  
         # ─────────────────────────────────────────────
         # 4. Create chamber for User
@@ -267,6 +267,7 @@ class AnonymousService(BaseService):
                     message="Email not Found",
                 )
         
+        await self.email_link_service.consume_link(encrypted_id=link_id)
         return "User Activated successfully relogin"
  
     async def users_password_reset(self, payload:UserEmailIn) -> str:
@@ -361,7 +362,7 @@ class AnonymousService(BaseService):
                 id_values=user.user_id,
                 data=update_data,
             )
-
-        #TODO: send email link
+        
+        await self.email_link_service.consume_link(encrypted_id=link_id)
         return "Password Changed Sussessfully, relogin"
 

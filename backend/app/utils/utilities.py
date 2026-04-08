@@ -52,12 +52,3 @@ def parse_lid(token: str) -> str:
         raise ValueError("Invalid signature")
 
     return link_id.decode()
-
-# 🔹 Usage Example
-original_id = "user_12345_profile"
-encrypted = generate_lid(original_id)
-decrypted = parse_lid(encrypted)
-
-print(f"Original:  {original_id}")
-print(f"Encrypted: {encrypted}")
-print(f"Decrypted: {decrypted}")

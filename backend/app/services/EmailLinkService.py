@@ -113,7 +113,6 @@ class EmailLinkService(BaseService):
         self,
         *,
         encrypted_id: str,
-        template_code: RefmEmailTemplatesEnum,
     ) -> EmailLink:
 
         link = await self.verify_link(
