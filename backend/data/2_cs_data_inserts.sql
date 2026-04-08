@@ -890,18 +890,6 @@ INSERT INTO activity_log (actor_chamber_id, actor_user_id, action, target, ip_ad
 
 
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 25.3  Login Audit
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO login_audit (actor_user_id, actor_chamber_id, email, ip_address, user_agent, status_code, login_time) VALUES
-(@user_vijay,   @chamber_vk, 'admin@vkchamber.in',   '117.192.45.12', 'Chrome / Windows', 'LSSU', '2026-03-24 09:00:00'),
-(@user_priya,   @chamber_vk, 'priya@vkchamber.in',   '117.192.45.13', 'Chrome / Mac',     'LSSU', '2026-03-24 09:30:00'),
-(@user_karthik, @chamber_vk, 'karthik@vkchamber.in', '49.204.123.88', 'Firefox / Linux',  'LSSU', '2026-03-24 10:00:00'),
-(@user_lokesh,  @chamber_sundar, 'lokesh@sundarlaw.in', '182.76.123.45', 'Chrome / Android', 'LSSU', '2026-03-24 08:45:00'),
-(@user_vijay,   @chamber_vk, 'admin@vkchamber.in',   '117.192.45.12', 'Chrome / Windows', 'LSFA', '2026-03-23 18:30:00');
-
-
 -- =============================================================================
 -- 26. VERIFICATION QUERIES (Dashboard Data Check) — FIXED
 -- =============================================================================

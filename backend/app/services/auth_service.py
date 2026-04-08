@@ -153,6 +153,14 @@ class AuthService(BaseService):
         chamber_ids = list(chamber_link_data.keys())
 
         if not chamber_ids:
+            loginRequest.chamber_id=None
+            await self.audit_repo.log_login(
+                self.session,
+                user_id=user.user_id,
+                loginRequest=loginRequest,
+                status_code=RefmLoginStatusConstants.FAILED,
+                failure_reason="User has no active chamber membership",
+            )
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
                 message="User has no active chamber membership"
@@ -163,16 +171,6 @@ class AuthService(BaseService):
 
         # optional: keep primary first
         chamber_id = loginRequest.chamber_id or chamber_ids[0]
-
-        # 4. Success audit
-        await self.audit_repo.log_login(
-            self.session,
-            user_id=user.user_id,
-            loginRequest=loginRequest,
-            status_code=RefmLoginStatusConstants.SUCCESS,
-            failure_reason=None,
-            chamber_id=chamber_id,
-        )
 
         is_temp = (
             is_regular
@@ -197,8 +195,31 @@ class AuthService(BaseService):
         users_service = UsersService(
             session=self.session
         )
-        user_details = await users_service.get_user_full_details(user_id=user.user_id,
+        try:
+            user_details = await users_service.get_user_full_details(user_id=user.user_id,
                                                                  chamber_id=chamber_id)
+        except ValidationErrorDetail as ve:
+            failure_reason = f"User not available in given chamber: {chamber_id}" if loginRequest.chamber_id else ve.message
+            loginRequest.chamber_id=None
+            await self.audit_repo.log_login(
+                self.session,
+                user_id=user.user_id,
+                loginRequest=loginRequest,
+                status_code=RefmLoginStatusConstants.FAILED,
+                failure_reason=failure_reason,
+            )
+            raise ve
+
+        # 4. Success audit
+        await self.audit_repo.log_login(
+            self.session,
+            user_id=user.user_id,
+            loginRequest=loginRequest,
+            status_code=RefmLoginStatusConstants.SUCCESS,
+            failure_reason=None,
+            chamber_id=chamber_id,
+        )
+        
         chamber_details = []
         
 

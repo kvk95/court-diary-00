@@ -1203,11 +1203,11 @@ CREATE TABLE login_audit (
     login_time     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     user_agent     TEXT         NULL,
     actor_user_id        CHAR(36)     NULL,  
-    actor_chamber_id     CHAR(36)     NOT NULL,
+    actor_chamber_id     CHAR(36)     NULL,
     ip_address     VARCHAR(45)  NULL, 
     created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_login_user
-        FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)             ON DELETE SET NULL,
+        FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)             ON DELETE CASCADE,
     CONSTRAINT fk_login_chamber
         FOREIGN KEY (actor_chamber_id) REFERENCES chamber(chamber_id)        ON DELETE CASCADE,
     CONSTRAINT fk_login_status

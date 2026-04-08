@@ -54,7 +54,7 @@ class LoginAuditRepository(BaseRepository[LoginAudit]):
         # Prepare audit data
         audit_data = {
             "actor_user_id": user_id,
-            "actor_chamber_id": chamber_id,  # ✅ Required per schema
+            "actor_chamber_id": chamber_id,
             "email": loginRequest.email,
             "status_code": status_code,
             "failure_reason": failure_reason,
