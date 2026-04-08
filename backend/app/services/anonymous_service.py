@@ -231,7 +231,7 @@ class AnonymousService(BaseService):
            
         return f"Check email for Activation link {link_url}"
  
-    async def users_reset(self, link_id: str) -> str:
+    async def users_reset(self, link_id: str) -> dict[str, str]:
 
         email_link_row:EmailLink = await self.email_link_service.verify_link(encrypted_id=link_id)
 
@@ -268,7 +268,11 @@ class AnonymousService(BaseService):
                 )
         
         await self.email_link_service.consume_link(encrypted_id=link_id)
-        return "User Activated successfully relogin"
+        ret_value = {
+            "email": email,
+            "msg":"Password Changed Sussessfully, relogin"
+        }
+        return ret_value
  
     async def users_password_reset(self, payload:UserEmailIn) -> str:
         # ─────────────────────────────────────────────
@@ -305,7 +309,7 @@ class AnonymousService(BaseService):
         )
         return f"Check email to reset password : {link_url}"
  
-    async def users_new_password(self, link_id: str,payload: UserPasswordIn) -> str:
+    async def users_new_password(self, link_id: str,payload: UserPasswordIn) -> dict[str, str]:
 
         email_link_row:EmailLink = await self.email_link_service.verify_link(encrypted_id=link_id)
 
@@ -364,5 +368,9 @@ class AnonymousService(BaseService):
             )
         
         await self.email_link_service.consume_link(encrypted_id=link_id)
-        return "Password Changed Sussessfully, relogin"
+        ret_value = {
+            "email": email,
+            "msg":"Password Changed Sussessfully, relogin"
+        }
+        return ret_value
 

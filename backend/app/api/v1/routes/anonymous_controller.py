@@ -76,8 +76,8 @@ class AnonymousController(BaseController):
         self,
         link_id: str = Query(None, description="Link id"),
         service: AnonymousService = Depends(get_anonymous_service),
-    ) -> BaseOutDto[str]:
-        result: str = await service.users_reset(link_id)
+    ) -> BaseOutDto[dict[str, str]]:
+        result: dict[str, str] = await service.users_reset(link_id)
         return self.success(result=result)
 
     @BaseController.put(
@@ -103,6 +103,6 @@ class AnonymousController(BaseController):
         link_id: str = Query(None, description="Link id"),
         payload: UserPasswordIn = Body(..., description="New user data"),
         service: AnonymousService = Depends(get_anonymous_service),
-    ) -> BaseOutDto[str]:
-        result: str = await service.users_new_password(link_id=link_id, payload=payload)
+    ) -> BaseOutDto[dict[str, str]]:
+        result: dict[str, str] = await service.users_new_password(link_id=link_id, payload=payload)
         return self.success(result=result)
