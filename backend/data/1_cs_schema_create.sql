@@ -518,7 +518,32 @@ CREATE TABLE user_roles (
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 7.1  Role Permissions  →  security_roles, chamber_modules, users
+-- 7.1  Role Permissions  →  security_roles, chamber_modules,role_permission_master, users
+-- ─────────────────────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS role_permission_master;
+CREATE TABLE role_permission_master (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    role_name VARCHAR(80) NOT NULL,
+    module_code CHAR(8) NOT NULL,
+
+    allow_all_ind BOOLEAN DEFAULT FALSE,
+    read_ind BOOLEAN DEFAULT TRUE,
+    write_ind BOOLEAN DEFAULT FALSE,
+    create_ind BOOLEAN DEFAULT FALSE,
+    delete_ind BOOLEAN DEFAULT FALSE,
+    import_ind BOOLEAN DEFAULT FALSE,
+    export_ind BOOLEAN DEFAULT FALSE,
+
+    CONSTRAINT fk_rpt_module
+        FOREIGN KEY (module_code)
+        REFERENCES refm_modules(code),
+
+    UNIQUE KEY (role_name, module_code)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.2  Role Permissions  →  security_roles, chamber_modules, users
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS role_permissions;

@@ -56,3 +56,52 @@ WHERE ROUTINE_SCHEMA = 'courtdiary'
 
 -- Test the function
 SELECT generate_uuid_v7() AS test_uuid;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- apply_role_permissions
+-- ─────────────────────────────────────────────────────────────────────────────
+
+DROP PROCEDURE IF EXISTS apply_role_permissions;
+
+DELIMITER $$
+
+CREATE PROCEDURE apply_role_permissions (
+    IN p_chamber_id CHAR(36),
+    IN p_user_id CHAR(36)
+)
+BEGIN
+
+    INSERT INTO role_permissions (
+        role_id,
+        chamber_module_id,
+        allow_all_ind,
+        read_ind,
+        write_ind,
+        create_ind,
+        delete_ind,
+        import_ind,
+        export_ind,
+        created_by
+    )
+    SELECT
+        cr.role_id,
+        cm.chamber_module_id,
+        rpm.allow_all_ind,
+        rpm.read_ind,
+        rpm.write_ind,
+        rpm.create_ind,
+        rpm.delete_ind,
+        rpm.import_ind,
+        rpm.export_ind,
+        p_user_id
+    FROM role_permission_master rpm
+    JOIN chamber_roles cr
+        ON cr.role_name = rpm.role_name
+       AND cr.chamber_id = p_chamber_id
+    JOIN chamber_modules cm
+        ON cm.module_code = rpm.module_code
+       AND cm.chamber_id = p_chamber_id;
+
+END$$
+
+DELIMITER ;

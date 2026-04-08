@@ -14,6 +14,7 @@ from app.database.models.users import Users
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
 from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
+from app.database.repositories.role_permission_master_repository import RolePermissionMasterRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
@@ -42,6 +43,7 @@ class AnonymousService(BaseService):
         security_role_repo: Optional[SecurityRolesRepository] = None,
         chamber_role_repo: Optional[ChamberRolesRepository] = None,
         user_role_repo: Optional[UserRolesRepository] = None,
+        role_permission_master_repo: Optional[RolePermissionMasterRepository] = None,
         role_permission_repo: Optional[RolePermissionsRepository] = None,
         email_link_service: Optional[EmailLinkService] = None,
     ):
@@ -53,6 +55,7 @@ class AnonymousService(BaseService):
         self.security_role_repo: SecurityRolesRepository = security_role_repo or SecurityRolesRepository()
         self.chamber_role_repo: ChamberRolesRepository = chamber_role_repo or ChamberRolesRepository()
         self.user_role_repo: UserRolesRepository = user_role_repo or UserRolesRepository()
+        self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
         self.email_link_service = email_link_service or EmailLinkService(session=self.session)
 
@@ -213,24 +216,52 @@ class AnonymousService(BaseService):
             },
         )
 
-        # ── 6. ROLE PERMISSIONS  (bulk) ───────────────────────────────────────
-        # Fix #3: collect all permission rows first, then single bulk_create
+        # ── 6. ROLE PERMISSIONS  (bulk, DB-driven) ─────────────────────────────
+
+        # 1. Load templates
+        templates = await self.role_permission_master_repo.list_all(
+            session=self.session
+        )
+
+        # 2. Build map: role_name → module_code → permissions
+        template_map: dict[str, dict[str, dict[str, Any]]] = {}
+
+        for t in templates:
+            template_map.setdefault(t.role_name, {})[t.module_code] = {
+                "allow_all_ind": t.allow_all_ind,
+                "read_ind": t.read_ind,
+                "write_ind": t.write_ind,
+                "create_ind": t.create_ind,
+                "delete_ind": t.delete_ind,
+                "import_ind": t.import_ind,
+                "export_ind": t.export_ind,
+            }
+
+        # 3. Build permission rows
         permission_rows: list[dict[str, Any]] = []
 
         for role_name, chamber_role in chamber_roles_map.items():
 
-            # Fix #5: cleaner .get() + truthiness check
-            role_matrix = self._ROLE_PERMISSION_MATRIX.get(role_name)
+            role_templates = template_map.get(role_name)
 
             for module_code, chamber_module in chamber_modules_map.items():
 
-                # Fix #6: cleaner permission resolution
-                if not role_matrix:
-                    perm = self._DEFAULT_PERMISSION
-                elif "__all__" in role_matrix:
-                    perm = role_matrix["__all__"]
+                if role_templates:
+                    perm = role_templates.get(module_code)
                 else:
-                    perm = role_matrix.get(module_code, self._DEFAULT_PERMISSION)
+                    perm = None
+
+                # fallback (same as your _DEFAULT_PERMISSION)
+                if not perm:
+                    perm = {
+                        "allow_all_ind": False,
+                        "read_ind": True,
+                        "write_ind": False,
+                        "create_ind": False,
+                        "delete_ind": False,
+                        "import_ind": False,
+                        "export_ind": False,
+                    }
 
                 permission_rows.append({
                     "role_id": chamber_role.role_id,
@@ -239,10 +270,10 @@ class AnonymousService(BaseService):
                     **perm,
                 })
 
-        # Single flush for all Roles × Modules rows
+        # 4. Bulk insert
         await self.role_permission_repo.bulk_create(
             session=self.session,
-            data_list=permission_rows,
+            data_list=permission_rows
         )    
 
     async def _check_user_chamber_membership(self, email: str) -> dict:

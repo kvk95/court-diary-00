@@ -384,71 +384,34 @@ INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 -- 19.4  Role Permissions (per chamber role)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-SET @cm_admn  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'ADMN');
-SET @cm_dash  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'DASH');
-SET @cm_case  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'CASE');
-SET @cm_hear  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'HEAR');
-SET @cm_cald  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'CALD');
-SET @cm_clnt  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'CLNT');
-SET @cm_bill  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'BILL');
-SET @cm_user  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'USER');
-SET @cm_rprt  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'RPRT');
-SET @cm_sett  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'SETT');
-SET @cm_coll  = (SELECT chamber_module_id FROM chamber_modules WHERE chamber_id = @chamber_vk AND module_code = 'COLL');
+INSERT INTO role_permission_master
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+SELECT 
+    'Administrator',
+    code,
+    TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
+FROM refm_modules;
 
--- Administrator - Full Access
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_admin_vk, @cm_admn, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_dash, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_case, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_hear, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_cald, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_clnt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_user, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_admin_vk, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
+CALL apply_role_permissions(@chamber_vk, @user_vijay);
+CALL apply_role_permissions(@chamber_sundar, @user_lokesh);
 
--- Senior Advocate - Manage Cases/Hearings
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_senior_vk, @cm_admn, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_dash, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_case, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),
-(@role_senior_vk, @cm_hear, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_vijay),
-(@role_senior_vk, @cm_cald, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_clnt, FALSE, TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_bill, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_user, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_rprt, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_vijay),
-(@role_senior_vk, @cm_sett, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_senior_vk, @cm_coll, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay);
-
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_admin_sundar, @cm_admn, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_dash, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_case, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_hear, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_cald, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_clnt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_user, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh),
-(@role_admin_sundar, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_lokesh);
-
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_senior_sundar, @cm_admn, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_dash, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_case, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_lokesh),
-(@role_senior_sundar, @cm_hear, FALSE, TRUE,  TRUE,  TRUE,  FALSE, TRUE,  TRUE,  @user_lokesh),
-(@role_senior_sundar, @cm_cald, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_clnt, FALSE, TRUE,  TRUE,  TRUE,  FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_bill, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_user, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_rprt, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, TRUE,  @user_lokesh),
-(@role_senior_sundar, @cm_sett, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh),
-(@role_senior_sundar, @cm_coll, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_lokesh);
+SELECT 
+    MAX(CASE WHEN module_code = 'ADMN' THEN chamber_module_id END) AS cm_admn,
+    MAX(CASE WHEN module_code = 'DASH' THEN chamber_module_id END) AS cm_dash,
+    MAX(CASE WHEN module_code = 'CASE' THEN chamber_module_id END) AS cm_case,
+    MAX(CASE WHEN module_code = 'HEAR' THEN chamber_module_id END) AS cm_hear,
+    MAX(CASE WHEN module_code = 'CALD' THEN chamber_module_id END) AS cm_cald,
+    MAX(CASE WHEN module_code = 'CLNT' THEN chamber_module_id END) AS cm_clnt,
+    MAX(CASE WHEN module_code = 'BILL' THEN chamber_module_id END) AS cm_bill,
+    MAX(CASE WHEN module_code = 'USER' THEN chamber_module_id END) AS cm_user,
+    MAX(CASE WHEN module_code = 'RPRT' THEN chamber_module_id END) AS cm_rprt,
+    MAX(CASE WHEN module_code = 'SETT' THEN chamber_module_id END) AS cm_sett,
+    MAX(CASE WHEN module_code = 'COLL' THEN chamber_module_id END) AS cm_coll
+INTO 
+    @cm_admn, @cm_dash, @cm_case, @cm_hear, @cm_cald, 
+    @cm_clnt, @cm_bill, @cm_user, @cm_rprt, @cm_sett, @cm_coll
+FROM chamber_modules
+WHERE chamber_id = @chamber_vk;
 
 -- Clerk - Limited Access
 INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
