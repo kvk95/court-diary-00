@@ -21,7 +21,7 @@ from app.database.repositories.users_repository import UsersRepository
 from app.dtos.oauth_dtos import ChamberDetails, LoginRequest, RefreshRequest, TokenOut
 from app.utils.security import verify_password
 from app.database.models.refm_login_status import RefmLoginStatusConstants
-from app.services.users_service import UsersService  # ← Import UsersService
+from app.services.users_service import UsersService
 from .base.base_service import BaseService
 
 _logger = logging.getLogger(__name__)
@@ -47,8 +47,6 @@ class AuthService(BaseService):
         self.user_profiles_repo = user_profiles_repo or UserProfilesRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.users_service = users_service  # ← Use for get_user_full_details
-
-    
     
     def _to_out(self, chamber: Chamber, chamber_link_data) -> ChamberDetails:
         return ChamberDetails(
@@ -118,7 +116,7 @@ class AuthService(BaseService):
         except asyncio.QueueFull:
             _logger.warning("Queue full. Dropping login audit log item.")
 
-    async def login(self, loginRequest: LoginRequest, is_regular: bool = True) -> TokenOut:
+    async def login(self, loginRequest: LoginRequest, is_regular: bool = True, is_oAuth=False) -> TokenOut:
         """
         Authenticate user and return access/refresh tokens with user context.
         """
@@ -140,15 +138,24 @@ class AuthService(BaseService):
             )
             raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="User not found")
 
-        # 2. Verify password
-        if not verify_password(loginRequest.password, user.password_hash):
-            await self.log_login(
-                user_id=user.user_id,
-                loginRequest=loginRequest,
-                status_code=RefmLoginStatusConstants.FAILED,
-                failure_reason="Invalid password",
-            )
-            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Invalid credentials")
+        if not is_oAuth:
+            if  user.google_auth_ind:
+                await self.log_login(
+                    user_id=user.user_id,
+                    loginRequest=loginRequest,
+                    status_code=RefmLoginStatusConstants.FAILED,
+                    failure_reason="oAuth User, trying regular login",
+                )
+                raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Try Login via Google")
+            # 2. Verify password
+            if not verify_password(loginRequest.password, user.password_hash):
+                await self.log_login(
+                    user_id=user.user_id,
+                    loginRequest=loginRequest,
+                    status_code=RefmLoginStatusConstants.FAILED,
+                    failure_reason="Invalid password",
+                )
+                raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Invalid credentials")
 
         # 3. Resolve user's PRIMARY chamber
         stmt = select(UserChamberLink).where(

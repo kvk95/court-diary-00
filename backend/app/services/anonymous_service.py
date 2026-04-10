@@ -8,7 +8,6 @@ from app.database.cache.refm_cache import RefmCache, RefmData
 from app.database.models.chamber_modules import ChamberModules
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
-from app.database.models.refm_modules import RefmModulesConstants
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.users import Users
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
@@ -21,7 +20,7 @@ from app.database.repositories.user_chamber_link_repository import UserChamberLi
 from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
-from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
+from app.dtos.users_dto import UserCreateBasic, UserCreateoAuth, UserEmailIn, UserPasswordIn
 from app.services.EmailLinkService import EmailLinkService
 from app.utils.security import hash_password
 from app.validators import aggregate_errors
@@ -62,77 +61,6 @@ class AnonymousService(BaseService):
     # ─────────────────────────────────────────────────────────────────────────
     # PERMISSION MATRIX  ·  data-driven, no hard-coded role names in loops
     # ─────────────────────────────────────────────────────────────────────────
-
-    _ROLE_PERMISSION_MATRIX: dict[str, dict[str, dict[str, bool]]] = {
-        "Administrator": {
-            # sentinel → full access on every module
-            "__all__": dict(
-                allow_all_ind=True,
-                read_ind=True,
-                write_ind=True,
-                create_ind=True,
-                delete_ind=True,
-                import_ind=True,
-                export_ind=True,
-            )
-        },
-        "Senior Advocate": {
-            RefmModulesConstants.ADMIN: dict(
-                allow_all_ind=False, read_ind=False, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.DASHBOARD: dict(
-                allow_all_ind=False, read_ind=True, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.CASES: dict(
-                allow_all_ind=False, read_ind=True, write_ind=True,
-                create_ind=True, delete_ind=False, import_ind=True, export_ind=True,
-            ),
-            RefmModulesConstants.HEARINGS: dict(
-                allow_all_ind=False, read_ind=True, write_ind=True,
-                create_ind=True, delete_ind=False, import_ind=True, export_ind=True,
-            ),
-            RefmModulesConstants.CALENDAR: dict(
-                allow_all_ind=False, read_ind=True, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.CLIENTS: dict(
-                allow_all_ind=False, read_ind=True, write_ind=True,
-                create_ind=True, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.BILLING: dict(
-                allow_all_ind=False, read_ind=True, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.USER_MANAGEMENT: dict(
-                allow_all_ind=False, read_ind=False, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.REPORTS: dict(
-                allow_all_ind=False, read_ind=True, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=True,
-            ),
-            RefmModulesConstants.SETTINGS: dict(
-                allow_all_ind=False, read_ind=True, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-            RefmModulesConstants.COLLABORATIONS: dict(
-                allow_all_ind=False, read_ind=False, write_ind=False,
-                create_ind=False, delete_ind=False, import_ind=False, export_ind=False,
-            ),
-        },
-    }
-
-    _DEFAULT_PERMISSION: dict[str, bool] = dict(
-        allow_all_ind=False,
-        read_ind=True,
-        write_ind=False,
-        create_ind=False,
-        delete_ind=False,
-        import_ind=False,
-        export_ind=False,
-    )
 
     # ─────────────────────────────────────────────────────────────────────────
     # SETUP CHAMBER SECURITY  (steps 3 → 6)
@@ -356,10 +284,90 @@ class AnonymousService(BaseService):
         return await RefmCache.get(session=self.session)
  
     # ─────────────────────────────────────────────────────────────────────────
+    # USERS EXISTS CHECK IF OAUTH LOGIN
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def is_oauth_user_exists(self, payload: UserCreateoAuth) -> tuple[bool, str|None]:
+        email: str = payload.email or ""
+        password: str = generate_password()
+        payload.password = password
+
+        # ── 1. VALIDATION ─────────────────────────────────────────────────────
+        if err := FieldValidator.validate_email(payload.email):
+                raise (err)
+
+        # ── 2. CHECK MEMBERSHIP ───────────────────────────────────────────────
+        membership = await self._check_user_chamber_membership(email)
+
+        if membership["exists"]:
+            user: Users = membership["user"]     
+            if membership["deleted_ind"] or not membership["status_ind"]: 
+
+                # Reactivate User
+                update_data: dict = {
+                        "status_ind": True,
+                    }        
+                
+                if(user.deleted_ind or user.deleted_by or user.deleted_by):                    
+                        update_data["deleted_ind"]= False
+                        update_data["deleted_date"]= None,
+                        update_data["deleted_by"] = None,
+                
+                if not user.google_auth_ind:
+                    update_data["google_auth_ind"]= True
+
+                if payload.image_data:
+                    update_data["image_data"] = payload.image_data
+        
+                if update_data:
+                    await self.users_repo.update(
+                        session=self.session,
+                        id_values=user.user_id,
+                        data=update_data,
+                    )
+
+            return True, user.email
+        
+        return False, None
+        
+ 
+    # ─────────────────────────────────────────────────────────────────────────
     # USERS ADD
     # ─────────────────────────────────────────────────────────────────────────
 
+    
+
+    async def oauth_users_add(self, payload: UserCreateoAuth) -> str:
+        user = await self.__create_user(payload)
+        update_data: dict = {
+                        "status_ind": True,
+                    }
+        update_data["google_auth_ind"]= True
+
+        if payload.image_data:
+            update_data["image_data"] = payload.image_data
+
+        if update_data:
+            await self.users_repo.update(
+                session=self.session,
+                id_values=user.user_id,
+                data=update_data,
+            )
+        return user.email
+
     async def users_add(self, payload: UserCreateBasic) -> str:
+        user = await self.__create_user(payload)
+
+        # ── 10. ACTIVATION EMAIL ──────────────────────────────────────────────
+        link_url = await self.email_link_service.generate_link(
+            user_id=user.user_id,
+            email=user.email,
+            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION,
+        )
+
+        return f"User created successfully. Check email for activation link: {link_url}"
+
+    async def __create_user(self, payload):
         email: str = payload.email or ""
         first_name: str = payload.first_name or ""
         last_name: str | None = (payload.last_name or "").strip() or None
@@ -423,15 +431,8 @@ class AnonymousService(BaseService):
             user_id=user.user_id,
             user_chamber_link_id=link.link_id,
         )
-
-        # ── 10. ACTIVATION EMAIL ──────────────────────────────────────────────
-        link_url = await self.email_link_service.generate_link(
-            user_id=user.user_id,
-            email=user.email,
-            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION,
-        )
-
-        return f"User created successfully. Check email for activation link: {link_url}"
+        
+        return user
  
     async def resendactivationlink(self, payload:UserEmailIn) -> str:
 

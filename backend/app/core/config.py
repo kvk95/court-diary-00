@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     SMTP_SERVER_PASSWORD: Optional[str] = None
     SMTP_USE_TLS: Optional[bool] = False
 
+    # OAUTH
+    GOOGLE_OAUTH_CLOCK_SKEW_IN_SECONDS:int = 0
+
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod
     def split_origins(cls, v):

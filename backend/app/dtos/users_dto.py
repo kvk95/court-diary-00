@@ -74,10 +74,12 @@ class UserCreateBasic(UserEmailIn,UserPasswordIn):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
-class UserCreate(UserCreateBasic):
-    email: Optional[str] = None
+class UserCreateoAuth(UserCreateBasic):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    image_data: Optional[str]
+
+class UserCreate(UserCreateBasic):
     phone: Optional[str] = None
     status_ind: bool = True
     advocate_ind: bool
