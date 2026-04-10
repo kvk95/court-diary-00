@@ -150,6 +150,7 @@ class OAuthController(BaseController):
         )
         token_out: TokenOut = await service.login(login_request, is_oAuth=True)
         self.set_token_expiry(token_out)
+        print(f"************** token out ***********\n{token_out.model_dump_json(indent=4)}")
         return self.success(result=token_out)
 
     def __google_user_info(self,code):

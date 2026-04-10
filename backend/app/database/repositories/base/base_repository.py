@@ -193,20 +193,36 @@ class BaseRepository(Generic[ModelType]):
         # print(sql_str)
         # print("└" + "─" * 75 + "┘\n")
 
-    async def execute(self, stmt, session: AsyncSession):
+    async def execute(
+            self, 
+            stmt, 
+            session: AsyncSession,
+            include_chamber_id: bool = True,
+            ):
         """
         Centralized execute with logging.
         """
         # stmt = self._apply_chamber_id_filter(stmt)
-        stmt = self._apply_restrictions(stmt=stmt)
+        stmt = self._apply_restrictions(
+                stmt=stmt,
+                include_chamber_id=include_chamber_id,
+            )
         self._log_stmt(stmt, session)
         return await session.execute(stmt)
 
-    async def execute_scalar(self, stmt, session: AsyncSession, default:int = 0) -> int:
-        """
-        Centralized execute with logging.
-        """
-        result = await self.execute(session=session, stmt=stmt)
+    async def execute_scalar(
+        self, 
+        stmt: Select, 
+        session: AsyncSession, 
+        default: int = 0,
+        include_chamber_id: bool = True
+    ) -> int:
+        """Centralized execute with logging and optional chamber filtering."""
+        result = await self.execute(
+            session=session, 
+            stmt=stmt, 
+            include_chamber_id=include_chamber_id
+        )
         return result.scalar() or default
 
     # ────────────────────────────────────────────────
@@ -356,8 +372,12 @@ class BaseRepository(Generic[ModelType]):
             )
         )
 
-    def _apply_restrictions(self, stmt) -> Select:
-        # Only apply to SELECT — Update/Delete are caller-scoped
+    def _apply_restrictions(
+        self, 
+        stmt: Select,
+        include_chamber_id: bool = True,
+    ) -> Select:
+        # Restrictions only apply to SELECT statements
         if not isinstance(stmt, Select):
             return stmt
 
@@ -365,7 +385,7 @@ class BaseRepository(Generic[ModelType]):
         involved_tables = inner_tables | outer_tables
         cases_table = Cases.__table__
 
-        if not self.anonymous and cases_table in involved_tables:
+        if include_chamber_id and not self.anonymous and cases_table in involved_tables:
             if not self._where_already_covers(stmt, cases_table, "chamber_id"):
                 stmt = self._apply_case_visibility(stmt)
 
@@ -376,7 +396,7 @@ class BaseRepository(Generic[ModelType]):
             if table in outer_tables:
                 continue
 
-            if "chamber_id" in table.c and not self.anonymous:
+            if include_chamber_id and "chamber_id" in table.c and not self.anonymous:
                 if not self._where_already_covers(stmt, table, "chamber_id"):
                     stmt = stmt.where(table.c.chamber_id == self.chamber_id)
 
@@ -518,7 +538,6 @@ class BaseRepository(Generic[ModelType]):
         # ─────────────────────────────────────────────
         # 🔹 AUDIT FIELDS
         # ─────────────────────────────────────────────
-        print(f"******************************* anonymous : {self.anonymous}")
         if not self.anonymous and self.user_id:
             # created_by → only on insert
             if not is_update:
@@ -625,6 +644,7 @@ class BaseRepository(Generic[ModelType]):
         where: Optional[Sequence[Any]] = None,
         joins: Optional[Sequence[InstrumentedAttribute]] = None,
         order_by: Optional[Sequence[ColumnElement[Any]]] = None,
+        include_chamber_id: bool = True,
     ) -> Optional[ModelType]:
         """
         Retrieve a single record. Two modes:
@@ -650,7 +670,9 @@ class BaseRepository(Generic[ModelType]):
             base = select(self.model).where(*pk_filters)
             stmt = base
 
-        result = await self.execute(stmt=stmt, session=session)
+        result = await self.execute(stmt=stmt, 
+                                    session=session,
+                                    include_chamber_id=include_chamber_id,)
         return result.scalars().first()
 
     async def get_first(
@@ -661,10 +683,8 @@ class BaseRepository(Generic[ModelType]):
         where: Optional[Sequence[Any]] = None,
         joins: Optional[Sequence[InstrumentedAttribute]] = None,
         order_by: Optional[Sequence[ColumnElement[Any]]] = None,
+        include_chamber_id: bool = True,
     ) -> Optional[ModelType]:
-        """
-        Return the first matching record using filters/where with optional joins and ordering.
-        """
         self._validate_query_params(
             filters=filters, where=where, joins=joins, order_by=order_by
         )
@@ -678,7 +698,7 @@ class BaseRepository(Generic[ModelType]):
             order_by=order_by,
         )
 
-        result = await self.execute(stmt=stmt, session=session)
+        result = await self.execute(stmt=stmt, session=session, include_chamber_id=include_chamber_id)
         return result.scalars().first()
 
     async def list_all(
@@ -689,10 +709,8 @@ class BaseRepository(Generic[ModelType]):
         where: Optional[Sequence[Any]] = None,
         joins: Optional[Sequence[InstrumentedAttribute]] = None,
         order_by: Optional[Sequence[ColumnElement[Any]]] = None,
+        include_chamber_id: bool = True,
     ) -> List[ModelType]:
-        """
-        Return all matching records. No implicit pagination; use list_paginated for controlled retrieval.
-        """
         self._validate_query_params(
             filters=filters, where=where, joins=joins, order_by=order_by
         )
@@ -706,7 +724,7 @@ class BaseRepository(Generic[ModelType]):
             order_by=order_by,
         )
 
-        result = await self.execute(stmt=stmt, session=session)
+        result = await self.execute(stmt=stmt, session=session, include_chamber_id=include_chamber_id)
         return cast(List[ModelType], result.scalars().all())
 
     async def list_paginated(
@@ -720,39 +738,34 @@ class BaseRepository(Generic[ModelType]):
         page: int = 1,
         limit: int = 50,
         distinct: bool = False,
+        include_chamber_id: bool = True,
     ) -> Tuple[List[ModelType], int]:
-        """
-        Fetch a paginated list with optional filtering, where, joins, distinct, and ordering.
-        Returns (items, total_count) where total_count is computed before pagination.
-        """
         self._validate_query_params(
             filters=filters, where=where, joins=joins, order_by=order_by
         )
 
-        if page < 1:
-            page = 1
-        if limit < 1:
-            limit = 1
+        if page < 1: page = 1
+        if limit < 1: limit = 1
 
+        # 1️⃣ Build base query (defer ordering for count subquery)
         base = select(self.model)
         stmt = self._apply_common_query_parts(
             base_select=base,
             filters=filters,
             where=where,
             joins=joins,
-            order_by=None,  # defer ordering until after count subquery
+            order_by=None,
         )
-
         if distinct:
             stmt = stmt.distinct()
 
-        # Count total BEFORE pagination (strip ordering in subquery)
-        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+        # 2️⃣ Count total BEFORE pagination (apply restrictions separately)
+        count_base = self._apply_restrictions(stmt.order_by(None), include_chamber_id=include_chamber_id)
+        count_stmt = select(func.count()).select_from(count_base.subquery())
         total = await session.scalar(count_stmt) or 0
 
-        # Apply ordering now
+        # 3️⃣ Apply ordering & pagination to data query
         if not order_by:
-            # Default ordering: first PK column asc
             pk_names = self._pk_names()
             if pk_names:
                 pk_col = getattr(self.model, pk_names[0], None)
@@ -761,10 +774,10 @@ class BaseRepository(Generic[ModelType]):
         if order_by:
             stmt = stmt.order_by(*order_by)
 
-        # Pagination
-        stmt = stmt.offset((page - 1) * limit).limit(limit)
+        stmt = self._paginate(stmt, limit=limit, offset=(page - 1) * limit)
 
-        result = await self.execute(stmt=stmt, session=session)
+        # 4️⃣ Execute data query with restrictions
+        result = await self.execute(stmt=stmt, session=session, include_chamber_id=include_chamber_id)
         items = result.scalars().all()
         return list(items), int(total)
 

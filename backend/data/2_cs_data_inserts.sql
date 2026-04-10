@@ -234,18 +234,7 @@ INSERT INTO refm_courts (court_name, state_code, court_type, sort_order) VALUES
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 17.1  Chambers
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, created_by) VALUES
-('VijayKrishnan & Associates', 'office@vkchamber.in',  '9876543210', 'Chennai',    'TN  ', 'PTPR', NULL),
-('Sundar Associates',          'office@sundarlaw.in',  '9445123456', 'Coimbatore', 'TN  ', 'PTFR', NULL);
-
-SET @chamber_vk     = (SELECT chamber_id FROM chamber WHERE chamber_name = 'VijayKrishnan & Associates');
-SET @chamber_sundar = (SELECT chamber_id FROM chamber WHERE chamber_name = 'Sundar Associates');
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 17.2  Users (chamber-agnostic)
+-- 17.1  Users (chamber-agnostic)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SET @pwd_hash = '$argon2id$v=19$m=65536,t=3,p=4$hfCeE0IoZay1lhLifA+BkA$3rA1GrCAkdhLzYyGi2S7lc422/W2eEPIqW3MD4u1B48';
@@ -264,6 +253,17 @@ SET @user_karthik = (SELECT user_id FROM users WHERE email = 'karthik@vkchamber.
 SET @user_jerem   = (SELECT user_id FROM users WHERE email = 'jerem@vkchamber.in');
 SET @user_suresh   = (SELECT user_id FROM users WHERE email = 'suresh@vkchamber.in');
 SET @user_lokesh  = (SELECT user_id FROM users WHERE email = 'lokesh@sundarlaw.in');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 17.1  Chambers
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, created_by) VALUES
+('VijayKrishnan & Associates', 'office@vkchamber.in',  '9876543210', 'Chennai',    'TN  ', 'PTPR', @user_vijay),
+('Sundar Associates',          'office@sundarlaw.in',  '9445123456', 'Coimbatore', 'TN  ', 'PTFR', @user_lokesh);
+
+SET @chamber_vk     = (SELECT chamber_id FROM chamber WHERE chamber_name = 'VijayKrishnan & Associates');
+SET @chamber_sundar = (SELECT chamber_id FROM chamber WHERE chamber_name = 'Sundar Associates');
 
 
 

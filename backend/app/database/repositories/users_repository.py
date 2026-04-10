@@ -83,7 +83,12 @@ class UsersRepository(BaseRepository[Users]):
                 )
             )
             .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
-            .outerjoin(ProfileImages, Users.user_id == ProfileImages.user_id)
+            .outerjoin(ProfileImages, 
+                       and_( Users.user_id == ProfileImages.user_id,
+                            ProfileImages.deleted_ind.is_(False),
+                            ProfileImages.deleted_date.is_(None)
+                            )
+                       )
             .outerjoin(
                 UserRoles,
                 and_(

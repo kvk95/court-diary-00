@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.chamber import Chamber
 from app.database.models.refm_modules import RefmModulesConstants
 from app.database.repositories.chamber_repository import ChamberRepository
+from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.chamber_dto import ChamberEdit, ChamberOut
 from app.services.base.secured_base_service import BaseSecuredService
@@ -22,11 +23,13 @@ class ChamberService(BaseSecuredService):
             self, 
             session: AsyncSession,                 
             chamber_repo: Optional[ChamberRepository] = None,
-            users_repo: UsersRepository | None = None,
+            users_repo: Optional[UsersRepository] | None = None,
+            user_chamber_link_repo: Optional[UserChamberLinkRepository] | None = None,
         ) -> None:
         super().__init__(session=session)
         self.chamber_repo = chamber_repo or ChamberRepository()
         self.users_repo = users_repo or UsersRepository()
+        self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -78,7 +81,12 @@ class ChamberService(BaseSecuredService):
             )
         return chamber
     
-    def _to_out(self, chamber: Chamber) -> ChamberOut:
+    async def _to_out(self, chamber: Chamber) -> ChamberOut:
+
+        chamber_own  = await self.chamber_repo.get_by_id(
+            session=self.session,
+            filters={Chamber.created_by: self.user_id}
+        )
         return ChamberOut(
             chamber_id=chamber.chamber_id,
             chamber_name=chamber.chamber_name,
@@ -96,6 +104,7 @@ class ChamberService(BaseSecuredService):
             status_ind=chamber.status_ind,
             created_date=chamber.created_date,
             updated_date=chamber.updated_date,
+            self_owned_ind = True if chamber_own else False,
         )
 
     # ------------------------------------------------------------------
@@ -116,7 +125,7 @@ class ChamberService(BaseSecuredService):
 
         # 3. Fetch & return
         chamber = await self._get_chamber()
-        return self._to_out(chamber)
+        return await self._to_out(chamber)
 
     async def chamber_edit(self, payload: ChamberEdit) -> ChamberOut:
         """
@@ -174,7 +183,7 @@ class ChamberService(BaseSecuredService):
         if not data:
             # Nothing to update; return current state
             chamber = await self._get_chamber()
-            return self._to_out(chamber)
+            return await self._to_out(chamber)
 
         # Stamp who last updated
         data["updated_by"] = self.user_id
@@ -185,4 +194,4 @@ class ChamberService(BaseSecuredService):
             data=self.chamber_repo.map_fields_to_db_column(data),
         )
 
-        return self._to_out(updated_chamber)
+        return await self._to_out(updated_chamber)

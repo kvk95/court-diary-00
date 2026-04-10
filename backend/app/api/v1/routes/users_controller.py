@@ -24,6 +24,19 @@ from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAG
 class UsersController(BaseController):
     CONTROLLER_NAME = "users"
 
+    #-- Heart beat --
+    
+    @BaseController.get(
+        "/ht",
+        summary="Heart Beat",
+        response_model=BaseOutDto[str],
+    )
+    async def ht(
+        self,
+        _: UserOut = Depends(get_current_user),
+    ) -> BaseOutDto[str]: 
+        return self.success(result="beating")
+
     # ── List/Paged (FIRST - before parameterized routes) ─────────────────────
 
     @BaseController.get(

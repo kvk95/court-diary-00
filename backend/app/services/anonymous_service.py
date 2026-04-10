@@ -421,6 +421,7 @@ class AnonymousService(BaseService):
                 "chamber_name": self.get_initials(first_name, last_name),
                 "email": email.lower(),
                 "plan_code": RefmPlanTypesConstants.FREE,
+                "created_by": user.user_id,
             },
         )
 

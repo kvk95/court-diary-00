@@ -31,6 +31,7 @@ class ChamberOut(BaseRecordData):
     status_ind: bool = True
     created_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
+    self_owned_ind:bool = False
 
 
 # ---------------------------------------------------------------------------
