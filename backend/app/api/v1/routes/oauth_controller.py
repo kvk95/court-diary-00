@@ -97,7 +97,7 @@ class OAuthController(BaseController):
         return self.success(result=token_out)   
 
     @BaseController.post(
-        "//<string:provider>/login",
+        "/<string:provider>/login",
         summary="Refresh access token",
         response_model=BaseOutDto[TokenOut],
     )
@@ -106,7 +106,7 @@ class OAuthController(BaseController):
         session: AsyncSession = Depends(get_session),
         service: AuthService = Depends(get_auth_service),
         anonymous_service: AnonymousService = Depends(get_anonymous_service),
-        provider: str = Query(None, description="oAuth Token"),):
+        provider: str = Query(None, description="oAuth Token")):
 
         provider = provider.lower()
         # github_token = request.json.get("access_token")
