@@ -356,12 +356,10 @@ class AnonymousService(BaseService):
                 data=update_data,
             )
 
-        
-
-        if payload.image_data: 
+        if payload.image_data:
             await self.image_service.handle_image(
                 session=self.session,
-                payload={"image_data":payload.image_data },
+                payload=payload,
                 entity_id=user.user_id,
                 image_upload_code=RefmImgUploadForEnum.USER,
                 description="User profile image",

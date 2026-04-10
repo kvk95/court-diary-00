@@ -52,13 +52,8 @@ async def get_current_user(
     path = (ctx.get("path") or "").lower()
     method = (ctx.get("method") or "").lower()
 
-    is_login = (
-        method == "post"
-        and path.startswith("/api/chamber/login/")
-    )
-
     # ❌ Temp user → only login allowed
-    if (temp_claim == "Y") != is_login:
+    if (temp_claim == "Y"):
         raise ValidationErrorDetail(
             code=ErrorCodes.PERMISSION_DENIED,
             message="Invalid access for token type"

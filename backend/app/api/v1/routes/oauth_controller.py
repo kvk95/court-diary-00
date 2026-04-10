@@ -102,7 +102,6 @@ class OAuthController(BaseController):
     )
     async def oauth_login(
         self,
-        session: AsyncSession = Depends(get_session),
         service: AuthService = Depends(get_auth_service),
         anonymous_service: AnonymousService = Depends(get_anonymous_service),
         provider: str = Path(description="oAuth Token"),
@@ -134,8 +133,8 @@ class OAuthController(BaseController):
 
         payload = UserCreateoAuth(
             email = user_data.get("email"),
-            first_name = user_data.get("given_name", "Name Unknown"),
-            last_name = user_data.get("family_name", ""),
+            first_name = user_data.get("first_name"),
+            last_name = user_data.get("last_name"),
             image_data = user_data.get("image_data", None),
         )
 
@@ -147,6 +146,7 @@ class OAuthController(BaseController):
         login_request = LoginRequest(
             email=email or '',
             password=str(uuid.uuid4()),
+            chamber_id=loginRequest.chamber_id
         )
         token_out: TokenOut = await service.login(login_request, is_oAuth=True)
         self.set_token_expiry(token_out)
