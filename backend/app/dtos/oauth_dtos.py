@@ -26,6 +26,22 @@ class LoginRequest(BaseModel):
     user_agent: Optional[str] = None
 
 
+class OAuthLoginRequest(BaseModel):
+    """
+    Login request payload.
+    chamber_id is optional - if not provided, user's primary chamber is used.
+    """
+    code: str
+    provider: str
+    chamber_id: Optional[str] = None 
+    remember_me: bool = False
+    # Optional: MFA / 2FA fields for future
+    mfa_code: Optional[str] = None
+    device_id: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+
+
 class RefreshRequest(BaseModel):
     """Refresh token request."""
     refresh_token: str

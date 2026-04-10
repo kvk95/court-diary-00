@@ -8,6 +8,7 @@ from app.database.cache.refm_cache import RefmCache, RefmData
 from app.database.models.chamber_modules import ChamberModules
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
+from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.users import Users
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
@@ -22,6 +23,7 @@ from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
 from app.dtos.users_dto import UserCreateBasic, UserCreateoAuth, UserEmailIn, UserPasswordIn
 from app.services.EmailLinkService import EmailLinkService
+from app.services.image_service import ImageService
 from app.utils.security import hash_password
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
@@ -45,6 +47,7 @@ class AnonymousService(BaseService):
         role_permission_master_repo: Optional[RolePermissionMasterRepository] = None,
         role_permission_repo: Optional[RolePermissionsRepository] = None,
         email_link_service: Optional[EmailLinkService] = None,
+        image_service: Optional[ImageService] = None,
     ):
         super().__init__(session)
         self.chamber_repo: ChamberRepository = chamber_repo or ChamberRepository()
@@ -57,6 +60,8 @@ class AnonymousService(BaseService):
         self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
         self.email_link_service = email_link_service or EmailLinkService(session=self.session)
+        self.image_service = image_service or ImageService(session)
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # PERMISSION MATRIX  ·  data-driven, no hard-coded role names in loops
@@ -344,14 +349,22 @@ class AnonymousService(BaseService):
                     }
         update_data["google_auth_ind"]= True
 
-        if payload.image_data:
-            update_data["image_data"] = payload.image_data
-
         if update_data:
             await self.users_repo.update(
                 session=self.session,
                 id_values=user.user_id,
                 data=update_data,
+            )
+
+        
+
+        if payload.image_data: 
+            await self.image_service.handle_image(
+                session=self.session,
+                payload={"image_data":payload.image_data },
+                entity_id=user.user_id,
+                image_upload_code=RefmImgUploadForEnum.USER,
+                description="User profile image",
             )
         return user.email
 

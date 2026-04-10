@@ -2,9 +2,8 @@ import base64
 from datetime import datetime, timezone
 import uuid
 
-from fastapi import Body, Depends, Query, Request
+from fastapi import Body, Depends, Path, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from httpx import request
 from jose import jwt
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -13,7 +12,7 @@ import requests
 from app.api.v1.routes.base.base_controller import BaseController
 from app.core.config import Settings
 from app.database.models.base.session import AsyncSession
-from app.dtos.oauth_dtos import LoginRequest, RefreshRequest, TokenOut
+from app.dtos.oauth_dtos import LoginRequest, OAuthLoginRequest, RefreshRequest, TokenOut
 from app.dependencies import get_anonymous_service, get_auth_service, get_session
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.users_dto import UserCreateoAuth
@@ -97,7 +96,7 @@ class OAuthController(BaseController):
         return self.success(result=token_out)   
 
     @BaseController.post(
-        "/<string:provider>/login",
+        "/{provider}/login",
         summary="Refresh access token",
         response_model=BaseOutDto[TokenOut],
     )
@@ -106,11 +105,13 @@ class OAuthController(BaseController):
         session: AsyncSession = Depends(get_session),
         service: AuthService = Depends(get_auth_service),
         anonymous_service: AnonymousService = Depends(get_anonymous_service),
-        provider: str = Query(None, description="oAuth Token")):
+        provider: str = Path(description="oAuth Token"),
+        loginRequest: OAuthLoginRequest = Body(..., description="Login credentials"),
+        ):
 
         provider = provider.lower()
         # github_token = request.json.get("access_token")
-        code = request.get_json()
+        code = loginRequest.code
         if not code:
             # return jsonify({"error": "code is required"}), 400
             raise ApplicationError(
@@ -142,17 +143,12 @@ class OAuthController(BaseController):
 
         if not is_exists:
             email = await anonymous_service.oauth_users_add(payload=payload)
-        
-        ip = request.client.host if request.client else None
-        ua = request.headers.get("user-agent")
 
         login_request = LoginRequest(
             email=email or '',
             password=str(uuid.uuid4()),
-            ip_address=ip,
-            user_agent=ua,
         )
-        token_out: TokenOut = await service.login(login_request, is_regular=False)
+        token_out: TokenOut = await service.login(login_request, is_oAuth=True)
         self.set_token_expiry(token_out)
         return self.success(result=token_out)
 
