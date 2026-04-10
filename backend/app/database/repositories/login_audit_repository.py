@@ -53,6 +53,7 @@ class LoginAuditRepository(BaseRepository[LoginAudit]):
 
         # Prepare audit data
         audit_data = {
+            "login_id":self.model.generate_uuid(),
             "actor_user_id": user_id,
             "actor_chamber_id": chamber_id,
             "email": loginRequest.email,
