@@ -246,32 +246,6 @@ BEGIN
 END$$
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Case Collaborations
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TRIGGER trg_case_collaborations_before_insert
-BEFORE INSERT ON case_collaborations
-FOR EACH ROW
-BEGIN
-    IF NEW.collaboration_id IS NULL OR NEW.collaboration_id = '' THEN
-        SET NEW.collaboration_id = generate_uuid_v7();
-    END IF;
-END$$
-
--- ─────────────────────────────────────────────────────────────────────────────
--- User Invitations
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TRIGGER trg_user_invitations_before_insert
-BEFORE INSERT ON user_invitations
-FOR EACH ROW
-BEGIN
-    IF NEW.invitation_id IS NULL OR NEW.invitation_id = '' THEN
-        SET NEW.invitation_id = generate_uuid_v7();
-    END IF;
-END$$
-
--- ─────────────────────────────────────────────────────────────────────────────
 -- Login Audit
 -- ─────────────────────────────────────────────────────────────────────────────
 

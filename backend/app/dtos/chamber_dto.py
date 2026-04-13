@@ -71,3 +71,8 @@ class ChamberAdd(BaseInData):
     
 class ChamberEdit(ChamberAdd):
     pass
+
+class ChamberAddAdditional(ChamberAdd):    
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    plan_code: Optional[str] = None

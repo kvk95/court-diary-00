@@ -5,6 +5,8 @@ from typing import List
 from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
+from app.auth.permissions import PType, require_permission
+from app.database.models.refm_modules import RefmModulesEnum
 from app.dependencies import get_role_permissions_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.role_permissions_dto import (
@@ -15,6 +17,7 @@ from app.dtos.role_permissions_dto import (
 )
 from app.services.role_permissions_service import RolePermissionsService
 
+_ADMN = RefmModulesEnum.ADMIN
 
 class RolePermissionsController(BaseController):
     CONTROLLER_NAME = "role-permissions"
@@ -94,6 +97,7 @@ class RolePermissionsController(BaseController):
         "/roles/{role_id}/permissions/edit",
         summary="Edit role permissions (bulk update from matrix)",
         response_model=BaseOutDto[bool],
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     )
     async def role_permissions_edit(
         self,

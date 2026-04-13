@@ -33,14 +33,14 @@ INSERT IGNORE INTO refm_plan_types (code, description, max_users, max_cases, pri
 
 INSERT IGNORE INTO refm_modules (code, name, description, sort_order) VALUES
 ('ADMN', 'Admin',           'System administration & control',     10),
-('BILL', 'Billing',         'Invoices, payments & accounts',       20),
+-- ('BILL', 'Billing',         'Invoices, payments & accounts',       20),
 ('CALD', 'Calendar',        'Court & personal calendar',           30),
 ('CASE', 'Cases',           'Case register & details',             40),
 ('CLNT', 'Clients',         'Client management & details',         50),
-('COLL', 'Collaborations',  'Inter-chamber case sharing',          60),
+-- ('COLL', 'Collaborations',  'Inter-chamber case sharing',          60),
 ('DASH', 'Dashboard',       'Overview & statistics',               70),
 ('HEAR', 'Hearings',        'Hearing schedule & history',          80),
-('RPRT', 'Reports',         'Analytics & exports',                 90),
+-- ('RPRT', 'Reports',         'Analytics & exports',                 90),
 ('SETT', 'Settings',        'Chamber configuration',               100),
 ('USER', 'User Management', 'Manage chamber users & roles',        110);
 
@@ -172,12 +172,6 @@ INSERT IGNORE INTO refm_user_deletion_status (code, description, sort_order) VAL
 ('DSDE', 'Deleted',  2),
 ('DSRJ', 'Rejected', 3);
 
-INSERT IGNORE INTO refm_invitation_status (code, description, color_code, sort_order) VALUES
-('ISPN', 'Pending',  '#f97316', 10),
-('ISAC', 'Accepted', '#22c55e', 20),
-('ISRJ', 'Rejected', '#ef4444', 30),
-('ISEX', 'Expired',  '#64748b', 40);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.6  Billing, Party Roles, AOR, Collab Access
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -202,11 +196,6 @@ INSERT IGNORE INTO refm_aor_status (code, description, color_code, sort_order) V
 ('ASAC', 'Active',      '#22c55e', 10),
 ('ASWD', 'Withdrawn',   '#64748b', 20),
 ('ASSU', 'Substituted', '#f97316', 30);
-
-INSERT IGNORE INTO refm_collab_access (code, description, permissions, color_code, sort_order) VALUES
-('CARO', 'Read Only',   'view',                    '#3b82f6', 10),
-('CARW', 'Read Write',  'view,edit,create',        '#a855f7', 20),
-('CAFU', 'Full Access', 'view,edit,create,delete', '#22c55e', 30);
 
 
 -- =============================================================================
@@ -317,11 +306,12 @@ INSERT INTO chamber_modules (chamber_id, module_code, active_ind, created_by) VA
 (@chamber_vk, 'HEAR', TRUE,  @user_vijay),
 (@chamber_vk, 'CALD', TRUE,  @user_vijay),
 (@chamber_vk, 'CLNT', TRUE,  @user_vijay),
-(@chamber_vk, 'BILL', TRUE,  @user_vijay),
+-- (@chamber_vk, 'BILL', TRUE,  @user_vijay),
 (@chamber_vk, 'USER', TRUE,  @user_vijay),
-(@chamber_vk, 'RPRT', TRUE,  @user_vijay),
-(@chamber_vk, 'SETT', TRUE,  @user_vijay),
-(@chamber_vk, 'COLL', TRUE,  @user_vijay);
+-- (@chamber_vk, 'RPRT', TRUE,  @user_vijay),
+(@chamber_vk, 'SETT', TRUE,  @user_vijay)
+-- (@chamber_vk, 'COLL', TRUE,  @user_vijay)
+;
 
 INSERT INTO chamber_modules (chamber_id, module_code, active_ind, created_by) VALUES
 (@chamber_sundar, 'ADMN', TRUE,  @user_lokesh),
@@ -330,11 +320,12 @@ INSERT INTO chamber_modules (chamber_id, module_code, active_ind, created_by) VA
 (@chamber_sundar, 'HEAR', TRUE,  @user_lokesh),
 (@chamber_sundar, 'CALD', TRUE,  @user_lokesh),
 (@chamber_sundar, 'CLNT', TRUE,  @user_lokesh),
-(@chamber_sundar, 'BILL', TRUE,  @user_lokesh),
+-- (@chamber_sundar, 'BILL', TRUE,  @user_lokesh),
 (@chamber_sundar, 'USER', FALSE, @user_lokesh),
-(@chamber_sundar, 'RPRT', FALSE, @user_lokesh),
-(@chamber_sundar, 'SETT', TRUE,  @user_lokesh),
-(@chamber_sundar, 'COLL', TRUE,  @user_lokesh);
+-- (@chamber_sundar, 'RPRT', FALSE, @user_lokesh),
+(@chamber_sundar, 'SETT', TRUE,  @user_lokesh)
+-- (@chamber_sundar, 'COLL', TRUE,  @user_lokesh)
+;
 
 
 -- =============================================================================
@@ -402,14 +393,19 @@ SELECT
     MAX(CASE WHEN module_code = 'HEAR' THEN chamber_module_id END) AS cm_hear,
     MAX(CASE WHEN module_code = 'CALD' THEN chamber_module_id END) AS cm_cald,
     MAX(CASE WHEN module_code = 'CLNT' THEN chamber_module_id END) AS cm_clnt,
-    MAX(CASE WHEN module_code = 'BILL' THEN chamber_module_id END) AS cm_bill,
+    -- MAX(CASE WHEN module_code = 'BILL' THEN chamber_module_id END) AS cm_bill,
     MAX(CASE WHEN module_code = 'USER' THEN chamber_module_id END) AS cm_user,
-    MAX(CASE WHEN module_code = 'RPRT' THEN chamber_module_id END) AS cm_rprt,
-    MAX(CASE WHEN module_code = 'SETT' THEN chamber_module_id END) AS cm_sett,
-    MAX(CASE WHEN module_code = 'COLL' THEN chamber_module_id END) AS cm_coll
+    -- MAX(CASE WHEN module_code = 'RPRT' THEN chamber_module_id END) AS cm_rprt,
+    MAX(CASE WHEN module_code = 'SETT' THEN chamber_module_id END) AS cm_sett
+    -- MAX(CASE WHEN module_code = 'COLL' THEN chamber_module_id END) AS cm_coll
 INTO 
     @cm_admn, @cm_dash, @cm_case, @cm_hear, @cm_cald, 
-    @cm_clnt, @cm_bill, @cm_user, @cm_rprt, @cm_sett, @cm_coll
+    @cm_clnt, 
+	-- @cm_bill, 
+	@cm_user, 
+	-- @cm_rprt, 
+	@cm_sett 
+	-- @cm_coll
 FROM chamber_modules
 WHERE chamber_id = @chamber_vk;
 
@@ -421,11 +417,12 @@ INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_in
 (@role_clerk_vk, @cm_hear, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
 (@role_clerk_vk, @cm_cald, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
 (@role_clerk_vk, @cm_clnt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+-- (@role_clerk_vk, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
 (@role_clerk_vk, @cm_user, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk_vk, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
+-- (@role_clerk_vk, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
+(@role_clerk_vk, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay)
+-- (@role_clerk_vk, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
+;
 
 
 -- =============================================================================
@@ -777,24 +774,9 @@ INSERT INTO email_settings (chamber_id, from_email, smtp_host, smtp_port, smtp_u
 (@chamber_vk, 'no-reply@vkchamber.in', 'smtp.gmail.com', 587, 'no-reply@vkchamber.in', 'app-password-placeholder', 'EETL', TRUE,  TRUE, @user_vijay),
 (@chamber_vk, 'office@vkchamber.in',   'smtp.zoho.com',  587, 'office@vkchamber.in',   'zoho-password-placeholder', 'EETL', FALSE, TRUE, @user_vijay);
 -- =============================================================================
--- 24. SEED DATA — TIER 10  (Collaboration & Invitations)
+-- 24. SEED DATA — TIER 10  (User Avatar)
 -- =============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 24.1  Case Collaborations
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO case_collaborations (case_id, owner_chamber_id, collaborator_chamber_id, access_level, invited_by, invited_date, accepted_date, status_code, created_by)
-VALUES (@case1, @chamber_vk, @chamber_sundar, 'CARW', @user_vijay, '2026-02-15', '2026-02-16', 'ISAC', @user_vijay);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 24.2  User Invitations (for Pending Invites widget)
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO user_invitations (chamber_id, email, role_id, invited_by, invited_date, expires_date, status_code, message, created_by)
-VALUES 
-(@chamber_vk, 'newlawyer@example.com', @role_senior_vk, @user_vijay, '2026-03-20', '2026-04-19', 'ISPN', 'Welcome to VijayKrishnan & Associates!', @user_vijay),
-(@chamber_vk, 'senlawyer@example.com', @role_senior_vk, @user_vijay, '2026-03-22', '2026-04-21', 'ISPN', 'Join our team as a Senior Advocate.', @user_vijay);
 
 -- Users (varied avatar styles)
 INSERT INTO profile_images (user_id, client_id, image_upload_code, image_data, description, created_by)

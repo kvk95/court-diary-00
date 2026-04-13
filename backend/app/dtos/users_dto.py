@@ -121,4 +121,3 @@ class UserStatsOut(BaseInData):
     total_users: int = 0
     active_users: int = 0
     total_roles: int = 0
-    pending_invites: int = 0

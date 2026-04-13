@@ -15,11 +15,8 @@ from app.database.models.hearings import Hearings
 from app.database.models.refm_case_status import RefmCaseStatusConstants
 from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatusConstants
-from app.database.models.refm_invitation_status import RefmInvitationStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
-from app.database.models.user_invitations import UserInvitations
 from app.database.models.user_roles import UserRoles
-from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.users import Users
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -338,13 +335,6 @@ class DashboardRepository(BaseRepository[Cases]):
             )
         )
 
-        pending_invites = await self.execute_scalar( session=session, stmt=
-            select(func.count(UserInvitations.invitation_id)).where(
-                UserInvitations.chamber_id == chamber_id,
-                UserInvitations.status_code == RefmInvitationStatusConstants.PENDING,
-            )
-        )
-
         # --- MoM Trend Calculation ---
         month_start = date(today.year, today.month, 1)
 
@@ -389,36 +379,9 @@ class DashboardRepository(BaseRepository[Cases]):
             "total_users": total_users,
             "active_users": active_users,
             "roles_count": roles_count,
-            "pending_invites": pending_invites,
             "users_trend_pct": users_trend,
             "active_users_trend_pct": active_trend,
         }
-
-    # ===================================================================
-    # PENDING INVITATIONS & RECENT ACTIVITY
-    # ===================================================================
-
-    async def get_pending_invitations(
-        self, session: AsyncSession, chamber_id: str, limit: int = 10
-    ) -> list:
-        rows = await self.execute( session=session, stmt=
-            select(
-                UserInvitations.invitation_id,
-                UserInvitations.email,
-                UserInvitations.invited_date,
-                UserInvitations.expires_date,
-                UserInvitations.status_code,
-                ChamberRoles.role_name,
-            )
-            .outerjoin(ChamberRoles, UserInvitations.role_id == ChamberRoles.role_id)
-            .where(
-                UserInvitations.chamber_id == chamber_id,
-                UserInvitations.status_code == RefmInvitationStatusConstants.PENDING,
-            )
-            .order_by(UserInvitations.invited_date.desc())
-            .limit(limit)
-        )
-        return [dict(row._mapping) for row in rows.all()]
 
     async def get_recent_activity(
         self, session: AsyncSession, chamber_id: str, limit: int = 10

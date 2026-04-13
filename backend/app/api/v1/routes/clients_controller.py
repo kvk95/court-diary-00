@@ -5,28 +5,40 @@ from typing import List, Optional
 from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
+from app.auth.permissions import PType, require_permission
 from app.database.models.refm_client_type import RefmClientTypeEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_party_type import RefmPartyTypeEnum
 from app.dependencies import get_clients_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.clients_dto import (
-    ClientCreate,
-    ClientDetailOut,
-    ClientEdit,
-    ClientListOut,
-    ClientDetailsOut,
-    ClientNotesEdit,
-    ClientSummaryStats,
+    ClientCreate, ClientDetailOut, ClientEdit, ClientDetailsOut,
+    ClientListOut, ClientNotesEdit, ClientSummaryStats,
 )
 from app.services.clients_service import ClientsService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
+
+_CLNT = RefmModulesEnum.CLIENTS
 
 
 class ClientsController(BaseController):
     CONTROLLER_NAME = "clients"
 
-    # ── Search (for Link Client modal) ────────────────────────────────────
+    # ── Stats ─────────────────────────────────────────────────────────────
+
+    @BaseController.get(
+        "/stats",
+        summary="Client summary stats",
+        response_model=BaseOutDto[ClientSummaryStats],
+    )
+    async def clients_get_stats(
+        self,
+        service: ClientsService = Depends(get_clients_service),  # read enforced in factory
+    ) -> BaseOutDto[ClientSummaryStats]:
+        return self.success(result=await service.clients_get_stats())
+
+    # ── Search ────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/search",
@@ -34,13 +46,10 @@ class ClientsController(BaseController):
         response_model=BaseOutDto[List[ClientDetailsOut]],
     )
     async def clients_search(
-        self,        
-        search: Optional[str] = Query(
-            None,
-            description="Search by case number, petitioner, or respondent",
-        ),
+        self,
+        search: Optional[str] = Query(None, description="Search by name, phone, or email"),
         limit: int = Query(20, ge=1, le=100),
-        service: ClientsService = Depends(get_clients_service),
+        service: ClientsService = Depends(get_clients_service),  # read enforced in factory
     ) -> BaseOutDto[List[ClientDetailsOut]]:
         return self.success(result=await service.clients_search(search=search, limit=limit))
 
@@ -58,23 +67,14 @@ class ClientsController(BaseController):
         search: Optional[str] = Query(None, description="Search name, phone, email"),
         client_type_code: Optional[RefmClientTypeEnum] = Query(None),
         party_type_code: Optional[RefmPartyTypeEnum] = Query(None),
-        service: ClientsService = Depends(get_clients_service),
+        service: ClientsService = Depends(get_clients_service),  # read enforced in factory
     ) -> BaseOutDto[PagingData[ClientListOut]]:
-        return self.success(result=await service.clients_get_paged(            
-            page=page, limit=limit, search=search, client_type_code=client_type_code,party_type_code=party_type_code
+        return self.success(result=await service.clients_get_paged(
+            page=page, limit=limit, search=search,
+            client_type_code=client_type_code, party_type_code=party_type_code,
         ))
 
     # ── Single ────────────────────────────────────────────────────────────
-    @BaseController.get(
-        "/stats",
-        summary="Client summary stats",
-        response_model=BaseOutDto[ClientSummaryStats],
-    )
-    async def clients_get_stats(
-        self,
-        service: ClientsService = Depends(get_clients_service),
-    ) -> BaseOutDto[ClientSummaryStats]:
-        return self.success(result=await service.clients_get_stats())
 
     @BaseController.get(
         "/{client_id}",
@@ -84,7 +84,7 @@ class ClientsController(BaseController):
     async def clients_get_by_id(
         self,
         client_id: str = Path(..., min_length=36, max_length=36),
-        service: ClientsService = Depends(get_clients_service),
+        service: ClientsService = Depends(get_clients_service),  # read enforced in factory
     ) -> BaseOutDto[ClientDetailOut]:
         return self.success(result=await service.clients_get_by_id(client_id=client_id))
 
@@ -94,6 +94,7 @@ class ClientsController(BaseController):
         "/add",
         summary="Add a new client",
         response_model=BaseOutDto[ClientDetailOut],
+        dependencies=[Depends(require_permission(_CLNT, PType.CREATE))],
     )
     async def clients_add(
         self,
@@ -108,6 +109,7 @@ class ClientsController(BaseController):
         "/{client_id}/edit",
         summary="Edit a client",
         response_model=BaseOutDto[ClientDetailOut],
+        dependencies=[Depends(require_permission(_CLNT, PType.WRITE))],
     )
     async def clients_edit(
         self,
@@ -115,12 +117,15 @@ class ClientsController(BaseController):
         payload: ClientEdit = Body(...),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[ClientDetailOut]:
-        return self.success(result=await service.clients_edit(client_id=client_id, payload=payload))
+        return self.success(result=await service.clients_edit(
+            client_id=client_id, payload=payload,
+        ))
 
     @BaseController.put(
         "/{client_id}/notes",
-        summary="Edit Notes",
+        summary="Edit client notes",
         response_model=BaseOutDto[ClientDetailOut],
+        dependencies=[Depends(require_permission(_CLNT, PType.WRITE))],
     )
     async def clients_notes_edit(
         self,
@@ -128,7 +133,9 @@ class ClientsController(BaseController):
         payload: ClientNotesEdit = Body(...),
         service: ClientsService = Depends(get_clients_service),
     ) -> BaseOutDto[ClientDetailOut]:
-        return self.success(result=await service.clients_notes_edit(client_id=client_id, payload=payload))
+        return self.success(result=await service.clients_notes_edit(
+            client_id=client_id, payload=payload,
+        ))
 
     # ── Delete ────────────────────────────────────────────────────────────
 
@@ -136,6 +143,7 @@ class ClientsController(BaseController):
         "/{client_id}/delete",
         summary="Soft-delete a client (blocked if linked to cases)",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_CLNT, PType.DELETE))],
     )
     async def clients_delete(
         self,

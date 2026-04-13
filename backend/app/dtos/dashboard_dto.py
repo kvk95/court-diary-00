@@ -24,7 +24,6 @@ class ChamberManagementStats(BaseRecordData):
     total_users: int = 0
     active_users: int = 0
     roles_count: int = 0
-    pending_invites: int = 0
     users_trend_pct: int = 0
     active_users_trend_pct: int = 0
 
@@ -83,20 +82,9 @@ class AdminStatCards(BaseRecordData):
     total_users: int = 0
     active_users: int = 0
     roles_defined: int = 0
-    pending_invites: int = 0
     # Trend indicators (month-over-month)
     users_trend_pct: Optional[float] = None    # e.g. 12.0 → shown as "+12%"
     active_users_trend_pct: Optional[float] = None
-
-
-class PendingInvitationItem(BaseRecordData):
-    """One row in the Pending Invitations widget."""
-    invitation_id: str
-    email: str
-    role_name: Optional[str] = None
-    invited_date: Optional[datetime] = None
-    expires_date: Optional[date] = None
-    status_code: str = "PN"
 
 
 class RecentActivityItem(BaseRecordData):
@@ -111,7 +99,6 @@ class RecentActivityItem(BaseRecordData):
 class AdminDashboardOut(BaseRecordData):
     """Complete payload for the Admin Dashboard — one call covers all sections."""
     stat_cards: AdminStatCards
-    pending_invitations: List[PendingInvitationItem] = []
     recent_activity: List[RecentActivityItem] = []
 
 class SummaryCountsOut(BaseRecordData):

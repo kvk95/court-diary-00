@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.delete_account_requests import DeleteAccountRequests
+from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
@@ -34,6 +35,7 @@ from app.dtos.users_dto import (
 )
 from app.dtos.roles_dto import RoleOut
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
+from app.services.email_link_service import EmailLinkService
 from app.services.image_service import ImageService
 from app.utils.security import hash_password
 from app.utils.utilities import generate_password
@@ -59,6 +61,7 @@ class UsersService(BaseSecuredService):
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
         profile_images_repo: Optional[ProfileImagesRepository] = None,
         image_service: Optional[ImageService] = None,
+        email_link_service: Optional[EmailLinkService] = None,
     ):
         super().__init__(session)
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
@@ -69,6 +72,7 @@ class UsersService(BaseSecuredService):
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
         self.image_service = image_service or ImageService(session)
+        self.email_link_service = email_link_service or EmailLinkService(session=self.session)
 
     # ─────────────────────────────────────────────────────────────────────────
     # HELPERS (Now Just Call Repository Methods - No Query Logic)
@@ -281,7 +285,6 @@ class UsersService(BaseSecuredService):
             total_users=stats["total_users"],
             active_users=stats["active_users"],
             total_roles=stats["total_roles"],
-            pending_invites=stats["pending_invites"],
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -429,9 +432,18 @@ class UsersService(BaseSecuredService):
             user_id=user.user_id,
             link_id=link.link_id,
         )
+
+        # ── 6. ACTIVATION EMAIL ──────────────────────────────────────────────
+        link_url = await self.email_link_service.generate_link(
+            user_id=user.user_id,
+            email=user.email,
+            template_code=RefmEmailTemplatesEnum.TEMPLATE_FOR_NEW_USER_ACCOUNT_ACTIVATION,
+        )
+
+        print(f"********** Link url: {link_url}")
  
         # ─────────────────────────────────────────────
-        # 6. RETURN
+        # 7. RETURN
         # ─────────────────────────────────────────────
         return await self.get_user_full_details(user_id=user.user_id)
  

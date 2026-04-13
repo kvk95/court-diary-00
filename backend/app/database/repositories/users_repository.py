@@ -11,8 +11,6 @@ from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.models.chamber import Chamber
-from app.database.models.user_invitations import UserInvitations
-from app.database.models.refm_invitation_status import RefmInvitationStatusConstants
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -375,7 +373,7 @@ class UsersRepository(BaseRepository[Users]):
     ) -> Dict[str, int]:
         """
         Get user management statistics for a chamber.
-        Returns dict with total_users, active_users, total_roles, pending_invites.
+        Returns dict with total_users, active_users, total_roles.
         """
         # 1. Total users in chamber (all time, including left)
         total_users_stmt = select(func.count(func.distinct(UserChamberLink.user_id))).where(
@@ -410,19 +408,8 @@ class UsersRepository(BaseRepository[Users]):
         total_roles_result = await self.execute( session=session, stmt=total_roles_stmt)
         total_roles = total_roles_result.scalar_one() or 0
 
-        # 4. Pending invitations
-        pending_invites_stmt = select(func.count(UserInvitations.invitation_id)).where(
-            and_(
-                UserInvitations.chamber_id == chamber_id,
-                UserInvitations.status_code == RefmInvitationStatusConstants.PENDING,
-            )
-        )
-        pending_invites_result = await self.execute( session=session, stmt=pending_invites_stmt)
-        pending_invites = pending_invites_result.scalar_one() or 0
-
         return {
             "total_users": total_users,
             "active_users": active_users,
             "total_roles": total_roles,
-            "pending_invites": pending_invites,
         }

@@ -5,6 +5,8 @@ from typing import List, Optional
 from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
+from app.auth.permissions import PType, require_permission
+from app.database.models.refm_modules import RefmModulesEnum
 from app.dependencies import get_roles_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
@@ -17,6 +19,8 @@ from app.dtos.roles_dto import (
 )
 from app.services.roles_service import RolesService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
+
+_ADMN = RefmModulesEnum.ADMIN
 
 
 class RolesController(BaseController):
@@ -83,6 +87,7 @@ class RolesController(BaseController):
         "/add",
         summary="Add new role",
         response_model=BaseOutDto[RoleOut],
+        dependencies=[Depends(require_permission(_ADMN, PType.CREATE))],
     )
     async def roles_add(
         self,
@@ -100,6 +105,7 @@ class RolesController(BaseController):
         "/{role_id}/edit",
         summary="Update role",
         response_model=BaseOutDto[RoleOut],
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     )
     async def roles_update(
         self,
@@ -118,6 +124,7 @@ class RolesController(BaseController):
         "/{role_id}/delete",
         summary="Delete role (soft delete, blocked if users assigned)",
         response_model=BaseOutDto[bool],
+        dependencies=[Depends(require_permission(_ADMN, PType.DELETE))],
     )
     async def roles_delete(
         self,

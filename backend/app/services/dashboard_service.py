@@ -18,7 +18,6 @@ from app.dtos.dashboard_dto import (
     DashboardHearingItem,
     MainDashboardOut,
     OverdueCaseItem,
-    PendingInvitationItem,
     PracticeOverviewStats,
     RecentActivityItem,
     SummaryCountsOut,
@@ -184,7 +183,6 @@ class DashboardService(BaseSecuredService):
                 total_users=chamber_stats["total_users"],
                 active_users=chamber_stats["active_users"],
                 roles_count=chamber_stats["roles_count"],
-                pending_invites=chamber_stats["pending_invites"],
                 users_trend_pct=chamber_stats.get("users_trend_pct", 0),
                 active_users_trend_pct=chamber_stats.get("active_users_trend_pct", 0),
             ),
@@ -216,26 +214,10 @@ class DashboardService(BaseSecuredService):
         chamber_stats = await self.repo.get_chamber_management_stats(
             session=self.session, chamber_id=cid, today=today
         )
-
-        invitations_rows = await self.repo.get_pending_invitations(
-            session=self.session, chamber_id=cid
-        )
+        
         activity_rows = await self.repo.get_recent_activity(
             session=self.session, chamber_id=cid
         )
-
-        # Convert pending invitations (dict rows)
-        pending_invitations = [
-            PendingInvitationItem(
-                invitation_id=r["invitation_id"],
-                email=r["email"],
-                invited_date=r["invited_date"],
-                expires_date=r["expires_date"],
-                status_code=r["status_code"],
-                role_name=r.get("role_name"),
-            )
-            for r in invitations_rows
-        ]
 
         # Convert recent activity (dict rows)
         recent_activity = [
@@ -254,11 +236,9 @@ class DashboardService(BaseSecuredService):
                 total_users=chamber_stats["total_users"],
                 active_users=chamber_stats["active_users"],
                 roles_defined=chamber_stats["roles_count"],
-                pending_invites=chamber_stats["pending_invites"],
                 users_trend_pct=chamber_stats.get("users_trend_pct"),
                 active_users_trend_pct=chamber_stats.get("active_users_trend_pct"),
             ),
-            pending_invitations=pending_invitations,
             recent_activity=recent_activity,
         )
 

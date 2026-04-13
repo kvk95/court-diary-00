@@ -91,7 +91,8 @@ class RolesService(BaseSecuredService):
 
         # ✅ Check including deleted
         stmt = select(ChamberRoles).where(
-            ChamberRoles.role_name == role_name
+            ChamberRoles.role_name == role_name,
+            ChamberRoles.chamber_id == self.chamber_id
         )
         result = await self.session.execute(stmt)
         existing_code = result.scalars().first()

@@ -185,15 +185,6 @@ CREATE TABLE refm_user_deletion_status (
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Account deletion request statuses';
 
-DROP TABLE IF EXISTS refm_invitation_status;
-CREATE TABLE refm_invitation_status (
-    code          CHAR(4)     PRIMARY KEY,
-    description   VARCHAR(50) NOT NULL,
-    color_code    CHAR(7)     DEFAULT '#64748b',
-    sort_order    INT         NOT NULL,
-    status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Invitation status codes';
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.6  Billing, Party Roles & Collaboration Access
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -224,16 +215,6 @@ CREATE TABLE refm_aor_status (
     sort_order    INT         NOT NULL,
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='AOR status codes';
-
-DROP TABLE IF EXISTS refm_collab_access;
-CREATE TABLE refm_collab_access (
-    code          CHAR(4)      PRIMARY KEY,
-    description   VARCHAR(50)  NOT NULL,
-    permissions   VARCHAR(255) NULL COMMENT 'Comma-separated: view,edit,delete,share',
-    color_code    CHAR(7)      DEFAULT '#64748b',
-    sort_order    INT          NOT NULL,
-    status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Collaboration access levels';
 
 -- =============================================================================
 -- 3. REFERENCE TABLES — TIER 1 (FK to other REFM only)
@@ -1090,87 +1071,6 @@ CREATE TABLE delete_account_requests (
     CONSTRAINT fk_delete_req_updated_by
         FOREIGN KEY (updated_by)  REFERENCES users(user_id)                   ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Account deletion requests';
-
-
--- =============================================================================
--- 10. TIER 10  —  Multi-Chamber Collaboration & Invitations
---     →  cases, chamber, security_roles, users
--- =============================================================================
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 10.1  Case Collaborations  →  cases, chamber, users
--- ─────────────────────────────────────────────────────────────────────────────
-
-DROP TABLE IF EXISTS case_collaborations;
-CREATE TABLE case_collaborations (
-    collaboration_id        CHAR(36)     PRIMARY KEY,  
-    case_id                 CHAR(36)     NOT NULL,  
-    owner_chamber_id        CHAR(36)     NOT NULL,  
-    collaborator_chamber_id CHAR(36)     NOT NULL,  
-    access_level            CHAR(4)      DEFAULT 'CARO',
-    invited_by              CHAR(36)     NULL,  
-    invited_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    accepted_date           TIMESTAMP    NULL,
-    status_code             CHAR(4)      DEFAULT 'PN',
-    notes                   TEXT         NULL,
-    created_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by              CHAR(36)     NULL,  
-    updated_date            TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by              CHAR(36)     NULL,  
-    CONSTRAINT fk_collab_case
-        FOREIGN KEY (case_id)                 REFERENCES cases(case_id)         ON DELETE CASCADE,
-    CONSTRAINT fk_collab_owner
-        FOREIGN KEY (owner_chamber_id)        REFERENCES chamber(chamber_id)    ON DELETE CASCADE,
-    CONSTRAINT fk_collab_collaborator
-        FOREIGN KEY (collaborator_chamber_id) REFERENCES chamber(chamber_id)    ON DELETE CASCADE,
-    CONSTRAINT fk_collab_access_level
-        FOREIGN KEY (access_level) REFERENCES refm_collab_access(code)    ON DELETE CASCADE,
-    CONSTRAINT fk_collab_invited_by
-        FOREIGN KEY (invited_by)              REFERENCES users(user_id)         ON DELETE SET NULL,
-    CONSTRAINT fk_collab_created_by
-        FOREIGN KEY (created_by)              REFERENCES users(user_id)         ON DELETE SET NULL,
-    CONSTRAINT fk_collab_updated_by
-        FOREIGN KEY (updated_by)              REFERENCES users(user_id)         ON DELETE SET NULL,
-    UNIQUE KEY uk_case_collaboration (case_id, collaborator_chamber_id),
-    INDEX idx_collab_case (case_id),
-    INDEX idx_collab_chamber (collaborator_chamber_id),
-    INDEX idx_collab_status (status_code)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Case collaboration between chambers';
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 10.2  User Invitations  →  chamber, security_roles, users
--- ─────────────────────────────────────────────────────────────────────────────
-
-DROP TABLE IF EXISTS user_invitations;
-CREATE TABLE user_invitations (
-    invitation_id CHAR(36)     PRIMARY KEY,  
-    chamber_id    CHAR(36)     NOT NULL,  
-    email         VARCHAR(150) NOT NULL,
-    role_id       INT          NULL,  -- INT FK to security_roles
-    invited_by    CHAR(36)     NOT NULL,  
-    invited_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    expires_date  DATE         NULL,
-    status_code   CHAR(4)      DEFAULT 'PN',
-    message       TEXT         NULL,
-    accepted_date TIMESTAMP    NULL,
-    accepted_by   CHAR(36)     NULL,  
-    created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by    CHAR(36)     NULL,  
-    CONSTRAINT fk_inv_chamber
-        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id)       ON DELETE CASCADE,
-    CONSTRAINT fk_inv_role
-        FOREIGN KEY (role_id)    REFERENCES security_roles(role_id)   ON DELETE SET NULL,
-    CONSTRAINT fk_inv_invited_by
-        FOREIGN KEY (invited_by) REFERENCES users(user_id)            ON DELETE CASCADE,
-    CONSTRAINT fk_inv_accepted_by
-        FOREIGN KEY (accepted_by) REFERENCES users(user_id)           ON DELETE SET NULL,
-    CONSTRAINT fk_inv_created_by
-        FOREIGN KEY (created_by)  REFERENCES users(user_id)           ON DELETE SET NULL,
-    UNIQUE KEY uk_invitation_email_chamber (chamber_id, email, status_code),
-    INDEX idx_inv_email (email),
-    INDEX idx_inv_status (status_code),
-    INDEX idx_inv_chamber (chamber_id)
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Pending user invitations';
 
 -- =============================================================================
 -- 11. TIER 11  —  Logging & Audit

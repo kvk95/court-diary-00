@@ -36,26 +36,20 @@ class RefmModules(BaseModel):
 
 class RefmModulesConstants:
     ADMIN = 'ADMN'
-    BILLING = 'BILL'
     CALENDAR = 'CALD'
     CASES = 'CASE'
     CLIENTS = 'CLNT'
-    COLLABORATIONS = 'COLL'
     DASHBOARD = 'DASH'
     HEARINGS = 'HEAR'
-    REPORTS = 'RPRT'
     SETTINGS = 'SETT'
     USER_MANAGEMENT = 'USER'
 
 class RefmModulesEnum(str, PyEnum):
     ADMIN = RefmModulesConstants.ADMIN
-    BILLING = RefmModulesConstants.BILLING
     CALENDAR = RefmModulesConstants.CALENDAR
     CASES = RefmModulesConstants.CASES
     CLIENTS = RefmModulesConstants.CLIENTS
-    COLLABORATIONS = RefmModulesConstants.COLLABORATIONS
     DASHBOARD = RefmModulesConstants.DASHBOARD
     HEARINGS = RefmModulesConstants.HEARINGS
-    REPORTS = RefmModulesConstants.REPORTS
     SETTINGS = RefmModulesConstants.SETTINGS
     USER_MANAGEMENT = RefmModulesConstants.USER_MANAGEMENT

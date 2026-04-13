@@ -27,12 +27,12 @@ class CalendarController(BaseController):
         self,
         year: int = Query(..., ge=2000, le=2099, description="Year e.g. 2026"),
         month: int = Query(..., ge=1, le=12, description="Month 1-12"),
-        service: CalendarService = Depends(get_calendar_service),
         status_code: Optional[RefmHearingStatusEnum] = Query(None),
+        service: CalendarService = Depends(get_calendar_service),  # read enforced in factory
     ) -> BaseOutDto[CalendarMonthOut]:
-        return self.success(result=await service.calendar_get_month(year=year, 
-                                                                    month=month,
-                                                                    status_code=status_code))
+        return self.success(result=await service.calendar_get_month(
+            year=year, month=month, status_code=status_code,
+        ))
 
     # ── Upcoming widget ───────────────────────────────────────────────────
 
@@ -45,11 +45,11 @@ class CalendarController(BaseController):
         self,
         days_ahead: int = Query(30, ge=1, le=365, description="Look-ahead window in days"),
         limit: int = Query(20, ge=1, le=100),
-        service: CalendarService = Depends(get_calendar_service),
+        service: CalendarService = Depends(get_calendar_service),  # read enforced in factory
     ) -> BaseOutDto[List[CalendarEventOut]]:
-        return self.success(
-            result=await service.calendar_get_upcoming(days_ahead=days_ahead, limit=limit)
-        )
+        return self.success(result=await service.calendar_get_upcoming(
+            days_ahead=days_ahead, limit=limit,
+        ))
 
     # ── Date range (week / agenda view) ──────────────────────────────────
 
@@ -62,11 +62,9 @@ class CalendarController(BaseController):
         self,
         date_from: date = Query(..., description="Start date (inclusive) Example 2026-04-01"),
         date_to: date = Query(..., description="End date (inclusive) Example 2026-04-30"),
-        service: CalendarService = Depends(get_calendar_service),
         status_code: Optional[RefmHearingStatusEnum] = Query(None),
+        service: CalendarService = Depends(get_calendar_service),  # read enforced in factory
     ) -> BaseOutDto[List[CalendarEventOut]]:
-        return self.success(
-            result=await service.calendar_get_range(date_from=date_from, 
-                                                    date_to=date_to,
-                                                    status_code=status_code,)
-        )
+        return self.success(result=await service.calendar_get_range(
+            date_from=date_from, date_to=date_to, status_code=status_code,
+        ))

@@ -5,6 +5,8 @@ from typing import List, Optional
 from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
+from app.auth.permissions import PType, require_permission
+from app.database.models.refm_modules import RefmModulesEnum
 from app.dependencies import get_aor_service
 from app.dtos.aor_dto import AorCreate, AorEdit, AorOut
 from app.dtos.base.base_out_dto import BaseOutDto
@@ -25,10 +27,10 @@ class AorController(BaseController):
     async def aors_get_by_case(
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
-        service: AorService = Depends(get_aor_service),
+        service: AorService = Depends(get_aor_service),  # read enforced in factory
     ) -> BaseOutDto[List[AorOut]]:
         return self.success(result=await service.aors_get_by_case(case_id=case_id))
-    
+
     @BaseController.get(
         "/chamber/",
         summary="Get all advocates of a chamber",
@@ -37,7 +39,7 @@ class AorController(BaseController):
     async def aors_get_by_chamber(
         self,
         search: Optional[str] = Query(None, description="Search by "),
-        service: AorService = Depends(get_aor_service),
+        service: AorService = Depends(get_aor_service),  # read enforced in factory
     ) -> BaseOutDto[List[UserBasicInfoOut]]:
         return self.success(result=await service.aors_get_by_chamber(search=search))
 
@@ -47,6 +49,7 @@ class AorController(BaseController):
         "/add",
         summary="Add an advocate on record to a case",
         response_model=BaseOutDto[AorOut],
+        dependencies=[Depends(require_permission(RefmModulesEnum.CASES, permission=PType.CREATE))],
     )
     async def aors_add(
         self,
@@ -55,12 +58,13 @@ class AorController(BaseController):
     ) -> BaseOutDto[AorOut]:
         return self.success(result=await service.aors_add(payload=payload))
 
-    # ── Edit AOR (set primary, update notes) ─────────────────────────────
+    # ── Edit AOR ─────────────────────────────────────────────────────────
 
     @BaseController.put(
         "/edit",
         summary="Edit an AOR record (set primary, change status, update notes)",
         response_model=BaseOutDto[AorOut],
+        dependencies=[Depends(require_permission(RefmModulesEnum.CASES, permission=PType.WRITE))],
     )
     async def aors_edit(
         self,
@@ -68,12 +72,14 @@ class AorController(BaseController):
         service: AorService = Depends(get_aor_service),
     ) -> BaseOutDto[AorOut]:
         return self.success(result=await service.aors_edit(payload=payload))
+
     # ── Remove AOR ────────────────────────────────────────────────────────
 
     @BaseController.delete(
         "/{case_aor_id}/remove",
         summary="Remove an AOR record entirely",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(RefmModulesEnum.CASES, permission=PType.DELETE))],
     )
     async def aors_remove(
         self,

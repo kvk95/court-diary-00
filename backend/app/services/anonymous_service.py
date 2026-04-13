@@ -1,11 +1,10 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from passlib.utils import generate_password
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.cache.refm_cache import RefmCache, RefmData
-from app.database.models.chamber_modules import ChamberModules
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
@@ -21,8 +20,10 @@ from app.database.repositories.user_chamber_link_repository import UserChamberLi
 from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
+from app.dtos.chamber_dto import ChamberAddAdditional
 from app.dtos.users_dto import UserCreateBasic, UserCreateoAuth, UserEmailIn, UserPasswordIn
-from app.services.EmailLinkService import EmailLinkService
+from app.services.chamber_service import ChamberService
+from app.services.email_link_service import EmailLinkService
 from app.services.image_service import ImageService
 from app.utils.security import hash_password
 from app.validators import aggregate_errors
@@ -48,6 +49,7 @@ class AnonymousService(BaseService):
         role_permission_repo: Optional[RolePermissionsRepository] = None,
         email_link_service: Optional[EmailLinkService] = None,
         image_service: Optional[ImageService] = None,
+        chamber_service: Optional[ChamberService] = None,
     ):
         super().__init__(session)
         self.chamber_repo: ChamberRepository = chamber_repo or ChamberRepository()
@@ -60,154 +62,8 @@ class AnonymousService(BaseService):
         self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
         self.email_link_service = email_link_service or EmailLinkService(session=self.session)
-        self.image_service = image_service or ImageService(session)
-
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # PERMISSION MATRIX  ·  data-driven, no hard-coded role names in loops
-    # ─────────────────────────────────────────────────────────────────────────
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # SETUP CHAMBER SECURITY  (steps 3 → 6)
-    # ─────────────────────────────────────────────────────────────────────────
-
-    async def _setup_chamber_security(
-        self,
-        *,
-        chamber_id: str,
-        user_id: str,
-        user_chamber_link_id: str,
-    ) -> None:
-        """
-        3. Add all refm_modules → chamber_modules
-        4. Copy security_roles  → chamber_roles
-        5. Link user            → Administrator chamber_role
-        6. Set role_permissions for every role × module (bulk insert)
-        """
-
-        # ── 3. MODULES ────────────────────────────────────────────────────────
-        # Fix #1: correct resolver call — column_attr=ChamberModules.module_code
-        modules: dict[str, Any] = await self.refm_resolver.get_refm_map(
-            column_attr=ChamberModules.module_code
-        )
-
-        created_modules: list[Any] = await self.chamber_module_repo.bulk_create(
-            session=self.session,
-            data_list=[
-                {
-                    "chamber_id": chamber_id,
-                    "module_code": module_code,
-                    "active_ind": True,
-                    "created_by": user_id,
-                }
-                for module_code in modules
-            ],
-        )
-
-        # Fix #2: correct Any import and type hint
-        chamber_modules_map: dict[str, Any] = {
-            cm.module_code: cm for cm in created_modules
-        }
-
-        # ── 4. ROLES ──────────────────────────────────────────────────────────
-        security_roles = await self.security_role_repo.list_all(session=self.session)
-
-        created_roles: list[Any] = await self.chamber_role_repo.bulk_create(
-            session=self.session,
-            data_list=[
-                {
-                    "chamber_id": chamber_id,
-                    "role_name": role.role_name,
-                    "description": role.description,
-                    "admin_ind": role.admin_ind,
-                    "system_ind": role.system_ind,
-                    "created_by": user_id,
-                }
-                for role in security_roles
-            ],
-        )
-
-        # Fix #2: correct Any import and type hint
-        chamber_roles_map: dict[str, Any] = {
-            cr.role_name: cr for cr in created_roles
-        }
-
-        # ── 5. ASSIGN ADMINISTRATOR ROLE TO USER ──────────────────────────────
-        # Fix #4: safer lookup + improved error message
-        admin_role = chamber_roles_map.get("Administrator")
-        if not admin_role:
-            raise ValueError(
-                "Administrator role not found in security_roles. Ensure seed data exists."
-            )
-
-        await self.user_role_repo.create(
-            session=self.session,
-            data={
-                "link_id": user_chamber_link_id,
-                "role_id": admin_role.role_id,
-                "created_by": user_id,
-            },
-        )
-
-        # ── 6. ROLE PERMISSIONS  (bulk, DB-driven) ─────────────────────────────
-
-        # 1. Load templates
-        templates = await self.role_permission_master_repo.list_all(
-            session=self.session
-        )
-
-        # 2. Build map: role_name → module_code → permissions
-        template_map: dict[str, dict[str, dict[str, Any]]] = {}
-
-        for t in templates:
-            template_map.setdefault(t.role_name, {})[t.module_code] = {
-                "allow_all_ind": t.allow_all_ind,
-                "read_ind": t.read_ind,
-                "write_ind": t.write_ind,
-                "create_ind": t.create_ind,
-                "delete_ind": t.delete_ind,
-                "import_ind": t.import_ind,
-                "export_ind": t.export_ind,
-            }
-
-        # 3. Build permission rows
-        permission_rows: list[dict[str, Any]] = []
-
-        for role_name, chamber_role in chamber_roles_map.items():
-
-            role_templates = template_map.get(role_name)
-
-            for module_code, chamber_module in chamber_modules_map.items():
-
-                if role_templates:
-                    perm = role_templates.get(module_code)
-                else:
-                    perm = None
-
-                # fallback (same as your _DEFAULT_PERMISSION)
-                if not perm:
-                    perm = {
-                        "allow_all_ind": False,
-                        "read_ind": True,
-                        "write_ind": False,
-                        "create_ind": False,
-                        "delete_ind": False,
-                        "import_ind": False,
-                        "export_ind": False,
-                    }
-
-                permission_rows.append({
-                    "role_id": chamber_role.role_id,
-                    "chamber_module_id": chamber_module.chamber_module_id,
-                    "created_by": user_id,
-                    **perm,
-                })
-
-        # 4. Bulk insert
-        await self.role_permission_repo.bulk_create(
-            session=self.session,
-            data_list=permission_rows
-        )    
+        self.image_service = image_service or ImageService(session) 
+        self.chamber_service: ChamberService = chamber_service or ChamberService(session=self.session)
 
     async def _check_user_chamber_membership(self, email: str) -> dict:
         """
@@ -339,9 +195,7 @@ class AnonymousService(BaseService):
     # ─────────────────────────────────────────────────────────────────────────
     # USERS ADD
     # ─────────────────────────────────────────────────────────────────────────
-
     
-
     async def oauth_users_add(self, payload: UserCreateoAuth) -> str:
         user = await self.__create_user(payload)
         update_data: dict = {
@@ -414,35 +268,13 @@ class AnonymousService(BaseService):
             },
         )
 
-        # ── 4. CREATE CHAMBER ─────────────────────────────────────────────────
-        chamber = await self.chamber_repo.create(
-            session=self.session,
-            data={
-                "chamber_name": self.get_initials(first_name, last_name),
-                "email": email.lower(),
-                "plan_code": RefmPlanTypesConstants.FREE,
-                "created_by": user.user_id,
-            },
+        chamber_payload: ChamberAddAdditional = ChamberAddAdditional(
+                chamber_name= self.get_initials(first_name, last_name),
+                email= email.lower(),
+                plan_code = RefmPlanTypesConstants.FREE,
         )
 
-        # ── 5. CREATE CHAMBER LINK ────────────────────────────────────────────
-        link = await self.user_chamber_link_repo.create(
-            session=self.session,
-            data={
-                "user_id": user.user_id,
-                "chamber_id": chamber.chamber_id,
-                "left_date": None,
-                "status_ind": True,
-                "primary_ind": True,
-            },
-        )
-
-        # ── 6-9. MODULES / ROLES / PERMISSIONS ───────────────────────────────
-        await self._setup_chamber_security(
-            chamber_id=chamber.chamber_id,
-            user_id=user.user_id,
-            user_chamber_link_id=link.link_id,
-        )
+        await self.chamber_service.__chamber_create(payload=chamber_payload,user_id=user.user_id)
         
         return user
  

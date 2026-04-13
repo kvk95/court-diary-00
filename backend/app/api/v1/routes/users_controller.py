@@ -2,6 +2,8 @@
 
 from typing import Optional
 from fastapi import Body, Depends, Path, Query
+from app.auth.permissions import PType, require_permission
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusEnum
 from app.dtos.users_dto import (
     UserOut, 
@@ -20,6 +22,7 @@ from app.dependencies import get_current_user, get_users_service
 from app.api.v1.routes.base.base_controller import BaseController
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
+_ADMN = RefmModulesEnum.ADMIN
 
 class UsersController(BaseController):
     CONTROLLER_NAME = "users"
@@ -107,6 +110,7 @@ class UsersController(BaseController):
         "/add",
         summary="Add user to chamber",
         response_model=BaseOutDto[UserOut],
+        dependencies=[Depends(require_permission(_ADMN, PType.CREATE))],
     )
     async def users_add(
         self,
@@ -128,6 +132,7 @@ class UsersController(BaseController):
         user_id: str = Path(..., min_length=36, max_length=36),
         payload: UserEdit = Body(..., description="Fields to update"),
         service: UsersService = Depends(get_users_service),
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     ) -> BaseOutDto[UserOut]:
         result = await service.users_edit(user_id=user_id, payload=payload)
         return self.success(result=result)  
@@ -152,11 +157,13 @@ class UsersController(BaseController):
         "/status",
         summary="Activate or deactivate a user",
         response_model=BaseOutDto[UserOut],
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     )
     async def users_toggle_status(
         self,
         payload: UserStatusToggle = Body(...),
         service: UsersService = Depends(get_users_service),
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     ) -> BaseOutDto[UserOut]:
         result = await service.users_toggle_status(payload=payload)
         return self.success(result=result)
@@ -167,6 +174,7 @@ class UsersController(BaseController):
         "/{user_id}/delete",
         summary="Request user deletion (creates approval request)",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_ADMN, PType.DELETE))],
     )
     async def users_delete(
         self,
@@ -196,6 +204,7 @@ class UsersController(BaseController):
     @BaseController.put(
         "/deletion-requests/{request_id}/approve",
         summary="Approve deletion request (admin)",
+        dependencies=[Depends(require_permission(_ADMN, PType.DELETE))],
         response_model=BaseOutDto[dict],
     )
     async def approve_deletion_request(
@@ -210,6 +219,7 @@ class UsersController(BaseController):
         "/deletion-requests/{request_id}/reject",
         summary="Reject deletion request (admin)",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_ADMN, PType.DELETE))],
     )
     async def reject_deletion_request(
         self,
@@ -228,6 +238,7 @@ class UsersController(BaseController):
         "/{user_id}/add-to-chamber",
         summary="Add user to this chamber",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     )
     async def users_add_to_chamber(
         self,
@@ -241,6 +252,7 @@ class UsersController(BaseController):
         "/{user_id}/remove-from-chamber",
         summary="Remove user from this chamber (preserves user account)",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_ADMN, PType.WRITE))],
     )
     async def users_remove_from_chamber(
         self,

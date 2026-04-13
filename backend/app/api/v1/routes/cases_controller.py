@@ -5,32 +5,22 @@ from typing import List, Optional
 from fastapi import Body, Depends, Path, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
+from app.auth.permissions import PType, require_permission
+from app.database.models.refm_modules import RefmModulesEnum
 from app.dependencies import get_cases_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import (
-    CaseClientLinkPayload,
-    CaseClientLinkedOut,
-    CaseClientOut,
-    CaseCreate,
-    CaseDelete,
-    CaseDetailOut,
-    CaseEdit,
-    CaseListOut,
-    CaseNoteCreate,
-    CaseNoteDelete,
-    CaseNoteEdit,
-    CaseNoteOut,
-    CaseQuickHearingOut,
-    CaseSummaryStats,
-    HearingCreate,
-    HearingDelete,
-    HearingEdit,
-    HearingOut,
-    RecentActivityItem,
+    CaseClientLinkPayload, CaseClientLinkedOut, CaseClientOut,
+    CaseCreate, CaseDelete, CaseDetailOut, CaseEdit, CaseListOut,
+    CaseNoteCreate, CaseNoteDelete, CaseNoteEdit, CaseNoteOut,
+    CaseQuickHearingOut, CaseSummaryStats, HearingCreate, HearingDelete,
+    HearingEdit, HearingOut, RecentActivityItem,
 )
 from app.services.cases_service import CasesService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE, RECORDS_DEFAULT_LIMIT
+
+_CASE = RefmModulesEnum.CASES
 
 
 class CasesController(BaseController):
@@ -45,13 +35,11 @@ class CasesController(BaseController):
     )
     async def cases_get_stats(
         self,
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[CaseSummaryStats]:
         return self.success(result=await service.cases_get_stats())
 
-    # ── List ──────────────────────────────────────────────────────────────
-
-    # ── Stats ─────────────────────────────────────────────────────────────
+    # ── Lookup ────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/cases/lookup",
@@ -61,29 +49,14 @@ class CasesController(BaseController):
     async def get_cases_for_lookup(
         self,
         limit: int = Query(RECORDS_DEFAULT_LIMIT, ge=1, le=500),
-        search: Optional[str] = Query(
-            None,
-            description="Search by case number, petitioner, or respondent",
-        ),
-        service: CasesService = Depends(get_cases_service),
+        search: Optional[str] = Query(None, description="Search by case number, petitioner, or respondent"),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[list[CaseQuickHearingOut]]:
-        """
-        Returns a lightweight list of cases for quick selection.
+        return self.success(result=await service.list_cases_for_quick_hearing(
+            search=search, limit=limit,
+        ))
 
-        Used in:
-        - Quick Hearing Add
-        - Case dropdowns / autocomplete
-
-        Supports:
-        - Search by case number, petitioner, respondent
-        - Limited result set for fast UI response
-        """
-        return self.success(
-            result=await service.list_cases_for_quick_hearing(
-                search=search,
-                limit=limit,
-            )
-        )
+    # ── List ──────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/paged",
@@ -98,7 +71,7 @@ class CasesController(BaseController):
         status_code: Optional[str] = Query(None, description="AC | ADJ | DIS | CLO | OVD"),
         court_id: Optional[int] = Query(None),
         sort_by: str = Query("updated_date", description="updated_date | hearing_date | case_number"),
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[PagingData[CaseListOut]]:
         return self.success(result=await service.cases_get_paged(
             page=page, limit=limit, search=search,
@@ -115,7 +88,7 @@ class CasesController(BaseController):
     async def cases_get_by_id(
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[CaseDetailOut]:
         return self.success(result=await service.cases_get_by_id(case_id=case_id))
 
@@ -125,6 +98,7 @@ class CasesController(BaseController):
         "/add",
         summary="Add a new case",
         response_model=BaseOutDto[CaseDetailOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.CREATE))],
     )
     async def cases_add(
         self,
@@ -139,6 +113,7 @@ class CasesController(BaseController):
         "/edit",
         summary="Edit a case",
         response_model=BaseOutDto[CaseDetailOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.WRITE))],
     )
     async def cases_edit(
         self,
@@ -153,6 +128,7 @@ class CasesController(BaseController):
         "/delete",
         summary="Soft-delete a case",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.DELETE))],
     )
     async def cases_delete(
         self,
@@ -172,11 +148,17 @@ class CasesController(BaseController):
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
         limit: int = Query(10, ge=1, le=50),
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[List[RecentActivityItem]]:
-        return self.success(result=await service.cases_get_recent_activity(case_id=case_id, limit=limit))
+        return self.success(result=await service.cases_get_recent_activity(
+            case_id=case_id, limit=limit,
+        ))
 
-    # ── Hearings — List ───────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════════
+    # Hearings
+    # ═══════════════════════════════════════════════════════════════════════
+
+    # ── List ──────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/{case_id}/hearings",
@@ -186,16 +168,17 @@ class CasesController(BaseController):
     async def hearings_get_by_case(
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[List[HearingOut]]:
         return self.success(result=await service.hearings_get_by_case(case_id=case_id))
 
-    # ── Hearings — Add ────────────────────────────────────────────────────
+    # ── Add ───────────────────────────────────────────────────────────────
 
     @BaseController.post(
         "/hearings/add",
         summary="Add a hearing",
         response_model=BaseOutDto[HearingOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.CREATE))],
     )
     async def hearings_add(
         self,
@@ -204,12 +187,13 @@ class CasesController(BaseController):
     ) -> BaseOutDto[HearingOut]:
         return self.success(result=await service.hearings_add(payload=payload))
 
-    # ── Hearings — Edit ───────────────────────────────────────────────────
+    # ── Edit ──────────────────────────────────────────────────────────────
 
     @BaseController.put(
         "/hearings/edit",
         summary="Edit a hearing",
         response_model=BaseOutDto[HearingOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.WRITE))],
     )
     async def hearings_edit(
         self,
@@ -218,12 +202,13 @@ class CasesController(BaseController):
     ) -> BaseOutDto[HearingOut]:
         return self.success(result=await service.hearings_edit(payload=payload))
 
-    # ── Hearings — Delete ─────────────────────────────────────────────────
+    # ── Delete ────────────────────────────────────────────────────────────
 
     @BaseController.delete(
         "/hearings/delete",
         summary="Delete a hearing",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.DELETE))],
     )
     async def hearings_delete(
         self,
@@ -232,7 +217,11 @@ class CasesController(BaseController):
     ) -> BaseOutDto[dict]:
         return self.success(result=await service.hearings_delete(payload=payload))
 
-    # ── Case Notes — List ─────────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════════
+    # Case Notes
+    # ═══════════════════════════════════════════════════════════════════════
+
+    # ── List ──────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/{case_id}/notes",
@@ -242,16 +231,17 @@ class CasesController(BaseController):
     async def case_notes_get(
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[List[CaseNoteOut]]:
         return self.success(result=await service.case_notes_get_by_case(case_id=case_id))
 
-    # ── Case Notes — Add ──────────────────────────────────────────────────
+    # ── Add ───────────────────────────────────────────────────────────────
 
     @BaseController.post(
         "/notes/add",
         summary="Add a case note",
         response_model=BaseOutDto[CaseNoteOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.DELETE))],
     )
     async def case_notes_add(
         self,
@@ -260,12 +250,13 @@ class CasesController(BaseController):
     ) -> BaseOutDto[CaseNoteOut]:
         return self.success(result=await service.case_notes_add(payload=payload))
 
-    # ── Case Notes — Edit ─────────────────────────────────────────────────
+    # ── Edit ──────────────────────────────────────────────────────────────
 
     @BaseController.put(
         "/notes/edit",
         summary="Edit a case note (author only)",
         response_model=BaseOutDto[CaseNoteOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.WRITE))],
     )
     async def case_notes_edit(
         self,
@@ -274,12 +265,13 @@ class CasesController(BaseController):
     ) -> BaseOutDto[CaseNoteOut]:
         return self.success(result=await service.case_notes_edit(payload=payload))
 
-    # ── Case Notes — Delete ───────────────────────────────────────────────
+    # ── Delete ────────────────────────────────────────────────────────────
 
     @BaseController.delete(
         "/notes/delete",
         summary="Delete a case note",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.DELETE))],
     )
     async def case_notes_delete(
         self,
@@ -288,7 +280,11 @@ class CasesController(BaseController):
     ) -> BaseOutDto[dict]:
         return self.success(result=await service.case_notes_delete(payload=payload))
 
-    # ── Case Clients — List ───────────────────────────────────────────────
+    # ═══════════════════════════════════════════════════════════════════════
+    # Case Clients
+    # ═══════════════════════════════════════════════════════════════════════
+
+    # ── List ──────────────────────────────────────────────────────────────
 
     @BaseController.get(
         "/{case_id}/clients",
@@ -298,16 +294,17 @@ class CasesController(BaseController):
     async def case_clients_get(
         self,
         case_id: str = Path(..., min_length=36, max_length=36),
-        service: CasesService = Depends(get_cases_service),
+        service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[List[CaseClientLinkedOut]]:
         return self.success(result=await service.case_clients_get(case_id=case_id))
 
-    # ── Case Clients — Link ───────────────────────────────────────────────
+    # ── Link ──────────────────────────────────────────────────────────────
 
     @BaseController.post(
         "/{case_id}/clients/link",
         summary="Link a client to a case",
         response_model=BaseOutDto[CaseClientOut],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.WRITE))],
     )
     async def case_clients_link(
         self,
@@ -315,14 +312,17 @@ class CasesController(BaseController):
         payload: CaseClientLinkPayload = Body(...),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[CaseClientOut]:
-        return self.success(result=await service.case_clients_link(case_id=case_id, payload=payload))
+        return self.success(result=await service.case_clients_link(
+            case_id=case_id, payload=payload,
+        ))
 
-    # ── Case Clients — Unlink ─────────────────────────────────────────────
+    # ── Unlink ────────────────────────────────────────────────────────────
 
     @BaseController.delete(
         "/{case_id}/clients/{case_client_id}/unlink",
         summary="Unlink a client from a case",
         response_model=BaseOutDto[dict],
+        dependencies=[Depends(require_permission(_CASE, permission=PType.WRITE))],
     )
     async def case_clients_unlink(
         self,
@@ -330,4 +330,6 @@ class CasesController(BaseController):
         case_client_id: str = Path(..., min_length=36, max_length=36),
         service: CasesService = Depends(get_cases_service),
     ) -> BaseOutDto[dict]:
-        return self.success(result=await service.case_clients_unlink(case_id=case_id, case_client_id=case_client_id))
+        return self.success(result=await service.case_clients_unlink(
+            case_id=case_id, case_client_id=case_client_id,
+        ))
