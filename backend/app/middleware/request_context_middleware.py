@@ -115,6 +115,14 @@ class RequestContextMiddleware:
             if message["type"] == "http.response.start":
                 status_code = message["status"]
                 headers = dict(message.get("headers", []))
+
+                # ✅ Add security headers here
+                headers[b"x-content-type-options"] = b"nosniff"
+                headers[b"x-frame-options"] = b"DENY"
+                headers[b"x-xss-protection"] = b"1; mode=block"
+
+                message["headers"] = list(headers.items())
+
                 for k, v in headers.items():
                     if k.lower() == b"content-type":
                         content_type = v.decode(errors="ignore").lower()
@@ -199,9 +207,9 @@ class RequestContextMiddleware:
                     "request_body": mask_sensitive(request_body),
                     "content_type": content_type,
                     "response_body": mask_sensitive(response_body),
-                    "user_id": ctx.get("user_id"),
-                    "company_id": ctx.get("company_id"),
-                    "ip": ctx.get("ip"),
+                    "actor_user_id": ctx.get("user_id"),
+                    "actor_chamber_id": ctx.get("company_id"),
+                    "ip_address": ctx.get("ip"),
                     "error": error,
                 }
                 

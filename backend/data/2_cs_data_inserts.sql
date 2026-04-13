@@ -375,10 +375,18 @@ INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 -- 19.4  Role Permissions (per chamber role)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO role_permission_master
+INSERT INTO `
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 SELECT 
     'Administrator',
+    code,
+    TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
+FROM refm_modules;
+
+INSERT INTO role_permission_master
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+SELECT 
+    'Senior Advocate',
     code,
     TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
 FROM refm_modules;

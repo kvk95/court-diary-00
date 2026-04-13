@@ -401,8 +401,19 @@ class UsersService(BaseSecuredService):
                     "password_hash": hash_password(password),
                 },
             )
-        else:
+        else:  
             user = membership["user"]
+            # 2. Check ACTIVE link
+            active_link = await self.user_chamber_link_repo.get_active_link(
+                session=self.session,
+                user_id=user.user_id,
+                chamber_id=self.chamber_id,
+            )
+            if active_link:
+                raise ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message="User is already a member of this chamber",
+                )
             if membership["deleted_ind"]:
                 await self._reactivate_user(user.user_id)
  

@@ -17,7 +17,7 @@ from app.database.repositories.security_roles_repository import SecurityRolesRep
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
-from app.dtos.chamber_dto import ChamberAdd, ChamberAddAdditional, ChamberEdit, ChamberOut
+from app.dtos.chamber_dto import ChamberAddAdditional, ChamberEdit, ChamberOut
 from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
@@ -55,11 +55,14 @@ class ChamberService(BaseSecuredService):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _assert_read_permission(self) -> None:
+    async def _assert_read_permission(self) -> None:
         """Raise 403 if the logged-in user lacks read rights on SETT."""
         user = self.userDetails
         # admin_ind bypasses module-level permission checks
         if user.role and user.role.admin_ind:
+            return
+        
+        if await self.__is_own_chamber():
             return
 
         perm = next(
@@ -72,10 +75,13 @@ class ChamberService(BaseSecuredService):
                 message="You do not have permission to view Settings",
             )
 
-    def _assert_write_permission(self) -> None:
+    async def _assert_write_permission(self) -> None:
         """Raise 403 if the logged-in user lacks write rights on SETT."""
         user = self.userDetails
         if user.role and user.role.admin_ind:
+            return
+        
+        if await self.__is_own_chamber():
             return
 
         perm = next(
@@ -103,10 +109,7 @@ class ChamberService(BaseSecuredService):
     
     async def _to_out(self, chamber: Chamber) -> ChamberOut:
 
-        chamber_own  = await self.chamber_repo.get_by_id(
-            session=self.session,
-            filters={Chamber.created_by: self.user_id}
-        )
+        chamber_own = await self.__is_own_chamber()
         return ChamberOut(
             chamber_id=chamber.chamber_id,
             chamber_name=chamber.chamber_name,
@@ -126,6 +129,14 @@ class ChamberService(BaseSecuredService):
             updated_date=chamber.updated_date,
             self_owned_ind = True if chamber_own else False,
         )
+
+    async def __is_own_chamber(self):
+        chamber_own  = await self.chamber_repo.get_by_id(
+            session=self.session,
+            filters={Chamber.created_by: self.user_id}
+        )
+        
+        return chamber_own
 
     # ─────────────────────────────────────────────────────────────────────────
     # SETUP CHAMBER SECURITY  (steps 3 → 6)
@@ -322,13 +333,13 @@ class ChamberService(BaseSecuredService):
         """
 
         # 2. Permission check
-        self._assert_read_permission()
+        # await self._assert_read_permission()
 
         # 3. Fetch & return
         chamber = await self._get_chamber()
         return await self._to_out(chamber)
 
-    async def chamber_add(self, payload: ChamberAdd) -> ChamberOut:
+    async def chamber_add(self) -> ChamberOut:
         """
         POST /settings/chamber
 
@@ -344,9 +355,6 @@ class ChamberService(BaseSecuredService):
           plan_code, subscription_start, subscription_end, status_ind
         """
 
-        # 2. Permission check
-        self._assert_write_permission()
-
         chamber_own  = await self.chamber_repo.get_by_id(
             session=self.session,
             filters={Chamber.created_by: self.user_id}
@@ -355,41 +363,12 @@ class ChamberService(BaseSecuredService):
             raise ValidationErrorDetail(
                 code=ErrorCodes.NOT_FOUND,
                 message="Chamber Already exists for user",
-            )
-
-        # 4. Field-level validations
-        errors = []
-
-        if payload.email and (err := FieldValidator.validate_email(payload.email)):
-            errors.append(err)
-
-        if payload.phone and (err := FieldValidator.validate_phone(payload.phone)):
-            errors.append(err)
-
-        if payload.state_code and len(payload.state_code.strip()) != 2:
-            errors.append(
-                ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message="state_code must be a 2-character code",
-                )
-            )
-
-        if payload.country_code and len(payload.country_code.strip()) != 2:
-            errors.append(
-                ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message="country_code must be a 2-character code",
-                )
-            )
-
-        if errors:
-            aggregate_errors(errors=errors)
-
-        user_out = self.userDetails
-
+            )        
+        
+        user = self.current_user
         chamber_payload: ChamberAddAdditional = ChamberAddAdditional(
-                **payload.model_dump(),
-                chamber_name= self.get_initials(user_out.first_name, user_out.last_name),
+                chamber_name= self.get_initials(user.first_name, user.last_name),
+                email= user.email,
                 plan_code = RefmPlanTypesConstants.FREE,
         )
 
@@ -414,13 +393,19 @@ class ChamberService(BaseSecuredService):
         """
 
         # 2. Permission check
-        self._assert_write_permission()
+        await self._assert_write_permission()
 
         # 3. Confirm chamber exists
         await self._get_chamber()
 
         # 4. Field-level validations
         errors = []
+
+        if not payload.chamber_name:
+            errors.append( ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Chamber Name is required"
+            ))
 
         if payload.email and (err := FieldValidator.validate_email(payload.email)):
             errors.append(err)

@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import EmailStr, field_validator
+from pydantic import EmailStr
 
 from app.dtos.base.base_data import BaseInData, BaseRecordData
 
@@ -56,18 +56,6 @@ class ChamberAdd(BaseInData):
     state_code: Optional[str] = None
     postal_code: Optional[str] = None
     country_code: Optional[str] = None
-
-    @field_validator("chamber_name")
-    @classmethod
-    def name_not_blank(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not v.strip():
-            raise ValueError("chamber_name must not be blank")
-        return v.strip() if v else v
-
-    @field_validator("phone")
-    @classmethod
-    def phone_stripped(cls, v: Optional[str]) -> Optional[str]:
-        return v.strip() if v else v
     
 class ChamberEdit(ChamberAdd):
     pass

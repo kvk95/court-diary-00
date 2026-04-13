@@ -39,7 +39,7 @@ def get_auth_service(
 
 async def get_chamber_service(
     session: AsyncSession = Depends(get_session),
-    _=Depends(require_permission(RefmModulesEnum.ADMIN, PType.READ)),
+    _ = Depends(get_current_user)
 ) -> ChamberService:
     return ChamberService(session=session)
 
