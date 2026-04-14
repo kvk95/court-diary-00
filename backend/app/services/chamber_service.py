@@ -280,7 +280,7 @@ class ChamberService(BaseSecuredService):
             data_list=permission_rows
         )    
     
-    async def __chamber_create(self, payload: ChamberAddAdditional, user_id:str):
+    async def chamber_create(self, payload: ChamberAddAdditional, user_id:str):
                 
         email: str = payload.email or ""
 
@@ -369,7 +369,7 @@ class ChamberService(BaseSecuredService):
                 plan_code = RefmPlanTypesConstants.FREE,
         )
 
-        created_chamber = await self.__chamber_create(payload=chamber_payload,user_id=self.user_id)
+        created_chamber = await self.chamber_create(payload=chamber_payload,user_id=self.user_id)
 
         return await self._to_out(created_chamber)
 
