@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>CourtDiary</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            font-family: "Comfortaa", sans-serif;
+        }
+
+        table {
+            width: 100%;
+        }
+
+        .container {
+            max-width: 580px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* CARD */
+        .main {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            color: #e2e8f0;
+        }
+
+        /* HEADER */
+        .header {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .header img {
+            height: 40px;
+        }
+
+        /* CONTENT */
+        .wrapper {
+            padding: 20px;
+        }
+
+        /* TEXT */
+        h1,
+        h2,
+        h3 {
+            color: #ffffff;
+        }
+
+        p {
+            color: #cbd5f5;
+        }
+
+        /* BUTTON */
+        .btn a {
+            background: #38bdf8;
+            color: #000;
+            padding: 12px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        /* FOOTER */
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .footer td {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <table role="presentation">
+        <tr>
+            <td class="container">
+
+                <!-- HEADER -->
+                <div class="header">
+                    <img src="https://court-diary.nyainfo.com/logo01.svg" alt="CourtDiary">
+                </div>
+
+                <!-- MAIN CARD -->
+                <table class="main">
+                    <tr>
+                        <td class="wrapper">
+                            {body}
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- FOOTER -->
+                <div class="footer">
+                    <table>
+                        <tr>
+                            <td>
+                                This email was sent to [{tomail}] by CourtDiary.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                © CourtDiary. All rights reserved.
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>

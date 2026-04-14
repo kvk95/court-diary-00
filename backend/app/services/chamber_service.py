@@ -280,18 +280,15 @@ class ChamberService(BaseSecuredService):
             data_list=permission_rows
         )    
     
-    async def chamber_create(self, payload: ChamberAddAdditional, user_id:str):
+    async def __chamber_create(self, payload: ChamberAddAdditional, user_id:str):
                 
         email: str = payload.email or ""
-        first_name: str = payload.first_name or ""
-        last_name: str | None = (payload.last_name or "").strip() or None
-        chamber_name = payload.chamber_name or self.get_initials(first_name, last_name)
 
         # ── 4. CREATE CHAMBER ─────────────────────────────────────────────────
         chamber = await self.chamber_repo.create(
             session=self.session,
             data={
-                "chamber_name": self.get_initials(first_name, last_name),
+                "chamber_name": payload.chamber_name,
                 "email": email.lower(),
                 "plan_code": RefmPlanTypesConstants.FREE,
                 "created_by": user_id,
@@ -372,7 +369,7 @@ class ChamberService(BaseSecuredService):
                 plan_code = RefmPlanTypesConstants.FREE,
         )
 
-        created_chamber = await self.chamber_create(payload=chamber_payload,user_id=self.user_id)
+        created_chamber = await self.__chamber_create(payload=chamber_payload,user_id=self.user_id)
 
         return await self._to_out(created_chamber)
 

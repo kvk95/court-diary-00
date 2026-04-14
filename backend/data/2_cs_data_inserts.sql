@@ -332,35 +332,57 @@ INSERT INTO chamber_modules (chamber_id, module_code, active_ind, created_by) VA
 -- 19. SEED DATA — TIER 4 & 5  (Roles & Permissions)
 -- =============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 19.1  Security Roles (Master Templates)
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================
+-- 19.1 Security Roles (Master Table)
+-- =============================================
+INSERT INTO security_roles 
+    (role_name, description, admin_ind, system_ind, created_by) 
+VALUES
+    ('Administrator',    'Full access to all modules and system configuration', TRUE,  TRUE,  @user_vijay),
+    ('Associates',       'Manage cases, hearings, clients, calendar and settlements', FALSE, TRUE,  @user_vijay),
+    ('Counsel',          'Manage office, cases, hearings, clients and calendar', FALSE, TRUE,  @user_vijay),
+    ('Contract',         'Manage cases, hearings and related documents', FALSE, TRUE,  @user_vijay),
+    ('Legal Assistants', 'Assist in case management, hearings and documentation', FALSE, TRUE,  @user_vijay),
+    ('Court Clerks',     'Manage court hearings, scheduling and basic case viewing', FALSE, TRUE,  @user_vijay),
+    ('HR',               'Manage human resources, users and settlement-related administration', FALSE, TRUE,  @user_vijay);
 
-INSERT INTO security_roles (role_name, description, admin_ind, system_ind, created_by) VALUES
-('Administrator',   'Full access to all modules',         TRUE, TRUE, @user_vijay),
-('Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_vijay);
+-- =============================================
+-- 19.2 Chamber Roles (Copy from Master)
+-- =============================================
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 19.2  Chamber Roles (Copy from master)
--- ─────────────────────────────────────────────────────────────────────────────
+-- For Chamber VK
+INSERT INTO chamber_roles 
+    (chamber_id, role_name, description, admin_ind, system_ind, created_by)
+SELECT 
+    @chamber_vk,
+    role_name,
+    description,
+    admin_ind,
+    system_ind,
+    @user_vijay
+FROM security_roles;
 
-INSERT INTO chamber_roles (chamber_id, role_name, description, admin_ind, system_ind, created_by) VALUES
-(@chamber_vk, 'Administrator',   'Full access to all modules',         TRUE, TRUE, @user_vijay),
-(@chamber_vk, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_vijay),
-(@chamber_vk, 'Clerk', 'Manages Office, hearings and clients', 		   FALSE, FALSE, @user_vijay),
-
-(@chamber_sundar, 'Administrator', 'Full access to all modules', FALSE, TRUE, @user_lokesh),
-(@chamber_sundar, 'Senior Advocate', 'Manage cases, hearings and clients', FALSE, TRUE, @user_lokesh);
+-- For Chamber Sundar (override system_ind and created_by as needed)
+INSERT INTO chamber_roles 
+    (chamber_id, role_name, description, admin_ind, system_ind, created_by)
+SELECT 
+    @chamber_sundar,
+    role_name,
+    description,
+    admin_ind,
+    CASE WHEN role_name = 'Administrator' THEN TRUE ELSE FALSE END,   -- Only Administrator is system role here
+    @user_lokesh
+FROM security_roles;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 19.3  User Roles (link to chamber_roles)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SET @role_admin_vk   = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Administrator');
-SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Senior Advocate');
-SET @role_clerk_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Clerk');
+SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Associates');
+SET @role_clerk_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Court Clerks');
 SET @role_admin_sundar = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar AND role_name = 'Administrator');
-SET @role_senior_sundar  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar   AND role_name = 'Senior Advocate');
+SET @role_senior_sundar  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar   AND role_name = 'Associates');
 
 INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_vijay_vk,      @role_admin_vk,   '2024-01-15', @user_vijay),
@@ -375,7 +397,7 @@ INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 -- 19.4  Role Permissions (per chamber role)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO `
+INSERT INTO role_permission_master
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 SELECT 
     'Administrator',
@@ -386,52 +408,87 @@ FROM refm_modules;
 INSERT INTO role_permission_master
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 SELECT 
-    'Senior Advocate',
+    'Associates',
     code,
     TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
 FROM refm_modules;
 
+---------------------------------------------------------
+-- COUNSEL
+---------------------------------------------------------
+INSERT INTO role_permission_master
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+VALUES
+('Counsel','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Counsel','CALD',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Counsel','CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Counsel','CLNT',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Counsel','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Counsel','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Counsel','SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Counsel','USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
+
+---------------------------------------------------------
+-- CONTRACT
+---------------------------------------------------------
+INSERT INTO role_permission_master 
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+VALUES
+('Contract','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Contract','CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Contract','CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Contract','CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Contract','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Contract','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Contract','SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Contract','USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
+
+---------------------------------------------------------
+-- LEGAL ASSISTANTS
+---------------------------------------------------------
+INSERT INTO role_permission_master 
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+VALUES
+('Legal Assistants','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Legal Assistants','CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Legal Assistants','CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Legal Assistants','CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Legal Assistants','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Legal Assistants','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Legal Assistants','SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Legal Assistants','USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
+
+---------------------------------------------------------
+-- COURT CLERKS
+---------------------------------------------------------
+INSERT INTO role_permission_master 
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+VALUES
+('Court Clerks','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Court Clerks','CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Court Clerks','CASE',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Court Clerks','CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Court Clerks','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Court Clerks','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('Court Clerks','SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('Court Clerks','USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
+---------------------------------------------------------
+-- HR
+---------------------------------------------------------
+INSERT INTO role_permission_master 
+(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+VALUES
+('HR','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('HR','CALD',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('HR','CASE',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('HR','CLNT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('HR','DASH',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('HR','HEAR',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+('HR','SETT',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+('HR','USER',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE);
+
 CALL apply_role_permissions(@chamber_vk, @user_vijay);
 CALL apply_role_permissions(@chamber_sundar, @user_lokesh);
-
-SELECT 
-    MAX(CASE WHEN module_code = 'ADMN' THEN chamber_module_id END) AS cm_admn,
-    MAX(CASE WHEN module_code = 'DASH' THEN chamber_module_id END) AS cm_dash,
-    MAX(CASE WHEN module_code = 'CASE' THEN chamber_module_id END) AS cm_case,
-    MAX(CASE WHEN module_code = 'HEAR' THEN chamber_module_id END) AS cm_hear,
-    MAX(CASE WHEN module_code = 'CALD' THEN chamber_module_id END) AS cm_cald,
-    MAX(CASE WHEN module_code = 'CLNT' THEN chamber_module_id END) AS cm_clnt,
-    -- MAX(CASE WHEN module_code = 'BILL' THEN chamber_module_id END) AS cm_bill,
-    MAX(CASE WHEN module_code = 'USER' THEN chamber_module_id END) AS cm_user,
-    -- MAX(CASE WHEN module_code = 'RPRT' THEN chamber_module_id END) AS cm_rprt,
-    MAX(CASE WHEN module_code = 'SETT' THEN chamber_module_id END) AS cm_sett
-    -- MAX(CASE WHEN module_code = 'COLL' THEN chamber_module_id END) AS cm_coll
-INTO 
-    @cm_admn, @cm_dash, @cm_case, @cm_hear, @cm_cald, 
-    @cm_clnt, 
-	-- @cm_bill, 
-	@cm_user, 
-	-- @cm_rprt, 
-	@cm_sett 
-	-- @cm_coll
-FROM chamber_modules
-WHERE chamber_id = @chamber_vk;
-
--- Clerk - Limited Access
-INSERT INTO role_permissions (role_id, chamber_module_id, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind, created_by) VALUES
-(@role_clerk_vk, @cm_admn, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk_vk, @cm_dash, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_case, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk_vk, @cm_hear, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
-(@role_clerk_vk, @cm_cald, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_clnt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
--- (@role_clerk_vk, @cm_bill, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_user, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, @user_vijay),
--- (@role_clerk_vk, @cm_rprt, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay),
-(@role_clerk_vk, @cm_sett, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay)
--- (@role_clerk_vk, @cm_coll, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, @user_vijay);
-;
-
 
 -- =============================================================================
 -- 20. SEED DATA — TIER 6  (Cases — Dashboard Ready)
@@ -598,7 +655,7 @@ INSERT INTO clients (chamber_id, client_type_code, party_type_code, client_name,
  '2024-02-15', 'Writ petition against patta cancellation', FALSE, @user_vijay),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Ramesh Kumar', 'Mr. Ramesh Kumar', 'Ramesh Kumar', 'ramesh.kumar@email.com', '9876503456', '9876503457',
- 'No. 42, Anna Nagar', 'Chennai', 'TN', '600040', 'IN', 'PTPN', 'XYZAB5678C', 'REF', 'Senior Advocate referral',
+ 'No. 42, Anna Nagar', 'Chennai', 'TN', '600040', 'IN', 'PTPN', 'XYZAB5678C', 'REF', 'Associates referral',
  '2025-12-20', 'Anticipatory bail petition - Crl.M.C.No.89/2026', FALSE, @user_priya),
 
 (@chamber_vk, 'CTIN', 'PTCP', 'Lakshmi Devi', 'Mrs. Lakshmi Devi', 'Lakshmi Devi', 'lakshmi.devi@email.com', '9876505678', NULL,

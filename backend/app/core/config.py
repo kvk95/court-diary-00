@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     CORS_ENABLED: bool = True
 
     SMTP_SERVER: Optional[str] = None
-    SMTP_SERVER_PORT: Optional[str] = None
+    SMTP_SERVER_PORT: Optional[int] = None
     SMTP_SERVER_USERNAME: Optional[str] = None
     SMTP_SERVER_PASSWORD: Optional[str] = None
     SMTP_USE_TLS: Optional[bool] = False
@@ -143,6 +143,52 @@ class Settings(BaseSettings):
                 "print('SECRET_KEY=', secrets.token_urlsafe(64))\n"
                 "EOF\n\n"
                 "The server will not start until a secure key is provided.\n" +
+                "=" * 80 + "\n"
+            )
+
+        return self
+    
+    @model_validator(mode="after")
+    def validate_smtp(self):
+        """
+        Ensures SMTP configuration is valid when provided.
+        Enforces security best practices.
+        """
+
+        # If partially configured → fail
+        if not self.SMTP_SERVER or not self.SMTP_SERVER_PORT or not self.SMTP_SERVER_USERNAME or not self.SMTP_SERVER_PASSWORD:
+            raise ValueError(
+                "\n" + "=" * 80 +
+                "\nFATAL CONFIG ERROR: Incomplete SMTP configuration!\n"
+                "All SMTP fields must be provided:\n"
+                "  - SMTP_SERVER\n"
+                "  - SMTP_SERVER_PORT\n"
+                "  - SMTP_SERVER_USERNAME\n"
+                "  - SMTP_SERVER_PASSWORD\n"
+                "=" * 80 + "\n"
+            )
+
+        # Port validation
+        if not (1 <= int(self.SMTP_SERVER_PORT) <= 65535):
+            raise ValueError("SMTP_SERVER_PORT must be between 1 and 65535")
+
+        # Basic security checks
+        weak_values = {"", "changeme", "password", "123456"}
+
+        if self.SMTP_SERVER_PASSWORD.lower() in weak_values:
+            raise ValueError(
+                "\n" + "=" * 80 +
+                "\nFATAL SECURITY ERROR: Weak SMTP password detected!\n"
+                "Use a strong app-specific password.\n"
+                "=" * 80 + "\n"
+            )
+
+        # TLS recommendation enforcement
+        if not self.SMTP_USE_TLS:
+            raise ValueError(
+                "\n" + "=" * 80 +
+                "\nFATAL SECURITY ERROR: SMTP_USE_TLS is disabled!\n"
+                "TLS is required to protect credentials in transit.\n"
                 "=" * 80 + "\n"
             )
 
