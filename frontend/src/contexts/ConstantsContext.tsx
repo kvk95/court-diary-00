@@ -17,7 +17,6 @@ interface ConstantData {
   REFM_CASE_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_CASE_TYPES: { code: string; description: string; status_ind: boolean }[];
   REFM_CLIENT_TYPE: { code: string; description: string; status_ind: boolean }[];
-  REFM_COLLAB_ACCESS: { code: string; description: string; permissions: string; color_code: string; status_ind: boolean }[];
   REFM_COMM_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_COUNTRIES: { code: string; description: string; phone_code: string; status_ind: boolean }[];
   REFM_COURTS: { court_id: string; court_name: string; state_code: string; court_type: string; address: string; status_ind: boolean }[];
@@ -26,7 +25,6 @@ interface ConstantData {
   REFM_HEARING_PURPOSE: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_HEARING_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_IMG_UPLOAD_FOR: { code: string; description: string; status_ind: boolean }[];
-  REFM_INVITATION_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
   REFM_LOGIN_STATUS: { code: string; description: string }[];
   REFM_MODULES: { code: string; name: string; description: string; status_ind: boolean }[];
   REFM_PARTY_ROLES: { code: string; description: string; category: string; status_ind: boolean }[];
@@ -44,7 +42,6 @@ const initialConstants: ConstantData = {
   REFM_CASE_STATUS: [],
   REFM_CASE_TYPES: [],
   REFM_CLIENT_TYPE: [],
-  REFM_COLLAB_ACCESS: [],
   REFM_COMM_STATUS: [],
   REFM_COUNTRIES: [],
   REFM_COURTS: [],
@@ -53,7 +50,6 @@ const initialConstants: ConstantData = {
   REFM_HEARING_PURPOSE: [],
   REFM_HEARING_STATUS: [],
   REFM_IMG_UPLOAD_FOR: [],
-  REFM_INVITATION_STATUS: [],
   REFM_LOGIN_STATUS: [],
   REFM_MODULES: [],
   REFM_PARTY_ROLES: [],

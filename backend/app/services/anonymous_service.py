@@ -274,7 +274,7 @@ class AnonymousService(BaseService):
                 plan_code = RefmPlanTypesConstants.FREE,
         )
 
-        await self.chamber_service.__chamber_create(payload=chamber_payload,user_id=user.user_id)
+        await self.chamber_service.chamber_create(payload=chamber_payload,user_id=user.user_id)
         
         return user
  
