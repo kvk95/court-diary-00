@@ -424,9 +424,9 @@ SELECT
     TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
 FROM refm_modules;
 
----------------------------------------------------------
+-- -------------------------------------------------------
 -- COUNSEL
----------------------------------------------------------
+-- -------------------------------------------------------
 INSERT INTO role_permission_master
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 VALUES
@@ -439,9 +439,9 @@ VALUES
 ('Counsel','SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
 ('Counsel','USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
----------------------------------------------------------
+-- -------------------------------------------------------
 -- CONTRACT
----------------------------------------------------------
+-- -------------------------------------------------------
 INSERT INTO role_permission_master 
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 VALUES
@@ -454,9 +454,9 @@ VALUES
 ('Contract','SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
 ('Contract','USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
----------------------------------------------------------
+-- -------------------------------------------------------
 -- LEGAL ASSISTANTS
----------------------------------------------------------
+-- -------------------------------------------------------
 INSERT INTO role_permission_master 
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 VALUES
@@ -469,9 +469,9 @@ VALUES
 ('Legal Assistants','SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
 ('Legal Assistants','USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
----------------------------------------------------------
+-- -------------------------------------------------------
 -- COURT CLERKS
----------------------------------------------------------
+-- -------------------------------------------------------
 INSERT INTO role_permission_master 
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 VALUES
@@ -483,9 +483,9 @@ VALUES
 ('Court Clerks','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
 ('Court Clerks','SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
 ('Court Clerks','USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
----------------------------------------------------------
+-- -------------------------------------------------------
 -- HR
----------------------------------------------------------
+-- -------------------------------------------------------
 INSERT INTO role_permission_master 
 (role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
 VALUES
