@@ -1,15 +1,17 @@
 # app/services/dashboard_service.py
 
 from datetime import date, datetime, timedelta
-from typing import Optional, List
+from typing import List, Optional, Any, Callable, Dict, Iterable, TypeVar
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.database.models.activity_log import ActivityLog
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.hearings import Hearings
 from app.database.models.refm_modules import RefmModulesConstants
+from app.database.models.users import Users
 from app.database.repositories.dashboard_repository import DashboardRepository
 from app.dtos.dashboard_dto import (
     AdminDashboardOut,
@@ -26,26 +28,7 @@ from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.dtos.roles_dto import RoleOut
 from app.dtos.users_dto import UserOut
 from app.services.base.secured_base_service import BaseSecuredService
-
-
-def _greeting(hour: int) -> str:
-    if hour < 12:
-        return "Good morning"
-    if hour < 17:
-        return "Good afternoon"
-    return "Good evening"
-
-
-def _full_name(first: Optional[str], last: Optional[str]) -> str:
-    return " ".join(p for p in [first, last] if p) or "User"
-
-
-def _trend_pct(current: int, previous: int) -> Optional[float]:
-    """Calculate month-over-month percentage change. Returns None if previous is 0."""
-    if previous == 0:
-        return None
-    return round(((current - previous) / previous) * 100, 1)
-
+from app.utils.activity_formatter import format_activity
 
 class DashboardService(BaseSecuredService):
     def __init__(
@@ -59,6 +42,40 @@ class DashboardService(BaseSecuredService):
     # ===================================================================
     # HELPERS
     # ===================================================================
+
+    def _greeting(self, hour: int) -> str:
+        if hour < 12:
+            return "Good morning"
+        if hour < 17:
+            return "Good afternoon"
+        return "Good evening"
+
+
+    def _full_name(self, first: Optional[str], last: Optional[str]) -> str:
+        return " ".join(p for p in [first, last] if p) or "User"
+
+
+    def _trend_pct(self, current: int, previous: int) -> Optional[float]:
+        """Calculate month-over-month percentage change. Returns None if previous is 0."""
+        if previous == 0:
+            return None
+        return round(((current - previous) / previous) * 100, 1)
+
+    K = TypeVar("K")
+    V = TypeVar("V")
+
+    async def _load_map(
+        self,
+        ids: Iterable[K],
+        query_builder: Callable[[list[K]], Any],
+        key_fn: Callable[[Any], K],
+        value_fn: Callable[[Any], V],
+    ) -> Dict[K, V]:
+        ids = list({i for i in ids if i})
+        if not ids:
+            return {}
+        rows = (await self.session.execute(query_builder(ids))).all()
+        return {key_fn(r): value_fn(r) for r in rows}
 
     async def _get_hearing_status_maps(self):
         """Load both description and color maps once."""
@@ -162,7 +179,7 @@ class DashboardService(BaseSecuredService):
         # BUILD RESPONSE
         # =========================
         mainDashboardOut: MainDashboardOut = MainDashboardOut(
-            greeting=_greeting(hour),
+            greeting=self._greeting(hour),
             user_first_name=user_first_name,
 
             # ✅ FIXED
@@ -215,21 +232,7 @@ class DashboardService(BaseSecuredService):
             session=self.session, chamber_id=cid, today=today
         )
         
-        activity_rows = await self.repo.get_recent_activity(
-            session=self.session, chamber_id=cid
-        )
-
-        # Convert recent activity (dict rows)
-        recent_activity = [
-            RecentActivityItem(
-                activity_id=r["activity_id"],
-                action=r["action"],
-                target=r["target"],
-                actor_name=_full_name(r.get("first_name"), r.get("last_name")),
-                created_date=r["created_date"],
-            )
-            for r in activity_rows
-        ]
+        recent_activity = await self.get_recent_activity()
 
         return AdminDashboardOut(
             stat_cards=AdminStatCards(
@@ -285,3 +288,49 @@ class DashboardService(BaseSecuredService):
             total_cases=total_cases,
             total_clients=total_clients,
         )
+
+    # ─────────────────────────────────────────────────────────────────────
+    # RECENT ACTIVITY
+    # ─────────────────────────────────────────────────────────────────────
+
+    async def get_recent_activity(
+        self, limit: int = 10
+    ) -> List[RecentActivityItem]:
+        try:
+            rows = await self.session.execute(
+                select(
+                    ActivityLog.action,
+                    ActivityLog.actor_user_id,
+                    ActivityLog.created_date,
+                    ActivityLog.metadata_json,
+                )
+                .where(
+                    ActivityLog.actor_chamber_id == self.chamber_id,
+                )
+                .order_by(ActivityLog.created_date.desc())
+                .limit(limit)
+            )
+            activity_rows = rows.fetchall()
+        except Exception:
+            return []
+        
+        # Load actor names efficiently
+        actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
+        actor_map = await self._load_map(
+            actor_ids,
+            lambda ids: select(
+                Users.user_id,
+                Users.first_name,
+                Users.last_name,
+            ).where(Users.user_id.in_(ids)),
+            lambda r: r.user_id,
+            lambda r: self.full_name(r.first_name, r.last_name),
+        )
+
+        return [
+            format_activity(
+                log=r,
+                actor_name=actor_map.get(r.actor_user_id) if r.actor_user_id else "System",
+            )
+            for r in activity_rows
+        ]

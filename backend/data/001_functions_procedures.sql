@@ -95,12 +95,25 @@ BEGIN
         rpm.export_ind,
         p_user_id
     FROM role_permission_master rpm
+
     JOIN chamber_roles cr
-        ON cr.role_name = rpm.role_name
+        ON cr.security_role_id = rpm.security_role_id
        AND cr.chamber_id = p_chamber_id
+       AND cr.status_ind = TRUE
+       AND cr.deleted_ind = FALSE
+
     JOIN chamber_modules cm
         ON cm.module_code = rpm.module_code
-       AND cm.chamber_id = p_chamber_id;
+       AND cm.chamber_id = p_chamber_id
+       AND cm.active_ind = TRUE
+       AND cm.deleted_ind = FALSE
+
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM role_permissions rp
+        WHERE rp.role_id = cr.role_id
+          AND rp.chamber_module_id = cm.chamber_module_id
+    );
 
 END$$
 

@@ -405,25 +405,45 @@ CREATE TABLE user_chamber_link (
 
 DROP TABLE IF EXISTS chamber_modules;
 CREATE TABLE chamber_modules (
-    chamber_module_id CHAR(36)     PRIMARY KEY,  
-    chamber_id        CHAR(36)     NOT NULL,  
-    module_code       CHAR(8)      NOT NULL,
-    active_ind        BOOLEAN      DEFAULT TRUE,
-    created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        CHAR(36)     NULL,  
-    updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        CHAR(36)     NULL,  
-    CONSTRAINT uk_cmodule_chamber
-        UNIQUE KEY (chamber_id, module_code),
-    CONSTRAINT fk_cmodule_chamber
-        FOREIGN KEY (chamber_id)  REFERENCES chamber(chamber_id)  ON DELETE CASCADE,
-    CONSTRAINT fk_cmodule_module
-        FOREIGN KEY (module_code) REFERENCES refm_modules(code)   ON DELETE RESTRICT,
-    CONSTRAINT fk_cmodule_created_by
-        FOREIGN KEY (created_by)  REFERENCES users(user_id)        ON DELETE SET NULL,
-    CONSTRAINT fk_cmodule_updated_by
-        FOREIGN KEY (updated_by)  REFERENCES users(user_id)        ON DELETE SET NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Modules allocated per chamber';
+    chamber_module_id CHAR(36) PRIMARY KEY,
+
+    chamber_id CHAR(36) NOT NULL,
+    module_code CHAR(8) NOT NULL,
+
+    active_ind BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_ind BOOLEAN DEFAULT FALSE,
+    deleted_date TIMESTAMP NULL,
+    deleted_by CHAR(36) NULL,
+
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+
+    -- Constraints
+    UNIQUE KEY uk_chamber_module (chamber_id, module_code),
+
+    CONSTRAINT fk_cmodules_chamber
+        FOREIGN KEY (chamber_id)
+        REFERENCES chamber(chamber_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_cmodules_module
+        FOREIGN KEY (module_code)
+        REFERENCES refm_modules(code)
+        ON DELETE RESTRICT,
+
+    -- 🔥 Audit FKs
+    CONSTRAINT fk_cmodules_created_by 
+        FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+
+    CONSTRAINT fk_cmodules_updated_by 
+        FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
+
+    CONSTRAINT fk_cmodules_deleted_by 
+        FOREIGN KEY (deleted_by) REFERENCES users(user_id) ON DELETE SET NULL
+
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Modules enabled per chamber';
 
 -- =============================================================================
 -- 6. TIER 4 — Roles (INT for security_roles, UUID v7 for others)
@@ -434,22 +454,34 @@ CREATE TABLE chamber_modules (
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS security_roles;
+
 CREATE TABLE security_roles (
-    role_id      INT          AUTO_INCREMENT PRIMARY KEY,  -- Keep INT (small table)
-    role_name    VARCHAR(80)  NOT NULL,
-    description  TEXT         NULL,
-    system_ind   BOOLEAN      NOT NULL DEFAULT TRUE,
-    admin_ind    BOOLEAN      NOT NULL DEFAULT FALSE,
-    status_ind   BOOLEAN      NOT NULL DEFAULT TRUE,
-    deleted_ind  BOOLEAN      DEFAULT FALSE,
-    deleted_date TIMESTAMP    NULL,
-    deleted_by   CHAR(36)     NULL,  
-    created_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by   CHAR(36)     NULL,  
-    updated_date TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by   CHAR(36)     NULL,  
-    CONSTRAINT uk_role_name
-        UNIQUE KEY (role_name)
+    role_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    role_code VARCHAR(20) NOT NULL UNIQUE,
+    role_name VARCHAR(80) NOT NULL,
+    description TEXT NULL,
+
+    system_ind BOOLEAN NOT NULL DEFAULT TRUE,
+    admin_ind  BOOLEAN NOT NULL DEFAULT FALSE,
+    status_ind BOOLEAN NOT NULL DEFAULT TRUE,
+
+    deleted_ind BOOLEAN DEFAULT FALSE,
+    deleted_date TIMESTAMP NULL,
+    deleted_by CHAR(36) NULL,
+
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+
+    CONSTRAINT uk_role_name UNIQUE (role_name),
+
+    -- 🔥 AUDIT FKs
+    CONSTRAINT fk_sroles_created_by FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_sroles_updated_by FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_sroles_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(user_id) ON DELETE SET NULL
+
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Master role templates';
 
 
@@ -458,27 +490,42 @@ CREATE TABLE security_roles (
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS chamber_roles;
+
 CREATE TABLE chamber_roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
+
     chamber_id CHAR(36) NOT NULL,
+    security_role_id INT NULL,
+	role_code VARCHAR(20) NOT NULL,
     role_name VARCHAR(80) NOT NULL,
     description TEXT NULL,
-	system_ind BOOLEAN NOT NULL DEFAULT FALSE,
+
+    system_ind BOOLEAN NOT NULL DEFAULT FALSE,
     admin_ind  BOOLEAN NOT NULL DEFAULT FALSE,
     status_ind BOOLEAN NOT NULL DEFAULT TRUE,
+
     deleted_ind BOOLEAN DEFAULT FALSE,
     deleted_date TIMESTAMP NULL,
     deleted_by CHAR(36) NULL,
+
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by CHAR(36) NULL,
     updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     updated_by CHAR(36) NULL,
-    CONSTRAINT uk_chamber_role_name UNIQUE KEY (chamber_id, role_name),
-    CONSTRAINT fk_croles_chamber FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
+
+    CONSTRAINT uk_chamber_role UNIQUE (chamber_id, role_name, role_code),
+
+    CONSTRAINT fk_croles_security_role
+        FOREIGN KEY (security_role_id)
+        REFERENCES security_roles(role_id)
+        ON DELETE SET NULL,
+
+    -- 🔥 AUDIT FKs
     CONSTRAINT fk_croles_created_by FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
     CONSTRAINT fk_croles_updated_by FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
-    INDEX idx_croles_chamber (chamber_id, status_ind)
-) ENGINE=InnoDB COMMENT='Chamber-specific role instances';
+    CONSTRAINT fk_croles_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(user_id) ON DELETE SET NULL
+
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Chamber-specific roles';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6.2  User Roles for PK, INT for role_id FK
@@ -511,10 +558,12 @@ CREATE TABLE user_roles (
 -- 7.1  Role Permissions  →  security_roles, chamber_modules,role_permission_master, users
 -- ─────────────────────────────────────────────────────────────────────────────
 DROP TABLE IF EXISTS role_permission_master;
+
 CREATE TABLE role_permission_master (
     id INT AUTO_INCREMENT PRIMARY KEY,
 
-    role_name VARCHAR(80) NOT NULL,
+    security_role_id INT NOT NULL,   -- ✅ FIXED
+
     module_code CHAR(8) NOT NULL,
 
     allow_all_ind BOOLEAN DEFAULT FALSE,
@@ -525,12 +574,19 @@ CREATE TABLE role_permission_master (
     import_ind BOOLEAN DEFAULT FALSE,
     export_ind BOOLEAN DEFAULT FALSE,
 
-    CONSTRAINT fk_rpt_module
-        FOREIGN KEY (module_code)
-        REFERENCES refm_modules(code),
+    CONSTRAINT fk_rpm_role
+        FOREIGN KEY (security_role_id)
+        REFERENCES security_roles(role_id)
+        ON DELETE CASCADE,
 
-    UNIQUE KEY (role_name, module_code)
-);
+    CONSTRAINT fk_rpm_module
+        FOREIGN KEY (module_code)
+        REFERENCES refm_modules(code)
+        ON DELETE RESTRICT,
+
+    UNIQUE KEY uk_rpm (security_role_id, module_code)
+
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Default permissions per global role';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 7.2  Role Permissions  →  security_roles, chamber_modules, users
@@ -1288,6 +1344,27 @@ CREATE TABLE support_tickets (
     INDEX idx_tickets_due_date (due_date)
     
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Support Ticket Management System';
+
+DROP TABLE IF EXISTS contact_messages;
+
+CREATE TABLE contact_messages (
+    message_id      BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    full_name       VARCHAR(150) NOT NULL,
+    email           VARCHAR(150) NOT NULL,
+    subject         VARCHAR(255),
+    message         TEXT NOT NULL,
+
+    chamber_id      CHAR(36) NULL,
+    audit_user_id   CHAR(36) NULL,
+
+    created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    deleted_ind     BOOLEAN DEFAULT FALSE,
+    deleted_date TIMESTAMP NULL,
+    deleted_by CHAR(36) NULL
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Contact Us / Message';
 
 
 -- =============================================================================

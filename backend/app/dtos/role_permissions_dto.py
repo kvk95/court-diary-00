@@ -33,12 +33,14 @@ class RolePermissionModuleOut(RolePermissionBase):
 class RolePermissionMatrixOut(BaseModel):
     """Full permission matrix for a role."""
     role_id: int
+    role_code: str
     role_name: str
     permissions: list[RolePermissionModuleOut]
 
 class RolePermissionsSummaryOut(BaseModel):
     """Summary of permissions for all roles (for admin view)."""
     role_id: int
+    role_code: str
     role_name: str
     description: Optional[str]
     status_ind: bool

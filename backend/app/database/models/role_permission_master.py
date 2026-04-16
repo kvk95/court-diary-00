@@ -1,6 +1,6 @@
 """role_permission_master"""
 
-from sqlalchemy import ForeignKey, Boolean, CHAR, Integer, String
+from sqlalchemy import ForeignKey, Boolean, CHAR, Integer
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -14,11 +14,11 @@ class RolePermissionMaster(BaseModel):
     # id : INTEGER
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
 
-    # role_name : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
-    role_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    # security_role_id : INTEGER
+    security_role_id: Mapped[int] = mapped_column(Integer, ForeignKey("security_roles.role_id", ondelete="CASCADE"), nullable=False)
 
     # module_code : CHAR(8) COLLATE "utf8mb4_unicode_ci"
-    module_code: Mapped[str] = mapped_column(CHAR(8), ForeignKey("refm_modules.code"), nullable=False)
+    module_code: Mapped[str] = mapped_column(CHAR(8), ForeignKey("refm_modules.code", ondelete="RESTRICT"), nullable=False)
 
     # allow_all_ind : TINYINT
     allow_all_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
@@ -43,6 +43,13 @@ class RolePermissionMaster(BaseModel):
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
+
+    # role_permission_master.security_role_id -> security_roles.role_id
+    role_permission_master_security_role_id_security_roles = relationship(
+        "SecurityRoles",
+        foreign_keys=[security_role_id], 
+        backref=backref("role_permission_master_security_role_id_security_roless", cascade="all, delete-orphan")
+    )
 
     # role_permission_master.module_code -> refm_modules.code
     role_permission_master_module_code_refm_modules = relationship(

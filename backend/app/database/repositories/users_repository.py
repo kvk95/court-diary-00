@@ -62,6 +62,7 @@ class UsersRepository(BaseRepository[Users]):
                 UserProfiles.font_family,
                 # Role fields
                 ChamberRoles.role_id,
+                ChamberRoles.role_code,
                 ChamberRoles.role_name,
                 ChamberRoles.description.label("role_description"),
                 ChamberRoles.status_ind.label("role_status_ind"),
@@ -138,6 +139,7 @@ class UsersRepository(BaseRepository[Users]):
             } if row.profile_id else None,
             "role": {
                 "role_id": row.role_id,
+                "role_code": row.role_code,
                 "role_name": row.role_name,
                 "description": row.role_description,
                 "status_ind": row.role_status_ind,
@@ -160,6 +162,7 @@ class UsersRepository(BaseRepository[Users]):
         page: int,
         limit: int,
         chamber_id: str,
+        role_code: Optional[str] = None,
         search: Optional[str] = None,
         status_ind: Optional[bool]=None,
     ) -> Tuple[List[Dict[str, Any]], int]:
@@ -179,6 +182,7 @@ class UsersRepository(BaseRepository[Users]):
                 UserChamberLink.status_ind,
                 Users.created_date,
                 ChamberRoles.role_id,
+                ChamberRoles.role_code,
                 ChamberRoles.role_name,
                 ChamberRoles.description.label("role_description"),
                 ChamberRoles.status_ind.label("role_status_ind"),
@@ -209,6 +213,9 @@ class UsersRepository(BaseRepository[Users]):
                 UserChamberLink.left_date.is_(None),
             )
         )
+
+        if role_code and role_code.strip():
+            stmt = stmt.where( ChamberRoles.role_code == role_code.strip() )
 
         if search and search.strip():
             kw = f"%{search.strip()}%"
@@ -252,6 +259,7 @@ class UsersRepository(BaseRepository[Users]):
                 "image_data": row.image_data,
                 "role": {
                     "role_id": row.role_id,
+                    "role_code": row.role_code,
                     "role_name": row.role_name,
                     "description": row.role_description,
                     "status_ind": row.role_status_ind,

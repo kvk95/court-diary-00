@@ -43,6 +43,7 @@ class RefmModulesConstants:
     HEARINGS = 'HEAR'
     SETTINGS = 'SETT'
     USER_MANAGEMENT = 'USER'
+    SUPER_USER = 'SUPER'
 
 class RefmModulesEnum(str, PyEnum):
     ADMIN = RefmModulesConstants.ADMIN
@@ -53,3 +54,4 @@ class RefmModulesEnum(str, PyEnum):
     HEARINGS = RefmModulesConstants.HEARINGS
     SETTINGS = RefmModulesConstants.SETTINGS
     USER_MANAGEMENT = RefmModulesConstants.USER_MANAGEMENT
+    SUPER_USER = RefmModulesConstants.SUPER_USER

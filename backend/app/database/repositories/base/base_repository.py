@@ -507,7 +507,7 @@ class BaseRepository(Generic[ModelType]):
 
         # chamber_id (insert only usually)
         if not is_update:
-            if hasattr(self.model, "chamber_id") and "chamber_id" not in result:
+            if hasattr(self.model, "chamber_id") and "chamber_id" not in result and not self.anonymous:
                 result["chamber_id"] = self.chamber_id
 
         # 🔥 updated_date ALWAYS on update

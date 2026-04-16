@@ -1,9 +1,10 @@
 """dashboard_dto.py — DTOs for Main Dashboard and Admin Dashboard"""
 
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional
 
 from app.dtos.base.base_data import BaseRecordData
+from app.dtos.cases_dto import RecentActivityItem
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -85,15 +86,6 @@ class AdminStatCards(BaseRecordData):
     # Trend indicators (month-over-month)
     users_trend_pct: Optional[float] = None    # e.g. 12.0 → shown as "+12%"
     active_users_trend_pct: Optional[float] = None
-
-
-class RecentActivityItem(BaseRecordData):
-    """One row in the Recent Activity feed."""
-    activity_id: str
-    action: str
-    target: Optional[str] = None
-    actor_name: Optional[str] = None
-    created_date: Optional[datetime] = None
 
 
 class AdminDashboardOut(BaseRecordData):

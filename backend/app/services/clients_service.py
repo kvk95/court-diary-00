@@ -54,17 +54,17 @@ class ClientsService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def _get_client_details(self, client_id: str) -> Clients:
-            client = await self.clients_repo.get_by_id(
-                session=self.session,
-                filters={Clients.client_id: client_id, Clients.chamber_id: self.chamber_id},
-            )
-            if not client:
-                raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client not found")
-            return client
+        client = await self.clients_repo.get_by_id(
+            session=self.session,
+            filters={Clients.client_id: client_id, Clients.chamber_id: self.chamber_id},
+        )
+        if not client:
+            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client not found")
+        return client
     
     async def _linked_cases_count(self, client_id: str) -> int:
         stmt = select(func.count(CaseClients.case_client_id)).where(CaseClients.client_id == client_id)
-        return await self.case_clients_repo.execute_scalar( session=self.session, stmt=stmt)
+        return await self.case_clients_repo.execute_scalar(session=self.session, stmt=stmt)
 
     async def _linked_cases(self, client_id: str):
         rows, total = await self.case_clients_repo.list_cases_for_client(
@@ -72,12 +72,6 @@ class ClientsService(BaseSecuredService):
             chamber_id=self.chamber_id,
             client_id=client_id,
         )
-
-        print(f"[_linked_cases] client_id={client_id} total={total} rows_count={len(rows)}")
-        for i, r in enumerate(rows):
-            print(f"  row[{i}] Cases={r.Cases.case_id if hasattr(r, 'Cases') else 'NO_CASES'} "
-                f"party_role={getattr(r, 'party_role_code', 'MISSING')} "
-                f"case_client_id={getattr(r, 'case_client_id', 'MISSING')}")
 
         used_court_ids      = {r.Cases.court_id       for r in rows if r.Cases.court_id}
         used_case_statuses  = {r.Cases.status_code    for r in rows if r.Cases.status_code}
@@ -216,9 +210,7 @@ class ClientsService(BaseSecuredService):
             updated_date=client.updated_date,
             linked_cases_count=total,
             linked_cases=records,
-            
-            case_client_id= '',
-            # case_clients=case_clients_out,
+            case_client_id='',
         )
 
     # ─────────────────────────────────────────────────────────────────────
@@ -236,12 +228,11 @@ class ClientsService(BaseSecuredService):
         client_type_map = await self.refm_resolver.get_desc_map(
             column_attr=Clients.client_type_code,
             value_column=RefmClientType.description
-        );
-
+        )
         party_type_map = await self.refm_resolver.get_desc_map(
             column_attr=Clients.party_type_code,
             value_column=RefmPartyType.description
-        );
+        )
 
         client_ids = [c.client_id for c in clients]
         image_map = await self.profile_images_repo.get_images_by_client_ids(
@@ -267,7 +258,6 @@ class ClientsService(BaseSecuredService):
             )
             for c in clients
         ]
-
 
     async def clients_get_paged(
         self,
@@ -422,6 +412,15 @@ class ClientsService(BaseSecuredService):
             image_upload_code=RefmImgUploadForEnum.CLIENT,
             description="Client image uploaded"
         )
+
+        # 📝 LOG ACTIVITY
+        await self.log_entity_change(
+            action="Client created",
+            entity_type="client",
+            entity_id=client.client_id,
+            payload=payload,
+        )
+
         return await self._to_detail_out(client)
 
     # ─────────────────────────────────────────────────────────────────────
@@ -445,6 +444,15 @@ class ClientsService(BaseSecuredService):
             description="Client image uploaded"
         )
 
+        # 📝 LOG ACTIVITY
+        await self.log_entity_change(
+            action="Client updated",
+            entity_type="client",
+            entity_id=client_id,
+            payload=payload,
+            extra_metadata={"updated_fields": list(data.keys())},
+        )
+
         return await self._to_detail_out(client)
 
     async def clients_notes_edit(self, client_id: str, payload: ClientNotesEdit) -> ClientDetailOut:
@@ -459,6 +467,14 @@ class ClientsService(BaseSecuredService):
             session=self.session,
             id_values=client_id,
             data=self.clients_repo.map_fields_to_db_column(data),
+        )
+
+        # 📝 LOG ACTIVITY
+        await self.log_entity_change(
+            action="Client notes updated",
+            entity_type="client",
+            entity_id=client_id,
+            payload=payload,
         )
 
         return await self._to_detail_out(client)
@@ -476,5 +492,14 @@ class ClientsService(BaseSecuredService):
                 code=ErrorCodes.VALIDATION_ERROR,
                 message=f"Cannot delete client: linked to {linked} case(s). Unlink first.",
             )
+
+        # 📝 LOG ACTIVITY (before soft delete to preserve client_name)
+        await self.log_entity_change(
+            action="Client deleted",
+            entity_type="client",
+            entity_id=client_id,
+            extra_metadata={"client_name": client.client_name},
+        )
+
         await self.clients_repo.delete(session=self.session, id_values=client_id, soft=True)
         return {"client_id": client_id, "deleted": True}

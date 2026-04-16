@@ -80,6 +80,7 @@ class RolePermissionsService(BaseSecuredService):
         return [
             RolePermissionsSummaryOut(
                 role_id=row["role_id"],
+                role_code=row["role_code"],
                 role_name=row["role_name"],
                 description=row["description"],
                 status_ind=row["status_ind"],
@@ -89,7 +90,6 @@ class RolePermissionsService(BaseSecuredService):
             for row in rows
         ]
 
-    # ✅ NEW: Get all roles with full permission matrix
     async def get_all_roles_full_matrix(
         self,
     ) -> dict:
@@ -111,6 +111,7 @@ class RolePermissionsService(BaseSecuredService):
             if row["role_id"] not in roles_dict:
                 roles_dict[row["role_id"]] = {
                     "role_id": row["role_id"],
+                    "role_code": row["role_code"],
                     "role_name": row["role_name"],
                 }
 
@@ -135,8 +136,8 @@ class RolePermissionsService(BaseSecuredService):
                 "write_ind": bool(row.get("write_ind")) if row.get("write_ind") is not None else False,
                 "create_ind": bool(row.get("create_ind")) if row.get("create_ind") is not None else False,
                 "delete_ind": bool(row.get("delete_ind")) if row.get("delete_ind") is not None else False,
-                "import_ind": bool(row.get("import_ind")) if row.get("import_ind") is not None else False,  # ✅ NEW
-                "export_ind": bool(row.get("export_ind")) if row.get("export_ind") is not None else False,  # ✅ NEW
+                "import_ind": bool(row.get("import_ind")) if row.get("import_ind") is not None else False,
+                "export_ind": bool(row.get("export_ind")) if row.get("export_ind") is not None else False,
             })
 
         return {
@@ -153,7 +154,6 @@ class RolePermissionsService(BaseSecuredService):
         """Bulk upsert permissions for a role from the toggle matrix."""
 
         # 1. Verify the chamber_role exists and belongs to current chamber
-        #    (Base repo will automatically apply chamber_id filter)
         role = await self.chamber_roles_repo.get_by_id(
             session=self.session, 
             id_values=role_id
@@ -164,10 +164,10 @@ class RolePermissionsService(BaseSecuredService):
                 message=f"Role {role_id} not found"
             )
 
+        updated_module_ids = []
         for dto in payload:
             # 2. Verify module exists and is active in current chamber
-            #    Using repository so chamber_id filter is applied automatically
-            module = await self.chamber_modules_repo.get_first(   # assuming you have ChamberModulesRepository
+            module = await self.chamber_modules_repo.get_first(
                 self.session,
                 filters={
                     ChamberModules.chamber_module_id: dto.chamber_module_id
@@ -194,7 +194,7 @@ class RolePermissionsService(BaseSecuredService):
                 "export_ind": getattr(dto, 'export_ind', False),
             }
 
-            # 4. Upsert using repository (recommended)
+            # 4. Upsert using repository
             await self.role_permissions_repo.upsert(
                 session=self.session,
                 filters={
@@ -203,6 +203,23 @@ class RolePermissionsService(BaseSecuredService):
                 },
                 data=perm_data,
             )
+            updated_module_ids.append(dto.chamber_module_id)
+
+        # 📝 LOG ACTIVITY
+        # Payload is a List, so we pass None to avoid model_dump() errors
+        # and capture a concise audit summary in extra_metadata
+        await self.log_entity_change(
+            action="Role permissions updated",
+            entity_type="role",
+            entity_id=str(role_id),
+            payload=None,
+            extra_metadata={
+                "role_code": role.role_code,
+                "role_name": role.role_name,
+                "modules_updated_count": len(updated_module_ids),
+                "modules_updated": updated_module_ids[:50],  # Cap for log size limits
+            },
+        )
 
         return True
 
@@ -221,6 +238,7 @@ class RolePermissionsService(BaseSecuredService):
 
         return RolePermissionMatrixOut(
             role_id=role_id,
+            role_code=role.role_code,
             role_name=role.role_name,
             permissions=permissions,
         )

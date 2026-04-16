@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession    
 
 from app.core.config import Settings
+from app.utils.logging_framework.activity_logger import log_activity
 from app.utils.refm.refm_resolver import RefmResolver
 
 class BaseService:
@@ -36,3 +37,28 @@ class BaseService:
     @property
     def ui_url(self)->str:
         return self.settings.UI_URL
+
+    # ─────────────────────────────────────────────────────────────────────
+    # LOG ACTIVITY — HELPER
+    # ─────────────────────────────────────────────────────────────────────
+    
+    async def log_entity_change(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        case_id: Optional[str] = None,
+        payload: Optional[Any] = None,
+        extra_metadata: Optional[Dict] = None,
+    ):
+        """Standardized logging for entity CRUD operations."""
+        metadata = payload.model_dump(exclude_unset=True, exclude_none=True) if payload else {}
+        metadata.update(extra_metadata or {})
+        if case_id:
+            metadata["case_id"] = case_id
+        
+        target = f"{entity_type}:{entity_id}"
+        if case_id:
+            target = f"case:{case_id}:{entity_type}:{entity_id}"
+        
+        await log_activity(action=action, target=target, metadata=metadata)

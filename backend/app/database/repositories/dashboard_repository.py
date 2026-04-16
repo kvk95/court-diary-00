@@ -7,7 +7,6 @@ from sqlalchemy import func, select, case, distinct, exists, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.database.models.activity_log import ActivityLog
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
 from app.database.models.clients import Clients
@@ -382,25 +381,6 @@ class DashboardRepository(BaseRepository[Cases]):
             "users_trend_pct": users_trend,
             "active_users_trend_pct": active_trend,
         }
-
-    async def get_recent_activity(
-        self, session: AsyncSession, chamber_id: str, limit: int = 10
-    ) -> list:
-        rows = await self.execute( session=session, stmt=
-            select(
-                ActivityLog.id.label("activity_id"),
-                ActivityLog.action,
-                ActivityLog.target,
-                ActivityLog.created_date,
-                Users.first_name,
-                Users.last_name,
-            )
-            .outerjoin(Users, ActivityLog.actor_user_id == Users.user_id)
-            .where(ActivityLog.actor_chamber_id == chamber_id)
-            .order_by(ActivityLog.created_date.desc())
-            .limit(limit)
-        )
-        return [dict(row._mapping) for row in rows.all()]
 
     async def get_case_count(
         self,

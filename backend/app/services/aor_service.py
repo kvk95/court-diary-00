@@ -38,7 +38,6 @@ class AorService(BaseSecuredService):
         self.users_chamer_repo = users_chamer_repo or UserChamberLinkRepository()
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
 
-
     # ─────────────────────────────────────────────────────────────────────
     # HELPERS
     # ─────────────────────────────────────────────────────────────────────
@@ -62,7 +61,6 @@ class AorService(BaseSecuredService):
         return self.full_name(user.first_name, user.last_name) if user else ""
 
     async def _to_out(self, aor, advocate_name, img) -> AorOut:
-
         return AorOut(
             case_aor_id=aor.case_aor_id,
             chamber_id=self.chamber_id,
@@ -73,7 +71,7 @@ class AorService(BaseSecuredService):
             image_data='', #img["image_data"] if img else None,
             primary_ind=bool(aor.primary_ind),
             status_code=aor.status_code or RefmAorStatusConstants.ACTIVE,
-            status_description= await self.refm_resolver.from_column(
+            status_description=await self.refm_resolver.from_column(
                 column_attr=CaseAors.status_code,
                 value_column=RefmAorStatus.description,
                 code=aor.status_code,
@@ -102,8 +100,9 @@ class AorService(BaseSecuredService):
         user_ids = list({a.user_id for a in aors})
         name_map: dict = {}
         if user_ids:
-            rows = await self.aors_repo.execute( session=self.session, stmt=
-                select(Users.user_id, Users.first_name, Users.last_name,)
+            rows = await self.aors_repo.execute(
+                session=self.session, 
+                stmt=select(Users.user_id, Users.first_name, Users.last_name)
                 .where(Users.user_id.in_(user_ids))
             )
             name_map = {r.user_id: self.full_name(r.first_name, r.last_name) for r in rows}
@@ -124,9 +123,8 @@ class AorService(BaseSecuredService):
             for a in aors
         ]
     
-    async def aors_get_by_chamber(self,search: Optional[str]) -> List[UserBasicInfoOut]:
-        rows = await self.aors_repo.aors_get_by_chamber(session=self.session,
-                                                        search=search)
+    async def aors_get_by_chamber(self, search: Optional[str]) -> List[UserBasicInfoOut]:
+        rows = await self.aors_repo.aors_get_by_chamber(session=self.session, search=search)
 
         user_ids = [c.user_id for c in rows]
 
@@ -136,9 +134,8 @@ class AorService(BaseSecuredService):
         )
         return [
             UserBasicInfoOut(
-
                 user_id=row.user_id,
-                full_name=self.full_name(row.first_name,row.last_name),
+                full_name=self.full_name(row.first_name, row.last_name),
                 first_name=row.first_name,
                 last_name=row.last_name,
                 email=row.email,
@@ -156,7 +153,6 @@ class AorService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def aors_add(self, payload: AorCreate) -> AorOut:
-
         # Verify user is an active member of this chamber
         link = await self.users_chamer_repo.get_first(
             session=self.session,
@@ -207,7 +203,17 @@ class AorService(BaseSecuredService):
         aor = await self.aors_repo.create(
             session=self.session,
             data=self.aors_repo.map_fields_to_db_column(data),
-        )        
+        )
+
+        # 📝 LOG ACTIVITY
+        await self.log_entity_change(
+            action="AOR added",
+            entity_type="aor",
+            entity_id=aor.case_aor_id,
+            case_id=payload.case_id,
+            payload=payload,
+            extra_metadata={"advocate_user_id": payload.user_id},
+        )
 
         image_map = await self.profile_images_repo.get_images_by_user_ids(
             session=self.session,
@@ -238,6 +244,16 @@ class AorService(BaseSecuredService):
                 id_values=payload.case_aor_id,
                 data=self.aors_repo.map_fields_to_db_column(data),
             )
+            
+            # 📝 LOG ACTIVITY (only when actual fields changed)
+            await self.log_entity_change(
+                action="AOR updated",
+                entity_type="aor",
+                entity_id=payload.case_aor_id,
+                case_id=aor.case_id,
+                payload=payload,
+                extra_metadata={"updated_fields": list(data.keys())},
+            )
 
         image_map = await self.profile_images_repo.get_images_by_user_ids(
             session=self.session,
@@ -250,7 +266,21 @@ class AorService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def aors_remove(self, case_aor_id: str) -> dict:
-        await self._get_aor_case_detail(case_aor_id)
+        aor = await self._get_aor_case_detail(case_aor_id)
+        
+        # 📝 LOG ACTIVITY (before delete to preserve context)
+        await self.log_entity_change(
+            action="AOR removed",
+            entity_type="aor",
+            entity_id=case_aor_id,
+            case_id=aor.case_id,
+            extra_metadata={
+                "advocate_user_id": aor.user_id,
+                "primary_ind": bool(aor.primary_ind),
+                "status_code": aor.status_code,
+            },
+        )
+        
         await self.aors_repo.delete(session=self.session, id_values=case_aor_id, soft=False)
         return {"case_aor_id": case_aor_id, "deleted": True}
 
@@ -260,16 +290,7 @@ class AorService(BaseSecuredService):
 
     async def _demote_existing_primary(self, case_id: str) -> None:
         """Set primary_ind=False on any currently-primary AOR for this case."""
-        existing_primary = await self.aors_repo.list_all(
-            session=self.session,
-            where = (
-                CaseAors.case_id == case_id,
-                CaseAors.chamber_id == self.chamber_id,
-                CaseAors.primary_ind.is_(True),
-                CaseAors.status_code == RefmAorStatusConstants.ACTIVE,
-            )
-        )
-        
+        # Note: Changed `where = (...)` to `where = [...]` for SQLAlchemy compatibility
         await self.aors_repo.bulk_update(
             session=self.session,
             where=[
@@ -279,6 +300,6 @@ class AorService(BaseSecuredService):
                 CaseAors.status_code == RefmAorStatusConstants.ACTIVE,
             ],
             data={
-                "primary_ind":False,
+                "primary_ind": False,
             },
         )

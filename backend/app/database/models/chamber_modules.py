@@ -1,9 +1,10 @@
 """chamber_modules"""
 
-from sqlalchemy import ForeignKey, Boolean, CHAR
+from sqlalchemy import ForeignKey, Boolean, CHAR, DateTime
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
+from datetime import datetime
 from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
@@ -22,7 +23,16 @@ class ChamberModules(BaseModel, TimestampMixin):
     module_code: Mapped[str] = mapped_column(CHAR(8), ForeignKey("refm_modules.code", ondelete="RESTRICT"), nullable=False)
 
     # active_ind : TINYINT
-    active_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=True)
+    active_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # deleted_ind : TINYINT
+    deleted_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
+
+    # deleted_date : TIMESTAMP
+    deleted_date: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # deleted_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    deleted_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
 
     # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
@@ -45,6 +55,13 @@ class ChamberModules(BaseModel, TimestampMixin):
         "RefmModules",
         foreign_keys=[module_code], 
         backref=backref("chamber_modules_module_code_refm_moduless", cascade="all, delete-orphan")
+    )
+
+    # chamber_modules.deleted_by -> users.user_id
+    chamber_modules_deleted_by_users = relationship(
+        "Users",
+        foreign_keys=[deleted_by], 
+        backref=backref("chamber_modules_deleted_by_userss", cascade="all, delete-orphan")
     )
 
     # chamber_modules.created_by -> users.user_id

@@ -252,6 +252,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         stmt = (
             select(
                 ChamberRoles.role_id,
+                ChamberRoles.role_code,
                 ChamberRoles.role_name,
                 ChamberRoles.description,
                 ChamberRoles.status_ind,
@@ -282,11 +283,12 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             )
             .group_by(
                 ChamberRoles.role_id,
+                ChamberRoles.role_code,
                 ChamberRoles.role_name,
                 ChamberRoles.description,
                 ChamberRoles.status_ind,
             )
-            .order_by(ChamberRoles.role_name)
+            .order_by(ChamberRoles.role_code)
         )
 
         result = await self.execute( session=session, stmt=stmt)
@@ -295,6 +297,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         return [
             {
                 "role_id": row.role_id,
+                "role_code":row.role_code,
                 "role_name": row.role_name,
                 "description": row.description,
                 "status_ind": row.status_ind,
@@ -318,6 +321,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
             select(
                 ChamberRoles.role_id,
                 ChamberRoles.role_name,
+                ChamberRoles.role_code,
                 RolePermissions.permission_id,
                 RolePermissions.chamber_module_id,
                 RolePermissions.allow_all_ind,
@@ -349,7 +353,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
                 ChamberModules.active_ind.is_(True),
             )
             .order_by(
-                ChamberRoles.role_name,
+                ChamberRoles.role_code,
                 RefmModules.sort_order,
             )
         )
@@ -360,6 +364,7 @@ class RolePermissionsRepository(BaseRepository[RolePermissions]):
         return [
             {
                 "role_id": row.role_id,
+                "role_code":row.role_code,
                 "role_name": row.role_name,
                 "permission_id": row.permission_id,
                 "chamber_module_id": row.chamber_module_id,

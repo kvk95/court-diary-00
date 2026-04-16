@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
@@ -32,20 +32,24 @@ class RolesService(BaseSecuredService):
         self,
         page: int,
         limit: int,
+        role_code: Optional[str] = None,
         search: Optional[str] = None,
         status: Optional[bool] = None,
     ) -> PagingData[RoleWithStatsOut]:
         """Paginated roles with active user count."""
+        # Read-only: No logging
         total, rows = await self.chamber_roles_repo.get_roles_paged(
             session=self.session,
             page=page,
             limit= limit, 
+            role_code=role_code,
             search=search, 
             status=status)
 
         roles = [
             RoleWithStatsOut(
                 role_id=role_row.role_id,
+                role_code=role_row.role_code,
                 role_name=role_row.role_name,
                 description=role_row.description,
                 status_ind=role_row.status_ind,
@@ -59,6 +63,7 @@ class RolesService(BaseSecuredService):
         return builder.build(records=roles)
 
     async def get_role_by_id(self, role_id: int) -> RoleOut:
+        # Read-only: No logging
         role = await self.chamber_roles_repo.get_by_id(
             session=self.session, id_values=role_id
         )
@@ -69,29 +74,40 @@ class RolesService(BaseSecuredService):
         return RoleOut.model_validate(role)
 
     async def roles_add(self, payload: RoleCreate) -> RoleOut:
+        if not payload.role_code or not payload.role_code.strip():
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Role code is required"
+            )
         if not payload.role_name or not payload.role_name.strip():
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
                 message="Role name is required"
             )
 
+        role_code = payload.role_code.strip()
         role_name = payload.role_name.strip()
 
         # ✅ Check active duplicate
         existing = await self.chamber_roles_repo.get_first(
             self.session,
-            filters={ChamberRoles.role_name: role_name},
-            where=[ChamberRoles.deleted_ind.is_(False)],
+            where=[
+                ChamberRoles.deleted_ind.is_(False),
+                or_(
+                    ChamberRoles.role_name == role_name,
+                    ChamberRoles.role_code == role_code,
+                ),
+            ],
         )
         if existing:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
-                message=f"Role name '{role_name}' already exists",
+                message=f"Role code '{role_code}' or Role name '{role_name}' already exists",
             )
 
         # ✅ Check including deleted
         stmt = select(ChamberRoles).where(
-            ChamberRoles.role_name == role_name,
+            ChamberRoles.role_name == role_code,
             ChamberRoles.chamber_id == self.chamber_id
         )
         result = await self.session.execute(stmt)
@@ -99,13 +115,12 @@ class RolesService(BaseSecuredService):
 
         if existing_code:
             if existing_code.deleted_ind:
-                # 🔥 Step 1: undelete
+                # 🔥 Revive Soft-Deleted Role
                 await self.chamber_roles_repo.undelete(
                     session=self.session,
                     id_values=existing_code.role_id
                 )
 
-                # 🔥 Step 2: update normally
                 revived = await self.chamber_roles_repo.update(
                     session=self.session,
                     id_values=existing_code.role_id,
@@ -115,22 +130,37 @@ class RolesService(BaseSecuredService):
                     }
                 )
 
-                return RoleOut.model_validate(revived)
-
-            else:
-                raise ValidationErrorDetail(
-                    code=ErrorCodes.VALIDATION_ERROR,
-                    message=f"Role name '{role_name}' already exists",
+                await self.log_entity_change(
+                    action="Role revived",
+                    entity_type="role",
+                    entity_id=str(revived.role_id),
+                    extra_metadata={"role_name": role_name}
                 )
 
-        # ✅ CREATE (this was missing ❗)
+                return RoleOut.model_validate(revived)
+            else:
+                # This branch is theoretically unreachable if the active check above is correct
+                raise ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message=f"Role code '{role_code}' already exists",
+                )
+
+        # ✅ CREATE new role
         role = await self.chamber_roles_repo.create(
             session=self.session,
             data={
+                "role_code": role_code,
                 "role_name": role_name,
                 "description": payload.description,
                 "status_ind": payload.status_ind if payload.status_ind is not None else True,
             },
+        )
+
+        await self.log_entity_change(
+            action="Role created",
+            entity_type="role",
+            entity_id=str(role.role_id),
+            payload=payload
         )
 
         return RoleOut.model_validate(role)
@@ -153,7 +183,7 @@ class RolesService(BaseSecuredService):
         if payload.role_name and payload.role_name.strip():
             new_name = payload.role_name.strip()
 
-            # Active duplicate
+            # Active duplicate check (excluding current role)
             duplicate = await self.chamber_roles_repo.get_first(
                 self.session,
                 filters={
@@ -169,7 +199,7 @@ class RolesService(BaseSecuredService):
                     message=f"Role name '{new_name}' already exists in this chamber."
                 )
 
-            # Soft-deleted duplicate
+            # Soft-deleted duplicate check
             stmt = select(ChamberRoles).where(
                 ChamberRoles.chamber_id == self.chamber_id,
                 ChamberRoles.role_name == new_name,
@@ -181,6 +211,7 @@ class RolesService(BaseSecuredService):
             soft_deleted_duplicate = result.scalars().first()
 
             if soft_deleted_duplicate:
+                # 🔥 Edge Case: Resurrect the deleted duplicate instead of updating current role
                 revived = await self.chamber_roles_repo.update(
                     session=self.session,
                     id_values=soft_deleted_duplicate.role_id,
@@ -191,6 +222,17 @@ class RolesService(BaseSecuredService):
                         "status_ind": payload.status_ind if payload.status_ind is not None else True,
                     }
                 )
+                
+                await self.log_entity_change(
+                    action="Role revived and updated",
+                    entity_type="role",
+                    entity_id=str(soft_deleted_duplicate.role_id),
+                    extra_metadata={
+                        "role_name": new_name,
+                        "reason": "Name conflict resolution: Revived soft-deleted duplicate"
+                    }
+                )
+
                 return RoleOut.model_validate(revived)
 
             update_data["role_name"] = new_name
@@ -211,6 +253,14 @@ class RolesService(BaseSecuredService):
             session=self.session,
             id_values=role_id,
             data=update_data
+        )
+
+        await self.log_entity_change(
+            action="Role updated",
+            entity_type="role",
+            entity_id=str(role_id),
+            payload=payload,
+            extra_metadata={"updated_fields": list(update_data.keys())}
         )
 
         return RoleOut.model_validate(updated)
@@ -240,9 +290,17 @@ class RolesService(BaseSecuredService):
         await self.chamber_roles_repo.delete(
             session=self.session, id_values=role_id, soft=True
         )
+        
+        await self.log_entity_change(
+            action="Role deleted",
+            entity_type="role",
+            entity_id=str(role_id),
+            extra_metadata={"role_name": role.role_name}
+        )
         return True
 
     async def get_role_stats(self, role_id: int) -> RoleUserCountOut:
+        # Read-only: No logging
         stmt = select(func.count(UserRoles.user_role_id)).where(
             and_(UserRoles.role_id == role_id, UserRoles.end_date.is_(None))
         )
@@ -251,7 +309,7 @@ class RolesService(BaseSecuredService):
         return RoleUserCountOut(role_id=role_id, user_count=user_count)
 
     async def get_all_roles(self) -> list[RoleOut]:
-        """Lightweight list for dropdowns (no pagination needed)."""
+        # Read-only: No logging
         roles = await self.chamber_roles_repo.list_all(
             session=self.session,
             where=[ChamberRoles.deleted_ind.is_(False), ChamberRoles.status_ind.is_(True)],

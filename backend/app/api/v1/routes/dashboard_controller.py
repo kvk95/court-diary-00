@@ -1,5 +1,6 @@
 """dashboard_controller.py — HTTP routes for Main Dashboard and Admin Dashboard"""
 
+
 from fastapi import Depends
 
 from app.api.v1.routes.base.base_controller import BaseController
@@ -50,6 +51,8 @@ class DashboardController(BaseController):
     )
     async def get_cases_client_counts(
         self,
-        service: DashboardService = Depends(get_dashboard_service),  # read enforced in factory
+        service: DashboardService = Depends(get_dashboard_service),
     ) -> BaseOutDto[SummaryCountsOut]:
         return self.success(result=await service.get_cases_client_counts())
+
+    # ── Recent Activity ───────────────────────────────────────────────────

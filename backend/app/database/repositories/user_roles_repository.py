@@ -1,14 +1,12 @@
 # app/database/repositories/user_roles_repository.py
 
-from typing import Optional, Tuple,List,Any, Dict
+from typing import Optional
 
 from datetime import date
-from sqlalchemy import and_, select,func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.user_roles import UserRoles
 from app.database.models.user_roles import UserRoles
-from app.database.models.chamber_roles import ChamberRoles
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
@@ -89,61 +87,3 @@ class UserRolesRepository(BaseRepository[UserRoles]):
                 "start_date": date.today(),
             },
         )
-    
-    async def get_roles_paged(
-        self,
-        session: AsyncSession,
-        page: int,
-        limit: int,
-        search: Optional[str] = None,
-        status: Optional[bool] = None,
-    ) -> Tuple[List[Dict[str, Any]], int]:
-        """Paginated roles with active user count."""
-        stmt = (
-            select(
-                ChamberRoles.role_id,
-                ChamberRoles.role_name,
-                ChamberRoles.description,
-                ChamberRoles.status_ind,
-                func.count(UserRoles.user_role_id).label("user_count"),
-            )
-            .outerjoin(
-                UserRoles,
-                and_(
-                    ChamberRoles.role_id == UserRoles.role_id,
-                    UserRoles.end_date.is_(None),
-                ),
-            )
-            .where(ChamberRoles.deleted_ind.is_(False))
-            .group_by(ChamberRoles.role_id)
-        )
-
-        if search and search.strip():
-            stmt = stmt.where(ChamberRoles.role_name.ilike(f"%{search.strip()}%"))
-
-        if status is not None:
-            stmt = stmt.where(ChamberRoles.status_ind == status)
-
-        # Count
-        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
-        total = await self.execute_scalar( session=session, stmt=count_stmt)
-
-        # Pagination
-        stmt = stmt.order_by(ChamberRoles.role_name.asc())
-        stmt = stmt.offset((page - 1) * limit).limit(limit)
-
-        result = await self.execute( session=session, stmt=stmt)
-        rows = result.all()
-
-        roles = [
-            {
-                "role_id": row.role_id,
-                "role_name": row.role_name,
-                "description": row.description,
-                "status_ind": row.status_ind,
-                "user_count": row.user_count or 0,
-            }
-            for row in rows
-        ]
-
-        return roles, total

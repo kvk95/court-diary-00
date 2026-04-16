@@ -338,34 +338,35 @@ INSERT INTO chamber_modules (chamber_id, module_code, active_ind, created_by) VA
 -- (@chamber_sundar, 'COLL', TRUE,  @user_lokesh)
 ;
 
-
 -- =============================================================================
 -- 19. SEED DATA — TIER 4 & 5  (Roles & Permissions)
 -- =============================================================================
 
 -- =============================================
--- 19.1 Security Roles (Master Table)
+-- 19.1 Security Roles
 -- =============================================
 INSERT INTO security_roles 
-    (role_name, description, admin_ind, system_ind, created_by) 
+(role_code, role_name, description, admin_ind, system_ind, created_by)
 VALUES
-    ('Administrator',    'Full access to all modules and system configuration', TRUE,  TRUE,  @user_vijay),
-    ('Associates',       'Manage cases, hearings, clients, calendar and settlements', FALSE, TRUE,  @user_vijay),
-    ('Counsel',          'Manage office, cases, hearings, clients and calendar', FALSE, TRUE,  @user_vijay),
-    ('Contract',         'Manage cases, hearings and related documents', FALSE, TRUE,  @user_vijay),
-    ('Legal Assistants', 'Assist in case management, hearings and documentation', FALSE, TRUE,  @user_vijay),
-    ('Court Clerks',     'Manage court hearings, scheduling and basic case viewing', FALSE, TRUE,  @user_vijay),
-    ('HR',               'Manage human resources, users and settlement-related administration', FALSE, TRUE,  @user_vijay);
+('ADMIN','Administrator','Full access to all modules and system configuration',TRUE,TRUE,@user_vijay),
+('ASSO','Associates','Manage cases, hearings, clients, calendar and settlements',FALSE,TRUE,@user_vijay),
+('CNSL','Counsel','Manage office, cases, hearings, clients and calendar',FALSE,TRUE,@user_vijay),
+('CONT','Contract','Manage cases, hearings and related documents',FALSE,TRUE,@user_vijay),
+('LASS','Legal Assistants','Assist in case management, hearings and documentation',FALSE,TRUE,@user_vijay),
+('CLRK','Court Clerks','Manage court hearings, scheduling and basic case viewing',FALSE,TRUE,@user_vijay),
+('HR','HR','Manage human resources and administration',FALSE,TRUE,@user_vijay);
 
 -- =============================================
--- 19.2 Chamber Roles (Copy from Master)
+-- 19.2 Chamber Roles (copy from master)
 -- =============================================
 
--- For Chamber VK
+-- Chamber VK
 INSERT INTO chamber_roles 
-    (chamber_id, role_name, description, admin_ind, system_ind, created_by)
+(chamber_id, security_role_id, role_code, role_name, description, admin_ind, system_ind, created_by)
 SELECT 
     @chamber_vk,
+    role_id,
+	role_code,
     role_name,
     description,
     admin_ind,
@@ -373,131 +374,146 @@ SELECT
     @user_vijay
 FROM security_roles;
 
--- For Chamber Sundar (override system_ind and created_by as needed)
+-- Chamber Sundar
 INSERT INTO chamber_roles 
-    (chamber_id, role_name, description, admin_ind, system_ind, created_by)
+(chamber_id, security_role_id, role_code, role_name, description, admin_ind, system_ind, created_by)
 SELECT 
     @chamber_sundar,
+    role_id,
+	role_code,
     role_name,
     description,
     admin_ind,
-    CASE WHEN role_name = 'Administrator' THEN TRUE ELSE FALSE END,   -- Only Administrator is system role here
+    CASE WHEN role_code = 'ADMIN' THEN TRUE ELSE FALSE END,
     @user_lokesh
 FROM security_roles;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 19.3  User Roles (link to chamber_roles)
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================
+-- 19.3 User Roles
+-- =============================================
 
-SET @role_admin_vk   = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Administrator');
-SET @role_senior_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Associates');
-SET @role_clerk_vk  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_vk   AND role_name = 'Court Clerks');
-SET @role_admin_sundar = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar AND role_name = 'Administrator');
-SET @role_senior_sundar  = (SELECT role_id FROM chamber_roles WHERE chamber_id = @chamber_sundar   AND role_name = 'Associates');
+SET @role_admin_vk   = (
+    SELECT role_id FROM chamber_roles 
+    WHERE chamber_id = @chamber_vk 
+      AND security_role_id = (SELECT role_id FROM security_roles WHERE role_code='ADMIN')
+);
+
+SET @role_asso_vk = (
+    SELECT role_id FROM chamber_roles 
+    WHERE chamber_id = @chamber_vk 
+      AND security_role_id = (SELECT role_id FROM security_roles WHERE role_code='ASSO')
+);
+
+SET @role_clerk_vk = (
+    SELECT role_id FROM chamber_roles 
+    WHERE chamber_id = @chamber_vk 
+      AND security_role_id = (SELECT role_id FROM security_roles WHERE role_code='CLRK')
+);
+
+SET @role_admin_sundar = (
+    SELECT role_id FROM chamber_roles 
+    WHERE chamber_id = @chamber_sundar 
+      AND security_role_id = (SELECT role_id FROM security_roles WHERE role_code='ADMIN')
+);
+
+SET @role_asso_sundar = (
+    SELECT role_id FROM chamber_roles 
+    WHERE chamber_id = @chamber_sundar 
+      AND security_role_id = (SELECT role_id FROM security_roles WHERE role_code='ASSO')
+);
 
 INSERT INTO user_roles (link_id, role_id, start_date, created_by) VALUES
 (@link_vijay_vk,      @role_admin_vk,   '2024-01-15', @user_vijay),
-(@link_priya_vk,      @role_senior_vk,  '2024-02-01', @user_vijay),
-(@link_karthik_vk,    @role_senior_vk,  '2024-03-10', @user_vijay),
-(@link_jerem_vk,      @role_senior_vk,  '2024-02-01', @user_vijay),
+(@link_priya_vk,      @role_asso_vk,    '2024-02-01', @user_vijay),
+(@link_karthik_vk,    @role_asso_vk,    '2024-03-10', @user_vijay),
+(@link_jerem_vk,      @role_asso_vk,    '2024-02-01', @user_vijay),
 (@link_suresh_vk,     @role_clerk_vk,   '2024-02-01', @user_vijay),
-(@link_lokesh_sundar, @role_admin_sundar, '2024-01-20', @user_lokesh),
-(@link_priya_sundar,  @role_senior_sundar,  '2024-02-01', @user_lokesh);
+(@link_lokesh_sundar, @role_admin_sundar,'2024-01-20', @user_lokesh),
+(@link_priya_sundar,  @role_asso_sundar, '2024-02-01', @user_lokesh);
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 19.4  Role Permissions (per chamber role)
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================
+-- 19.4 Role Permission Master
+-- =============================================
 
+-- Get role IDs
+SET @r_admin    = (SELECT role_id FROM security_roles WHERE role_code='ADMIN');
+SET @r_asso     = (SELECT role_id FROM security_roles WHERE role_code='ASSO');
+SET @r_counsel  = (SELECT role_id FROM security_roles WHERE role_code='CNSL');
+SET @r_contract = (SELECT role_id FROM security_roles WHERE role_code='CONT');
+SET @r_legal    = (SELECT role_id FROM security_roles WHERE role_code='LASS');
+SET @r_clerk    = (SELECT role_id FROM security_roles WHERE role_code='CLRK');
+SET @r_hr       = (SELECT role_id FROM security_roles WHERE role_code='HR');
+
+-- ADMIN (full access)
 INSERT INTO role_permission_master
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-SELECT 
-    'Administrator',
-    code,
-    TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
+(security_role_id, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+SELECT @r_admin, code, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
 FROM refm_modules;
 
+-- ASSOCIATES (full access)
 INSERT INTO role_permission_master
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-SELECT 
-    'Associates',
-    code,
-    TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
+(security_role_id, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
+SELECT @r_asso, code, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE
 FROM refm_modules;
 
--- -------------------------------------------------------
 -- COUNSEL
--- -------------------------------------------------------
-INSERT INTO role_permission_master
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-VALUES
-('Counsel','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Counsel','CALD',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Counsel','CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Counsel','CLNT',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Counsel','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Counsel','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Counsel','SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Counsel','USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
+INSERT INTO role_permission_master VALUES
+(NULL,@r_counsel,'ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_counsel,'CALD',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_counsel,'CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_counsel,'CLNT',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_counsel,'DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_counsel,'HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_counsel,'SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_counsel,'USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
--- -------------------------------------------------------
 -- CONTRACT
--- -------------------------------------------------------
-INSERT INTO role_permission_master 
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-VALUES
-('Contract','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Contract','CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Contract','CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Contract','CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Contract','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Contract','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Contract','SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Contract','USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
+INSERT INTO role_permission_master VALUES
+(NULL,@r_contract,'ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_contract,'CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_contract,'CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_contract,'CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_contract,'DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_contract,'HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_contract,'SETT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_contract,'USER',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
--- -------------------------------------------------------
 -- LEGAL ASSISTANTS
--- -------------------------------------------------------
-INSERT INTO role_permission_master 
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-VALUES
-('Legal Assistants','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Legal Assistants','CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Legal Assistants','CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Legal Assistants','CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Legal Assistants','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Legal Assistants','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Legal Assistants','SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Legal Assistants','USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
+INSERT INTO role_permission_master VALUES
+(NULL,@r_legal,'ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_legal,'CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_legal,'CASE',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_legal,'CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_legal,'DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_legal,'HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_legal,'SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_legal,'USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
--- -------------------------------------------------------
 -- COURT CLERKS
--- -------------------------------------------------------
-INSERT INTO role_permission_master 
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-VALUES
-('Court Clerks','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Court Clerks','CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Court Clerks','CASE',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Court Clerks','CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Court Clerks','DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Court Clerks','HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('Court Clerks','SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('Court Clerks','USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
--- -------------------------------------------------------
--- HR
--- -------------------------------------------------------
-INSERT INTO role_permission_master 
-(role_name, module_code, allow_all_ind, read_ind, write_ind, create_ind, delete_ind, import_ind, export_ind)
-VALUES
-('HR','ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('HR','CALD',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('HR','CASE',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('HR','CLNT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('HR','DASH',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('HR','HEAR',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
-('HR','SETT',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
-('HR','USER',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE);
+INSERT INTO role_permission_master VALUES
+(NULL,@r_clerk,'ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_clerk,'CALD',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_clerk,'CASE',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_clerk,'CLNT',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_clerk,'DASH',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_clerk,'HEAR',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_clerk,'SETT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_clerk,'USER',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE);
 
+-- HR
+INSERT INTO role_permission_master VALUES
+(NULL,@r_hr,'ADMN',FALSE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_hr,'CALD',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_hr,'CASE',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_hr,'CLNT',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_hr,'DASH',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_hr,'HEAR',FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE),
+(NULL,@r_hr,'SETT',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE),
+(NULL,@r_hr,'USER',TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE);
+
+-- =============================================
+-- APPLY PERMISSIONS
+-- =============================================
 CALL apply_role_permissions(@chamber_vk, @user_vijay);
 CALL apply_role_permissions(@chamber_sundar, @user_lokesh);
 
@@ -918,6 +934,7 @@ WHERE TABLE_SCHEMA = 'courtdiary'
 SELECT 
     cr.role_id,
     c.chamber_name,
+	cr.role_code,
     cr.role_name,
     cr.description,
     cr.admin_ind
@@ -929,6 +946,7 @@ ORDER BY c.chamber_name, cr.role_name;
 SELECT
     u.email,
     c.chamber_name,
+	cr.role_code,
     cr.role_name,
     ur.start_date,
     ur.end_date
@@ -942,12 +960,13 @@ ORDER BY c.chamber_name, u.email;
 -- 4. Bonus: Check how many permissions exist per chamber role
 SELECT 
     c.chamber_name,
+	cr.role_code,
     cr.role_name,
     COUNT(rp.permission_id) AS permission_count
 FROM chamber_roles cr
 JOIN chamber c ON cr.chamber_id = c.chamber_id
 LEFT JOIN role_permissions rp ON rp.role_id = cr.role_id
-GROUP BY c.chamber_name, cr.role_name
+GROUP BY c.chamber_name, cr.role_code, cr.role_name
 ORDER BY c.chamber_name, cr.role_name;
 
 -- =============================================================================

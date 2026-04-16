@@ -54,7 +54,6 @@ from app.dtos.cases_dto import (
 from app.dtos.clients_dto import ClientDetailsOut
 from app.services.base.secured_base_service import BaseSecuredService
 from app.utils.activity_formatter import format_activity
-from app.utils.logging_framework.activity_logger import log_activity
 from app.validators import ErrorCodes, ValidationErrorDetail
 
 
@@ -408,27 +407,6 @@ class CasesService(BaseSecuredService):
                 case_clients_out[0].party_role_description if case_clients_out else '',
             ),
         )
-    
-    async def _log_entity_change(
-        self,
-        action: str,
-        entity_type: str,
-        entity_id: str,
-        case_id: Optional[str] = None,
-        payload: Optional[Any] = None,
-        extra_metadata: Optional[Dict] = None,
-    ):
-        """Standardized logging for entity CRUD operations."""
-        metadata = payload.model_dump(exclude_unset=True, exclude_none=True) if payload else {}
-        metadata.update(extra_metadata or {})
-        if case_id:
-            metadata["case_id"] = case_id
-        
-        target = f"{entity_type}:{entity_id}"
-        if case_id:
-            target = f"case:{case_id}:{entity_type}:{entity_id}"
-        
-        await log_activity(action=action, target=target, metadata=metadata)
 
     # ─────────────────────────────────────────────────────────────────────
     # CASES — Stats
@@ -659,7 +637,7 @@ class CasesService(BaseSecuredService):
             metadata["client_id"] = case_clients.case_client_id or ""
             metadata["party_role_code"] = case_clients.party_role_code or ""
 
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Case created",
             entity_type="case",
             entity_id=case.case_id,
@@ -679,7 +657,7 @@ class CasesService(BaseSecuredService):
                 id_values=payload.case_id,
                 data=self.cases_repo.map_fields_to_db_column(data),
             )
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Case updated",
             entity_type="case",
             entity_id=payload.case_id,
@@ -691,7 +669,7 @@ class CasesService(BaseSecuredService):
 
     async def cases_delete(self, payload: CaseDelete) -> dict:
         case = await self._get_case_details(payload.case_id)
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Case deleted",
             entity_type="case",
             entity_id=payload.case_id,
@@ -798,7 +776,7 @@ class CasesService(BaseSecuredService):
         )
         await self._sync_case_hearing_dates(payload.case_id, payload.hearing_date)
         
-        await self._log_entity_change(
+        await self.log_entity_change(
             action=f"Hearing added for {payload.hearing_date}",
             entity_type="hearing",
             entity_id=hearing.hearing_id,
@@ -854,7 +832,7 @@ class CasesService(BaseSecuredService):
         )
         await self._sync_case_hearing_dates(updated.case_id, updated.hearing_date)
         
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Hearing updated",
             entity_type="hearing",
             entity_id=payload.hearing_id,
@@ -894,7 +872,7 @@ class CasesService(BaseSecuredService):
         if not hearing:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Hearing not found")
         
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Hearing deleted",
             entity_type="hearing",
             entity_id=payload.hearing_id,
@@ -950,7 +928,7 @@ class CasesService(BaseSecuredService):
             data=self.case_notes_repo.map_fields_to_db_column(data),
         )
         
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Case note added",
             entity_type="note",
             entity_id=note.note_id,
@@ -1009,7 +987,7 @@ class CasesService(BaseSecuredService):
         if not note:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Note not found")
         
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Case note deleted",
             entity_type="note",
             entity_id=payload.note_id,
@@ -1236,7 +1214,7 @@ class CasesService(BaseSecuredService):
             },
         )
 
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Client linked to case",
             entity_type="client_link",
             entity_id=link.case_client_id,
@@ -1266,7 +1244,7 @@ class CasesService(BaseSecuredService):
         if not link:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client link not found")
         
-        await self._log_entity_change(
+        await self.log_entity_change(
             action="Client unlinked from case",
             entity_type="client_link",
             entity_id=case_client_id,

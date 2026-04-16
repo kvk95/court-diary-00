@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class RoleBase(BaseModel):
+    role_code: str
     role_name: str = Field(..., min_length=1, max_length=80)
     description: Optional[str] = None
     status_ind: bool = True
@@ -21,6 +22,7 @@ class RoleUpdate(BaseModel):
 
 class RoleOut(BaseModel):
     role_id: int
+    role_code: str
     role_name: str
     description: Optional[str]
     status_ind: bool

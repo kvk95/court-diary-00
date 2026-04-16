@@ -39,11 +39,12 @@ class RolesController(BaseController):
         self,
         page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1, le=10_000),
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=1000),
+        role_code: Optional[str] = Query(None, description="Search by role_code"),
         search: Optional[str] = Query(None, description="Search by role name"),
         status: Optional[bool] = Query(None, description="Filter by active status"),
         service: RolesService = Depends(get_roles_service),
     ) -> BaseOutDto[PagingData[RoleWithStatsOut]]:
-        data = await service.roles_get_paged(page, limit, search, status)
+        data = await service.roles_get_paged(page, limit, role_code, search, status)
         return self.success(result=data)
 
     # ─────────────────────────────────────────────────────────────────────────

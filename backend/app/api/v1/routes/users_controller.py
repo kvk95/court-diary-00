@@ -65,11 +65,12 @@ class UsersController(BaseController):
         self,
         page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1, description="Page number"),
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500, description="Items per page"),
-        search: Optional[str] = Query(None, description="Search by name, email, phone, role"),
+        role_code: Optional[str] = Query(None, description="Search by role_code"),
+        search: Optional[str] = Query(None, description="Search by name, email, phone, role name"),
         status_ind: Optional[bool] = Query(None, description="None -> All, true -> Active, false -> InActive"),
         service: UsersService = Depends(get_users_service),
     ) -> BaseOutDto[PagingData[UserOut]]:
-        data = await service.users_get_paged(page=page, limit=limit, search=search,status_ind=status_ind)
+        data = await service.users_get_paged(page=page, limit=limit,role_code=role_code, search=search,status_ind=status_ind)
         return self.success(result=data)
 
     # ── Current User (SECOND - before parameterized routes) ──────────────────

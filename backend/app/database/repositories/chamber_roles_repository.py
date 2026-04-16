@@ -16,7 +16,9 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
         self,
         session: AsyncSession,
         *,
-        page, limit, search, status):
+        page, limit, 
+        role_code,
+        search, status):
         stmt = (
             select(
                 ChamberRoles,
@@ -33,6 +35,9 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
             .group_by(ChamberRoles.role_id)
         )
 
+        if role_code and role_code.strip():
+            stmt = stmt.where( ChamberRoles.role_code == role_code.strip() )
+
         if search and search.strip():
             stmt = stmt.where(ChamberRoles.role_name.ilike(f"%{search.strip()}%"))
 
@@ -43,7 +48,7 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
         count_result = await self.execute(session=session, stmt=count_stmt)
         total = count_result.scalar_one() or 0
 
-        stmt = stmt.order_by(ChamberRoles.role_name.asc())
+        stmt = stmt.order_by(ChamberRoles.role_code.asc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
 
         result = await self.execute(session=session,stmt=stmt)

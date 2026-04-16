@@ -56,14 +56,23 @@ def humanize_field(field: str) -> str:
 
 def _get_entity_type(action: str) -> str:
     """Extract entity type from action (e.g., CASE, TICKET, NOTE)"""
-    if "TICKET" in action:
-        return "Ticket"
+    action = action.upper()
+    if "AOR" in action:
+        return "AOR"
+    if "CLIENT" in action:
+        return "Client"
+    if "PERMISSION" in action:
+        return "Permissions"
+    if "ROLE" in action:
+        return "Role"
+    if "USER" in action:
+        return "User"
     if "NOTE" in action:
         return "Note"
     if "HEARING" in action:
         return "Hearing"
-    if "CLIENT" in action:
-        return "Client"
+    if "TICKET" in action:
+        return "Ticket"
     return "Case"
 
 
