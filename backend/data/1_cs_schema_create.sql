@@ -57,7 +57,16 @@ CREATE TABLE refm_modules (
     description   TEXT         NULL,
     sort_order    INT          NOT NULL DEFAULT 0,
     status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='System modules for permissions';
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='System modules for permissions';DROP TABLE IF EXISTS refm_ticket_status;
+
+CREATE TABLE refm_ticket_status (
+    code CHAR(4) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status_ind BOOLEAN NOT NULL DEFAULT TRUE,
+    color_code VARCHAR(7) NULL DEFAULT '#6B7280' COMMENT 'Hex color for UI display'
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Reference table for Support Ticket Status';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.3  Case & Hearing Statuses
@@ -1206,6 +1215,79 @@ CREATE TABLE email_link (
         ON DELETE RESTRICT
 
 ) ENGINE=InnoDB;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.6  Support Ticket
+-- ─────────────────────────────────────────────────────────────────────────────
+
+DROP TABLE IF EXISTS support_tickets;
+
+CREATE TABLE support_tickets (
+    ticket_id CHAR(36) PRIMARY KEY,
+    chamber_id CHAR(36) NOT NULL,
+    
+    -- Ticket Identification
+    ticket_number VARCHAR(50) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    
+    -- Module Reference (which module the ticket belongs to)
+    module_code CHAR(8) NULL,
+    
+    -- Status (using new refm_ticket_status)
+    status_code CHAR(4) NOT NULL DEFAULT 'OPEN',
+    
+    -- Priority & Severity
+    priority_code CHAR(4) NULL DEFAULT 'MEDI' COMMENT 'LOW, MEDI, HIGH, URGT',
+    
+    -- Assignment
+    assigned_to CHAR(36) NULL,           -- user_id
+    reported_by CHAR(36) NOT NULL,       -- user_id who raised the ticket
+    
+    -- Dates
+    reported_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    assigned_date TIMESTAMP NULL,
+    resolved_date TIMESTAMP NULL,
+    due_date DATE NULL,
+    
+    -- Soft Delete & Audit
+    deleted_ind BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_date TIMESTAMP NULL,
+    deleted_by CHAR(36) NULL,
+    
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+
+    -- Constraints
+    CONSTRAINT uk_ticket_chamber_number 
+        UNIQUE KEY (chamber_id, ticket_number),
+    
+    CONSTRAINT fk_support_tickets_chamber
+        FOREIGN KEY (chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
+    
+    CONSTRAINT fk_support_tickets_module
+        FOREIGN KEY (module_code) REFERENCES refm_modules(code) ON DELETE SET NULL,
+    
+    CONSTRAINT fk_support_tickets_status
+        FOREIGN KEY (status_code) REFERENCES refm_ticket_status(code) ON DELETE RESTRICT,
+    
+    CONSTRAINT fk_support_tickets_reported_by
+        FOREIGN KEY (reported_by) REFERENCES users(user_id) ON DELETE RESTRICT,
+    
+    CONSTRAINT fk_support_tickets_assigned_to
+        FOREIGN KEY (assigned_to) REFERENCES users(user_id) ON DELETE SET NULL,
+    
+    -- Indexes for performance
+    INDEX idx_tickets_chamber_status (chamber_id, status_code),
+    INDEX idx_tickets_reported_by (reported_by),
+    INDEX idx_tickets_assigned_to (assigned_to),
+    INDEX idx_tickets_module (module_code),
+    INDEX idx_tickets_reported_date (reported_date DESC),
+    INDEX idx_tickets_due_date (due_date)
+    
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Support Ticket Management System';
 
 
 -- =============================================================================

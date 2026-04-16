@@ -73,8 +73,9 @@ class LoggingRepo:
             clean_payload = {k: v for k, v in payload.items() if k != "_ctx"}
             # 🔥 Convert dict → Pydantic model
             activity_payload = ActivityLogPayload(**clean_payload)
-
+            _ = ActivityLog()
             inst = ActivityLog(
+                id = ActivityLog.generate_uuid(),
                 timestamp=activity_payload.timestamp,
                 action=activity_payload.action,
                 target=activity_payload.target,
@@ -86,8 +87,6 @@ class LoggingRepo:
                 actor_user_id=ctx.get("user_id"),
                 actor_chamber_id=ctx.get("chamber_id"),
                 ip_address=ctx.get("ip"),
-
-                created_by=ctx.get("user_id"),
             )
 
             await self._insert(inst)

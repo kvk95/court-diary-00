@@ -17,6 +17,7 @@ from app.services.cases_service import CasesService
 from app.services.clients_service import ClientsService
 from app.services.role_permissions_service import RolePermissionsService
 from app.services.roles_service import RolesService
+from app.services.support_ticket_service import SupportTicketService
 from app.services.users_service import UsersService
 from app.services.dashboard_service import DashboardService
 from app.services.aor_service import AorService
@@ -117,3 +118,9 @@ async def get_role_permissions_service(
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),  # same
 ) -> RolePermissionsService:
     return RolePermissionsService(session=session)
+
+async def get_support_ticket_service(
+    session: AsyncSession = Depends(get_session),
+    _ = Depends(get_current_user)
+) -> SupportTicketService:
+    return SupportTicketService(session=session)

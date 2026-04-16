@@ -41,7 +41,6 @@ from app.database.models.base.base_model import BaseModel
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
 from app.database.models.refm_modules import RefmModulesConstants
-from app.database.repositories.base.relationship_config import RELATIONSHIP_CONFIG
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.dtos.roles_dto import RoleOut
 from app.dtos.users_dto import UserOut
@@ -119,51 +118,6 @@ class BaseRepository(Generic[ModelType]):
                 for p in permissions
             )
             self.anonymous = False
-
-    # ────────────────────────────────────────────────
-    # ──────── FIELD / LOGGING HELPERS ────────
-    # ────────────────────────────────────────────────
-
-    async def _log_activity(
-        self,
-        *,
-        action: str,
-        target: str | None = None,
-        metadata: dict | None = None,
-    ):
-
-        # await log_activity(
-        #     action=action,
-        #     actor_user_id=self.user_id,
-        #     actor_chamber_id=self.chamber_id,
-        #     target=target,
-        #     metadata=metadata,
-        # )
-        pass
-
-    def _get_relationship_config(self):
-        return RELATIONSHIP_CONFIG.get(self.model)
-
-    def _get_entity_id(self, obj):
-        pk_names = self._pk_names()
-        if len(pk_names) == 1:
-            return getattr(obj, pk_names[0], None)
-        return {k: getattr(obj, k) for k in pk_names}
-    
-    def _compute_diff(self, old_obj, new_data: dict):
-        changes = {}
-
-        for field, new_val in new_data.items():
-            old_val = getattr(old_obj, field, None)
-
-            # normalize for comparison
-            if old_val != new_val:
-                changes[field] = {
-                    "old": old_val,
-                    "new": new_val,
-                }
-
-        return changes
 
     def map_fields_to_db_column(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -590,45 +544,6 @@ class BaseRepository(Generic[ModelType]):
         result = await self.execute(reload_stmt, session)
         new_obj = result.scalars().first()
 
-        # 🟢 4. AUTO LOG 🔥
-        if old_obj and new_obj:
-            changes = self._compute_diff(old_obj, update_data)
-
-            if changes:
-
-                rel = self._get_relationship_config()
-
-                if rel and old_obj and new_obj:
-                    changes = self._compute_diff(old_obj, update_data)
-
-                    if changes:
-
-                        parent_id = getattr(new_obj, rel["parent_field"], None)
-                        child_id = getattr(new_obj, rel["child_field"], None)
-
-                        await self._log_activity(
-                            action=f"{rel['entity']}_UPDATED",
-                            target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
-                            metadata={
-                                "relationship": rel["entity"],
-                                "parent_id": parent_id,
-                                "child_id": child_id,
-                                "changes": changes,
-                            },
-                        )
-
-                entity_id = self._get_entity_id(new_obj)
-
-                await self._log_activity(
-                    action=f"{self.LOG_ENTITY.upper()}_UPDATED",
-                    target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
-                    metadata={
-                        "entity": self.LOG_ENTITY,
-                        "entity_id": entity_id,
-                        "changes": changes,
-                    },
-                )
-
         return new_obj
 
     # ────────────────────────────────────────────────
@@ -810,33 +725,6 @@ class BaseRepository(Generic[ModelType]):
         session.add(obj)
         await session.flush()
         await session.refresh(obj)
-
-        entity_id = self._get_entity_id(obj)
-
-        rel = self._get_relationship_config()
-
-        if rel:
-            parent_id = getattr(obj, rel["parent_field"], None)
-            child_id = getattr(obj, rel["child_field"], None)
-
-            await self._log_activity(
-                action=f"{rel['entity']}_LINKED",
-                target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
-                metadata={
-                    "relationship": rel["entity"],
-                    "parent_id": parent_id,
-                    "child_id": child_id,
-                },
-            )
-
-        await self._log_activity(
-            action=f"{self.LOG_ENTITY.upper()}_CREATED",
-            target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
-            metadata={
-                "entity": self.LOG_ENTITY,
-                "entity_id": entity_id,
-            },
-        )
 
         return obj
 
@@ -1113,34 +1001,6 @@ class BaseRepository(Generic[ModelType]):
             session.add(obj)
         else:
             await session.delete(obj)
-
-        entity_id = self._get_entity_id(obj)
-
-        rel = self._get_relationship_config()
-
-        if rel:
-
-            parent_id = getattr(obj, rel["parent_field"], None)
-            child_id = getattr(obj, rel["child_field"], None)
-
-            await self._log_activity(
-                action=f"{rel['entity']}_UNLINKED",
-                target=f"{rel['parent_field'].replace('_id','')}:{parent_id}",
-                metadata={
-                    "relationship": rel["entity"],
-                    "parent_id": parent_id,
-                    "child_id": child_id,
-                },
-            )
-
-        await self._log_activity(
-            action=f"{self.LOG_ENTITY.upper()}_DELETED",
-            target=f"{self.LOG_ENTITY.lower()}:{entity_id}",
-            metadata={
-                "entity": self.LOG_ENTITY,
-                "entity_id": entity_id,
-            },
-)
 
         await session.flush()
 

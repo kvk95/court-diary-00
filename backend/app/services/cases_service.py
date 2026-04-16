@@ -106,7 +106,7 @@ class CasesService(BaseSecuredService):
         if extra_filters:
             stmt = stmt.where(*extra_filters)
         stmt = stmt.group_by(field)
-        rows = (await self.cases_repo.execute( session=self.session, stmt=stmt)).all()        
+        rows = (await self.cases_repo.execute(session=self.session, stmt=stmt)).all()        
         return {r[0]: r[1] for r in rows}
 
     # ─────────────────────────────────────────────
@@ -172,7 +172,8 @@ class CasesService(BaseSecuredService):
     async def _get_case_details(self, case_id: str) -> Cases:
         case = await self.cases_repo.get_case_details(
             session=self.session,
-            case_id = case_id)
+            case_id=case_id
+        )
         if not case:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Case not found")
         return case
@@ -237,10 +238,9 @@ class CasesService(BaseSecuredService):
             .order_by(CaseClients.primary_ind.desc(), Clients.client_name.asc())
         )).all()
 
-        # Batch-resolve reference codes for clients
-        used_party_roles  = {r.CaseClients.party_role_code for r in cc_rows if r.CaseClients.party_role_code}
-        used_client_types = {r.Clients.client_type_code    for r in cc_rows if r.Clients.client_type_code}
-        used_party_types  = {r.Clients.party_type_code     for r in cc_rows if r.Clients.party_type_code}
+        used_party_roles = {r.CaseClients.party_role_code for r in cc_rows if r.CaseClients.party_role_code}
+        used_client_types = {r.Clients.client_type_code for r in cc_rows if r.Clients.client_type_code}
+        used_party_types = {r.Clients.party_type_code for r in cc_rows if r.Clients.party_type_code}
 
         party_role_map = {}
         if used_party_roles:
@@ -271,7 +271,7 @@ class CasesService(BaseSecuredService):
 
         for row in cc_rows:
             cc: CaseClients = row.CaseClients
-            cl: Clients     = row.Clients
+            cl: Clients = row.Clients
 
             case_clients_out.append(CaseClientOut(
                 case_client_id=cc.case_client_id,
@@ -290,9 +290,9 @@ class CasesService(BaseSecuredService):
                 client_id=cl.client_id,
                 chamber_id=cl.chamber_id,
                 client_type_code=cl.client_type_code,
-                client_type_description=client_type_map.get(cl.client_type_code,""),
+                client_type_description=client_type_map.get(cl.client_type_code, ""),
                 party_type_code=cl.party_type_code,
-                party_type_description=party_type_map.get(cl.party_type_code,""),
+                party_type_description=party_type_map.get(cl.party_type_code, ""),
                 client_name=cl.client_name,
                 display_name=cl.display_name,
                 contact_person=cl.contact_person,
@@ -408,6 +408,27 @@ class CasesService(BaseSecuredService):
                 case_clients_out[0].party_role_description if case_clients_out else '',
             ),
         )
+    
+    async def _log_entity_change(
+        self,
+        action: str,
+        entity_type: str,
+        entity_id: str,
+        case_id: Optional[str] = None,
+        payload: Optional[Any] = None,
+        extra_metadata: Optional[Dict] = None,
+    ):
+        """Standardized logging for entity CRUD operations."""
+        metadata = payload.model_dump(exclude_unset=True, exclude_none=True) if payload else {}
+        metadata.update(extra_metadata or {})
+        if case_id:
+            metadata["case_id"] = case_id
+        
+        target = f"{entity_type}:{entity_id}"
+        if case_id:
+            target = f"case:{case_id}:{entity_type}:{entity_id}"
+        
+        await log_activity(action=action, target=target, metadata=metadata)
 
     # ─────────────────────────────────────────────────────────────────────
     # CASES — Stats
@@ -418,8 +439,7 @@ class CasesService(BaseSecuredService):
         # aggregation using conditional COUNT (CASE WHEN ... END).  One
         # round-trip instead of four.
         today = date.today()
-
-        r = await self.cases_repo.get_case_summary(self.session,today)
+        r = await self.cases_repo.get_case_summary(self.session, today)
         return CaseSummaryStats(
             total=r.total or 0,
             active=r.active or 0,
@@ -444,17 +464,10 @@ class CasesService(BaseSecuredService):
             limit=limit,
         )
 
-        used_court_ids   = {r.Cases.court_id          for r in rows if r.Cases.court_id}
-        used_statuses    = {r.Cases.status_code        for r in rows if r.Cases.status_code}
-        used_case_types  = {r.Cases.case_type_code     for r in rows if r.Cases.case_type_code}
-        used_party_roles = {r.party_role_code          for r in rows if r.party_role_code}
-
-        print(f"******************{used_party_roles}")
-        for party in used_party_roles:
-            print(f"***********8party{party}")
-
-        for r in rows:
-            print(f"ROW party_role_code={r.party_role_code!r}  aor_user_id={r.aor_user_id!r}")
+        used_court_ids = {r.Cases.court_id for r in rows if r.Cases.court_id}
+        used_statuses = {r.Cases.status_code for r in rows if r.Cases.status_code}
+        used_case_types = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
+        used_party_roles = {r.party_role_code for r in rows if r.party_role_code}
 
         court_map = {}
         if used_court_ids:
@@ -502,10 +515,10 @@ class CasesService(BaseSecuredService):
                 filing_year=r.Cases.filing_year,
                 petitioner=r.Cases.petitioner,
                 respondent=r.Cases.respondent,
-                aor_user_id='', #r.aor_user_id,
+                aor_user_id='',
                 aor_name=self.full_name(r.first_name, r.last_name),
-                party_role_code='',#r.party_role_code,
-                party_role_description=party_role_map.get(r.party_role_code,''),
+                party_role_code='',
+                party_role_description=party_role_map.get(r.party_role_code, ''),
             )
             for r in rows
         ]
@@ -535,12 +548,11 @@ class CasesService(BaseSecuredService):
             sort_by=sort_by,
         )
 
-        # Batch collect
-        used_court_ids      = {r.Cases.court_id              for r in rows if r.Cases.court_id}
-        used_case_statuses  = {r.Cases.status_code           for r in rows if r.Cases.status_code}
-        used_case_types     = {r.Cases.case_type_code        for r in rows if r.Cases.case_type_code}
-        used_hearing_status = {r.hearing_status_code         for r in rows if r.hearing_status_code}
-        used_party_roles    = {r.party_role_code             for r in rows if r.party_role_code}
+        used_court_ids = {r.Cases.court_id for r in rows if r.Cases.court_id}
+        used_case_statuses = {r.Cases.status_code for r in rows if r.Cases.status_code}
+        used_case_types = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
+        used_hearing_status = {r.hearing_status_code for r in rows if r.hearing_status_code}
+        used_party_roles = {r.party_role_code for r in rows if r.party_role_code}
 
         court_map = {}
         if used_court_ids:
@@ -607,7 +619,7 @@ class CasesService(BaseSecuredService):
                 next_hearing_status=hearing_status_map.get(hearing_status_code),
                 updated_date=c.updated_date,
             )
-            for c, first_name, last_name, hearing_status_code, party_role_code,case_client_id, aor_user_id in rows
+            for c, first_name, last_name, hearing_status_code, party_role_code, case_client_id, aor_user_id in rows
         ]
 
         return PagingBuilder(total_records=total, page=page, limit=limit).build(records=records)
@@ -636,14 +648,24 @@ class CasesService(BaseSecuredService):
             session=self.session,
             data=self.cases_repo.map_fields_to_db_column(data),
         )
-        caseClients = await self.case_clients_repo.get_by_id(
+        
+        # Build metadata with optional case client info
+        metadata = case.model_dump(exclude_unset=True, exclude_none=True)
+        case_clients = await self.case_clients_repo.get_by_id(
             session=self.session,
             filters={CaseClients.case_id: case.case_id},
         )
-        await log_activity(
+        if case_clients:
+            metadata["client_id"] = case_clients.case_client_id or ""
+            metadata["party_role_code"] = case_clients.party_role_code or ""
+
+        await self._log_entity_change(
             action="Case created",
-            target=f"case:{case.case_id}:{case.case_number}",
-            metadata={"case_id": case.case_id},
+            entity_type="case",
+            entity_id=case.case_id,
+            case_id=case.case_id,
+            payload=payload,
+            extra_metadata=metadata,
         )
         return await self._enrich_case_detail(case)
 
@@ -657,17 +679,25 @@ class CasesService(BaseSecuredService):
                 id_values=payload.case_id,
                 data=self.cases_repo.map_fields_to_db_column(data),
             )
-        await log_activity(
+        await self._log_entity_change(
             action="Case updated",
-            target=f"case:{payload.case_id}:{case.case_number}",
-            metadata={"updated_fields": list(data.keys())},
+            entity_type="case",
+            entity_id=payload.case_id,
+            case_id=payload.case_id,
+            payload=payload,
+            extra_metadata={"updated_fields": list(data.keys())},
         )
         return await self.cases_get_by_id(payload.case_id)
 
     async def cases_delete(self, payload: CaseDelete) -> dict:
-        case,_ = await self._get_case_details(payload.case_id)
+        case = await self._get_case_details(payload.case_id)
+        await self._log_entity_change(
+            action="Case deleted",
+            entity_type="case",
+            entity_id=payload.case_id,
+            case_id=payload.case_id,
+        )
         await self.cases_repo.delete(session=self.session, id_values=payload.case_id, soft=True)
-        await log_activity(action="Case deleted", target=f"case:{payload.case_id}:{case.case_number}")
         return {"case_id": payload.case_id, "deleted": True}
 
     # ─────────────────────────────────────────────────────────────────────
@@ -692,7 +722,6 @@ class CasesService(BaseSecuredService):
                 Hearings.hearing_date < today,
             )
         )
-
         await self.cases_repo.update(
             session=self.session,
             id_values=case_id,
@@ -731,7 +760,6 @@ class CasesService(BaseSecuredService):
             column_attr=Cases.status_code,
             value_column=RefmCaseStatus.description,
         )
-
         purpose_map = await self.refm_resolver.get_desc_map(
             column_attr=Hearings.purpose_code,
             value_column=RefmHearingPurpose.description,
@@ -747,13 +775,11 @@ class CasesService(BaseSecuredService):
                     desc_map=status_map,
                     code=h.status_code
                 ),
-
-                purpose_code=h.purpose_code, 
+                purpose_code=h.purpose_code,
                 purpose_description=await self.refm_resolver.get_value(
                     desc_map=purpose_map,
-                    code=h.status_code
+                    code=h.purpose_code
                 ),
-
                 notes=h.notes,
                 order_details=h.order_details,
                 next_hearing_date=h.next_hearing_date,
@@ -771,11 +797,16 @@ class CasesService(BaseSecuredService):
             data=self.hearings_repo.map_fields_to_db_column(data),
         )
         await self._sync_case_hearing_dates(payload.case_id, payload.hearing_date)
-        await log_activity(
+        
+        await self._log_entity_change(
             action=f"Hearing added for {payload.hearing_date}",
-            target=f"case:{payload.case_id}",
-            metadata={"hearing_id": hearing.hearing_id},
+            entity_type="hearing",
+            entity_id=hearing.hearing_id,
+            case_id=payload.case_id,
+            payload=payload,
+            extra_metadata={"hearing_id": hearing.hearing_id},
         )
+        
         status_desc = None
         if hearing.status_code:
             hs = await self.session.get(RefmHearingStatus, hearing.status_code)
@@ -783,12 +814,12 @@ class CasesService(BaseSecuredService):
 
         purpose_desc = None
         if hearing.purpose_code:
-            purpose_desc=await self.refm_resolver.from_column(
-                    column_attr=Hearings.purpose_code,
-                    code=hearing.purpose_code,
-                    value_column=RefmHearingPurpose.description,
-                    default=None
-                )
+            purpose_desc = await self.refm_resolver.from_column(
+                column_attr=Hearings.purpose_code,
+                code=hearing.purpose_code,
+                value_column=RefmHearingPurpose.description,
+                default=None
+            )
 
         return HearingOut(
             hearing_id=hearing.hearing_id,
@@ -822,15 +853,24 @@ class CasesService(BaseSecuredService):
             else hearing
         )
         await self._sync_case_hearing_dates(updated.case_id, updated.hearing_date)
-        await log_activity(action="Hearing updated", target=f"case:{hearing.case_id}")
+        
+        await self._log_entity_change(
+            action="Hearing updated",
+            entity_type="hearing",
+            entity_id=payload.hearing_id,
+            case_id=updated.case_id,
+            payload=payload,
+            extra_metadata={"updated_fields": list(data.keys())},
+        )
+        
         status_desc = None
         if updated.status_code:
             hs = await self.session.get(RefmHearingStatus, updated.status_code)
-            status_desc = hs.description if hs else None        
+            status_desc = hs.description if hs else None
 
         purpose_desc = None
         if updated.purpose_code:
-            p = await self.session.get(RefmHearingPurpose, hearing.purpose_code)
+            p = await self.session.get(RefmHearingPurpose, updated.purpose_code)
             purpose_desc = p.description if p else None
 
         return HearingOut(
@@ -853,9 +893,16 @@ class CasesService(BaseSecuredService):
         )
         if not hearing:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Hearing not found")
+        
+        await self._log_entity_change(
+            action="Hearing deleted",
+            entity_type="hearing",
+            entity_id=payload.hearing_id,
+            case_id=hearing.case_id,
+        )
+        
         await self.hearings_repo.delete(session=self.session, id_values=payload.hearing_id, soft=True)
         await self._sync_case_hearing_dates(hearing.case_id, date.today())
-        await log_activity(action="Hearing deleted", target=f"case:{hearing.case_id}")
         return {"hearing_id": payload.hearing_id, "deleted": True}
 
     # ─────────────────────────────────────────────────────────────────────
@@ -863,7 +910,6 @@ class CasesService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def case_notes_get_by_case(self, case_id: str) -> List[CaseNoteOut]:
-        # OPTIMISATION: lightweight existence check — result not used.
         await self._assert_case_exists(case_id)
         notes = await self.case_notes_repo.list_all(
             session=self.session,
@@ -888,7 +934,7 @@ class CasesService(BaseSecuredService):
                 user_id=n.user_id,
                 author_name=author_map.get(n.user_id),
                 note_text=n.note_text,
-                created_date = n.created_date
+                created_date=n.created_date
             )
             for n in notes
         ]
@@ -898,13 +944,21 @@ class CasesService(BaseSecuredService):
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data["chamber_id"] = self.chamber_id
         data["user_id"] = self.user_id
-        print(f"f=====================data: {data}")
-        mapped = self.case_notes_repo.map_fields_to_db_column(data)
-        print("AFTER MAP:", mapped)
+        
         note = await self.case_notes_repo.create(
             session=self.session,
             data=self.case_notes_repo.map_fields_to_db_column(data),
         )
+        
+        await self._log_entity_change(
+            action="Case note added",
+            entity_type="note",
+            entity_id=note.note_id,
+            case_id=payload.case_id,
+            payload=payload,
+            extra_metadata={"user_id": self.user_id},
+        )
+        
         u = await self.session.get(Users, self.user_id)
         return CaseNoteOut(
             note_id=note.note_id,
@@ -913,7 +967,7 @@ class CasesService(BaseSecuredService):
             author_name=self.full_name(u.first_name, u.last_name) if u else None,
             note_text=note.note_text,
             private_ind=bool(note.private_ind),
-            created_date = note.created_date
+            created_date=note.created_date
         )
 
     async def case_notes_edit(self, payload: CaseNoteEdit) -> CaseNoteOut:
@@ -944,7 +998,7 @@ class CasesService(BaseSecuredService):
             author_name=self.full_name(u.first_name, u.last_name) if u else None,
             note_text=updated.note_text,
             private_ind=bool(updated.private_ind),
-            created_date = updated.created_date
+            created_date=updated.created_date
         )
 
     async def case_notes_delete(self, payload: CaseNoteDelete) -> dict:
@@ -954,6 +1008,15 @@ class CasesService(BaseSecuredService):
         )
         if not note:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Note not found")
+        
+        await self._log_entity_change(
+            action="Case note deleted",
+            entity_type="note",
+            entity_id=payload.note_id,
+            case_id=note.case_id,
+            extra_metadata={"note_text_preview": note.note_text[:200] if note.note_text else ""},
+        )
+        
         await self.case_notes_repo.delete(session=self.session, id_values=payload.note_id, soft=True)
         return {"note_id": payload.note_id, "deleted": True}
 
@@ -977,8 +1040,6 @@ class CasesService(BaseSecuredService):
             )
             .join(Clients, CaseClients.client_id == Clients.client_id)
             .join(Cases, CaseClients.case_id == Cases.case_id)
-
-            # ✅ ADD THIS
             .outerjoin(
                 CaseAors,
                 and_(
@@ -991,7 +1052,6 @@ class CasesService(BaseSecuredService):
                 Users,
                 Users.user_id == CaseAors.user_id,
             )
-
             .outerjoin(
                 ProfileImages,
                 and_(
@@ -1007,12 +1067,12 @@ class CasesService(BaseSecuredService):
         )).all()
 
         # Batch-resolve all reference codes used across all rows
-        used_party_roles   = {r.CaseClients.party_role_code for r in rows if r.CaseClients.party_role_code}
-        used_case_statuses = {r.Cases.status_code           for r in rows if r.Cases.status_code}
-        used_case_types    = {r.Cases.case_type_code        for r in rows if r.Cases.case_type_code}
-        used_court_ids     = {r.Cases.court_id              for r in rows if r.Cases.court_id}
-        used_client_types  = {r.Clients.client_type_code    for r in rows if r.Clients.client_type_code}
-        used_party_types   = {r.Clients.party_type_code     for r in rows if r.Clients.party_type_code}
+        used_party_roles = {r.CaseClients.party_role_code for r in rows if r.CaseClients.party_role_code}
+        used_case_statuses = {r.Cases.status_code for r in rows if r.Cases.status_code}
+        used_case_types = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
+        used_court_ids = {r.Cases.court_id for r in rows if r.Cases.court_id}
+        used_client_types = {r.Clients.client_type_code for r in rows if r.Clients.client_type_code}
+        used_party_types = {r.Clients.party_type_code for r in rows if r.Clients.party_type_code}
 
         # Resolve maps
         party_role_map = {}
@@ -1065,9 +1125,9 @@ class CasesService(BaseSecuredService):
 
         result = []
         for row in rows:
-            cc: CaseClients  = row.CaseClients
-            cl: Clients      = row.Clients
-            ca: Cases        = row.Cases
+            cc: CaseClients = row.CaseClients
+            cl: Clients = row.Clients
+            ca: Cases = row.Cases
             aor_user_id = row.aor_user_id
             aor_name = self.full_name(row.first_name, row.last_name) if row.aor_user_id else ''
 
@@ -1092,7 +1152,7 @@ class CasesService(BaseSecuredService):
                 updated_date=ca.updated_date,
                 # ── from CaseQuickHearingOut ─────────────────────────────────────
                 aor_user_id=aor_user_id or '',
-                aor_name=aor_name ,
+                aor_name=aor_name,
                 party_role_code=cc.party_role_code or '',
                 party_role_description=party_role_map.get(cc.party_role_code, ''),
             )
@@ -1176,13 +1236,13 @@ class CasesService(BaseSecuredService):
             },
         )
 
-        await log_activity(
+        await self._log_entity_change(
             action="Client linked to case",
-            target=f"case:{case_id}",
-            metadata={
-                "client_id": payload.client_id,
-                "role": payload.party_role_code,
-            },
+            entity_type="client_link",
+            entity_id=link.case_client_id,
+            case_id=case_id,
+            payload=payload,
+            extra_metadata={"client_id": payload.client_id, "role": payload.party_role_code},
         )
 
         pr = await self.session.get(RefmPartyRoles, payload.party_role_code)
@@ -1205,8 +1265,15 @@ class CasesService(BaseSecuredService):
         )
         if not link:
             raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Client link not found")
+        
+        await self._log_entity_change(
+            action="Client unlinked from case",
+            entity_type="client_link",
+            entity_id=case_client_id,
+            case_id=case_id,
+        )
+        
         await self.case_clients_repo.delete(session=self.session, id_values=case_client_id, soft=False)
-        await log_activity(action="Client unlinked from case", target=f"case:{case_id}")
         return {"case_client_id": case_client_id, "deleted": True}
 
     # ─────────────────────────────────────────────────────────────────────
@@ -1222,7 +1289,7 @@ class CasesService(BaseSecuredService):
                     ActivityLog.action,
                     ActivityLog.actor_user_id,
                     ActivityLog.created_date,
-                    ActivityLog.metadata_json,   # 🔥 IMPORTANT
+                    ActivityLog.metadata_json,
                 )
                 .where(
                     ActivityLog.actor_chamber_id == self.chamber_id,
@@ -1234,26 +1301,24 @@ class CasesService(BaseSecuredService):
             activity_rows = rows.fetchall()
         except Exception:
             return []
-
-        # ---------------------------------------------
-        # 🔹 LOAD ACTOR NAMES (same as before)
-        # ---------------------------------------------
+        
+        # Load actor names efficiently
+        actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
         actor_map = await self._load_map(
-            (r.user_id for r in activity_rows if r.user_id),
+            actor_ids,
             lambda ids: select(
-                Users.user_id, Users.first_name, Users.last_name
+                Users.user_id,
+                Users.first_name,
+                Users.last_name,
             ).where(Users.user_id.in_(ids)),
             lambda r: r.user_id,
             lambda r: self.full_name(r.first_name, r.last_name),
         )
 
-        # ---------------------------------------------
-        # 🔹 FORMAT TO TIMELINE (🔥 CORE CHANGE)
-        # ---------------------------------------------
         return [
             format_activity(
                 log=r,
-                actor_name=actor_map.get(r.user_id) if r.user_id else None,
+                actor_name=actor_map.get(r.actor_user_id) if r.actor_user_id else "System",
             )
             for r in activity_rows
         ]

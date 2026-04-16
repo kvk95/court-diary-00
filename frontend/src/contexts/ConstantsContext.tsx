@@ -32,6 +32,7 @@ interface ConstantData {
   REFM_PLAN_TYPES: { code: string; description: string; max_users: string; max_cases: string; price_monthly_amt: string; price_annual_amt: string; currency_code: string; status_ind: boolean }[];
   REFM_PROOF_TYPE: { code: string; description: string; status_ind: boolean }[];
   REFM_STATES: { code: string; description: string; country_code: string; status_ind: boolean }[];
+  REFM_TICKET_STATUS: { code: string; name: string; description: string; status_ind: boolean; color_code: string }[];
   REFM_USER_DELETION_STATUS: { code: string; description: string; color_code: string; status_ind: boolean }[];
 }
 
@@ -57,6 +58,7 @@ const initialConstants: ConstantData = {
   REFM_PLAN_TYPES: [],
   REFM_PROOF_TYPE: [],
   REFM_STATES: [],
+  REFM_TICKET_STATUS: [],
   REFM_USER_DELETION_STATUS: [],
 };
 // === AUTO-GENERATED SECTION END ===

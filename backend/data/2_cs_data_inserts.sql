@@ -42,7 +42,18 @@ INSERT IGNORE INTO refm_modules (code, name, description, sort_order) VALUES
 ('HEAR', 'Hearings',        'Hearing schedule & history',          80),
 -- ('RPRT', 'Reports',         'Analytics & exports',                 90),
 ('SETT', 'Settings',        'Chamber configuration',               100),
-('USER', 'User Management', 'Manage chamber users & roles',        110);
+('USER', 'User Management', 'Manage chamber users & roles',        110),
+('SUPER', 'Super User', 'Manage Application',        120);
+
+-- Standard inserts for ticket statuses
+INSERT IGNORE INTO refm_ticket_status (code, name, description, sort_order, color_code) VALUES
+('OPEN', 'Open', 'Ticket is newly created and awaiting assignment', 10, '#EF4444'),
+('ASGN', 'Assigned', 'Ticket has been assigned to a support person', 20, '#F59E0B'),
+('INPR', 'In Progress', 'Work is actively being done on the ticket', 30, '#3B82F6'),
+('PEND', 'Pending', 'Waiting for user input or external dependency', 40, '#8B5CF6'),
+('RSOL', 'Resolved', 'Issue has been resolved', 50, '#10B981'),
+('CLSD', 'Closed', 'Ticket is closed after resolution', 60, '#6B7280'),
+('REOP', 'Reopened', 'Previously closed ticket has been reopened', 70, '#EF4444');
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.3  Case & Hearing Statuses
