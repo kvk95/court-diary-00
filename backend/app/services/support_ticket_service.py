@@ -1,6 +1,8 @@
 """Support Ticket Service — Business logic"""
 
-from datetime import date
+import secrets
+import string
+from datetime import date, datetime, timezone
 from typing import List, Optional, Dict, Any, Callable, Iterable, TypeVar
 
 from sqlalchemy import select
@@ -8,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.support_tickets import SupportTickets
 from app.database.models.refm_modules import RefmModules
-from app.database.models.refm_ticket_status import RefmTicketStatus
+from app.database.models.refm_ticket_status import RefmTicketStatus, RefmTicketStatusConstants
 from app.database.models.users import Users
 from app.database.repositories.support_tickets_repository import SupportTicketsRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
@@ -129,6 +131,17 @@ class SupportTicketService(BaseSecuredService):
         target = f"ticket:{entity_id}"
         
         # await log_activity(action=action, target=target, metadata=metadata)
+
+    def _generate_ticket_number(self) -> str:
+        """Generate ticket: 8-char timestamp (YYMMDDHH) + 7 random chars."""
+        # Timestamp: YYMMDDHH (e.g., "26041714" = 2026-04-17 14:xx UTC)
+        ts = datetime.now(timezone.utc).strftime("%y%m%d%H")
+        
+        # 7 random alphanumeric chars
+        alphabet = string.ascii_uppercase + string.digits
+        suffix = ''.join(secrets.choice(alphabet) for _ in range(7))
+        
+        return ts + suffix  # Total: 15 chars
     
     # ─────────────────────────────────────────────────────────────────────
     # STATS
@@ -242,18 +255,19 @@ class SupportTicketService(BaseSecuredService):
         existing = await self.tickets_repo.get_by_ticket_number(
             session=self.session,
             chamber_id=self.chamber_id,
-            ticket_number=payload.ticket_number,
+            user_id=self.user_id,
+            description=payload.description,
         )
         if existing:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
-                message=f"Ticket number '{payload.ticket_number}' already exists",
+                message=f"Ticket '{payload.description}' already exists",
             )
         
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
-        data["chamber_id"] = self.chamber_id
+        data["ticket_number"] = self._generate_ticket_number()
         data["reported_by"] = self.user_id
-        data["status_code"] = data.get("status_code") or "OPEN"
+        data["status_code"] = RefmTicketStatusConstants.OPEN
         
         ticket = await self.tickets_repo.create(
             session=self.session,

@@ -22,13 +22,15 @@ class SupportTicketsRepository(BaseRepository[SupportTickets]):
         self,
         session: AsyncSession,
         chamber_id: str,
-        ticket_number: str,
+        user_id: str,
+        description: str,
         exclude_deleted: bool = True,
     ) -> Optional[SupportTickets]:
         """Get ticket by chamber_id + ticket_number (unique constraint)."""
         filters = {
             SupportTickets.chamber_id: chamber_id,
-            SupportTickets.ticket_number: ticket_number,
+            SupportTickets.description: description,
+            SupportTickets.created_by: user_id,
         }
         where = [SupportTickets.deleted_ind == False] if exclude_deleted else []
 

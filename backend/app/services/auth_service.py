@@ -120,7 +120,6 @@ class AuthService(BaseService):
         """
         Authenticate user and return access/refresh tokens with user context.
         """
-        print(f"LoginRequest: {loginRequest}")
 
         # 1. Find user by email
         user = await self.users_repo.get_first(

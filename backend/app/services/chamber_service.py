@@ -150,14 +150,18 @@ class ChamberService(BaseSecuredService):
         user_chamber_link_id: str,
     ) -> None:
         """
-        3. Add all refm_modules → chamber_modules
-        4. Copy security_roles  → chamber_roles
-        5. Link user            → Administrator chamber_role
-        6. Set role_permissions for every role × module (bulk insert)
+        Setup security using role_code (corrected version)
+
+        Flow:
+        1. Create chamber_modules
+        2. Copy security_roles → chamber_roles
+        3. Assign ADMIN role to user
+        4. Create role_permissions (FULL MATRIX with fallback)
         """
 
-        # ── 3. MODULES ────────────────────────────────────────────────────────
-        # Fix #1: correct resolver call — column_attr=ChamberModules.module_code
+        # ─────────────────────────────────────────────
+        # 1. MODULES
+        # ─────────────────────────────────────────────
         modules: dict[str, Any] = await self.refm_resolver.get_refm_map(
             column_attr=ChamberModules.module_code
         )
@@ -175,19 +179,25 @@ class ChamberService(BaseSecuredService):
             ],
         )
 
-        # Fix #2: correct Any import and type hint
-        chamber_modules_map: dict[str, Any] = {
+        chamber_modules_map = {
             cm.module_code: cm for cm in created_modules
         }
 
-        # ── 4. ROLES ──────────────────────────────────────────────────────────
-        security_roles = await self.security_role_repo.list_all(session=self.session)
+        # ─────────────────────────────────────────────
+        # 2. ROLES
+        # ─────────────────────────────────────────────
+        security_roles = await self.security_role_repo.list_all(
+            session=self.session,
+            include_chamber_id=False,
+        )
 
-        created_roles: list[Any] = await self.chamber_role_repo.bulk_create(
+        created_roles = await self.chamber_role_repo.bulk_create(
             session=self.session,
             data_list=[
                 {
                     "chamber_id": chamber_id,
+                    "security_role_id": role.role_id,
+                    "role_code": role.role_code,
                     "role_name": role.role_name,
                     "description": role.description,
                     "admin_ind": role.admin_ind,
@@ -198,18 +208,21 @@ class ChamberService(BaseSecuredService):
             ],
         )
 
-        # Fix #2: correct Any import and type hint
-        chamber_roles_map: dict[str, Any] = {
-            cr.role_name: cr for cr in created_roles
+        # 🔥 KEY CHANGE: use role_code mapping
+        chamber_roles_map = {
+            cr.role_code: cr for cr in created_roles
         }
 
-        # ── 5. ASSIGN ADMINISTRATOR ROLE TO USER ──────────────────────────────
-        # Fix #4: safer lookup + improved error message
-        admin_role = chamber_roles_map.get("Administrator")
+        # ─────────────────────────────────────────────
+        # 3. ASSIGN ADMIN ROLE
+        # ─────────────────────────────────────────────
+        admin_role = next(
+            (cr for cr in created_roles if cr.admin_ind),
+            None
+        )
+
         if not admin_role:
-            raise ValueError(
-                "Administrator role not found in security_roles. Ensure seed data exists."
-            )
+            raise ValueError("ADMIN role not found in security_roles")
 
         await self.user_role_repo.create(
             session=self.session,
@@ -220,18 +233,27 @@ class ChamberService(BaseSecuredService):
             },
         )
 
-        # ── 6. ROLE PERMISSIONS  (bulk, DB-driven) ─────────────────────────────
-
-        # 1. Load templates
-        templates = await self.role_permission_master_repo.list_all(
-            session=self.session
+        # ─────────────────────────────────────────────
+        # 4. LOAD PERMISSION TEMPLATES
+        # ─────────────────────────────────────────────
+        perm_templates = await self.role_permission_master_repo.list_all(
+            session=self.session,
+            include_chamber_id=False,
         )
 
-        # 2. Build map: role_name → module_code → permissions
-        template_map: dict[str, dict[str, dict[str, Any]]] = {}
+        # 🔥 Build template map using role_code
+        template_map = {}
 
-        for t in templates:
-            template_map.setdefault(t.role_name, {})[t.module_code] = {
+        for t in perm_templates:
+            # need role_code → so map via security_roles
+            role = next(
+                (r for r in security_roles if r.role_id == t.security_role_id),
+                None
+            )
+            if not role:
+                continue
+
+            template_map.setdefault(role.role_code, {})[t.module_code] = {
                 "allow_all_ind": t.allow_all_ind,
                 "read_ind": t.read_ind,
                 "write_ind": t.write_ind,
@@ -241,21 +263,20 @@ class ChamberService(BaseSecuredService):
                 "export_ind": t.export_ind,
             }
 
-        # 3. Build permission rows
-        permission_rows: list[dict[str, Any]] = []
+        # ─────────────────────────────────────────────
+        # 5. BUILD ROLE × MODULE MATRIX
+        # ─────────────────────────────────────────────
+        role_permissions_data = []
 
-        for role_name, chamber_role in chamber_roles_map.items():
+        for role_code, chamber_role in chamber_roles_map.items():
 
-            role_templates = template_map.get(role_name)
+            role_templates = template_map.get(role_code, {})
 
             for module_code, chamber_module in chamber_modules_map.items():
 
-                if role_templates:
-                    perm = role_templates.get(module_code)
-                else:
-                    perm = None
+                perm = role_templates.get(module_code)
 
-                # fallback (same as your _DEFAULT_PERMISSION)
+                # fallback (same as old working code)
                 if not perm:
                     perm = {
                         "allow_all_ind": False,
@@ -267,18 +288,20 @@ class ChamberService(BaseSecuredService):
                         "export_ind": False,
                     }
 
-                permission_rows.append({
+                role_permissions_data.append({
                     "role_id": chamber_role.role_id,
                     "chamber_module_id": chamber_module.chamber_module_id,
                     "created_by": user_id,
                     **perm,
                 })
 
-        # 4. Bulk insert
+        # ─────────────────────────────────────────────
+        # 6. BULK INSERT
+        # ─────────────────────────────────────────────
         await self.role_permission_repo.bulk_create(
             session=self.session,
-            data_list=permission_rows
-        )    
+            data_list=role_permissions_data,
+        )
     
     async def chamber_create(self, payload: ChamberAddAdditional, user_id:str):
                 

@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import Field
 
+from app.database.models.refm_modules import RefmModulesConstants
 from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 
@@ -12,20 +13,20 @@ class SupportTicketBase(BaseInData):
     """Base fields for Support Ticket"""
     subject: str = Field(..., max_length=255)
     description: str = Field(..., min_length=1)
-    module_code: Optional[str] = Field(None, max_length=8)
-    status_code: Optional[str] = Field(None, max_length=4)
-    assigned_to: Optional[str] = None
-    due_date: Optional[date] = None
+    module_code: Optional[str] = Field(RefmModulesConstants.DASHBOARD, max_length=8)
 
 
 class SupportTicketCreate(SupportTicketBase):
     """Payload for creating a new support ticket"""
-    ticket_number: str = Field(..., max_length=50)
 
 
 class SupportTicketEdit(SupportTicketBase):
     """Payload for updating a support ticket"""
     ticket_id: str
+    ticket_number: str = Field(..., max_length=50)
+    status_code: Optional[str] = Field(None, max_length=4)
+    assigned_to: Optional[str] = None
+    due_date: Optional[date] = None
 
 
 class SupportTicketDelete(BaseInData):
