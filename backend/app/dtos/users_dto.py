@@ -58,6 +58,7 @@ class UserOut(UserBasicInfoOut):
     profile: Optional[UserProfileOut] = None
     permissions: List[RolePermissionModuleOut] = []
     chamber_id: Optional[str] = None
+    last_login_time: Optional[datetime] = None
 
 
 # =============================================================================

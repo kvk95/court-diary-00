@@ -5,7 +5,9 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
+from app.database.models.login_audit import LoginAudit
 from app.database.models.profile_images import ProfileImages
+from app.database.models.refm_login_status import RefmLoginStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
@@ -41,6 +43,19 @@ class UsersRepository(BaseRepository[Users]):
         """
         if not user_id and not email:
             raise ValueError("Either user_id or email must be provided")
+        
+        latest_login_subq = (
+            select(
+                LoginAudit.actor_user_id.label("user_id"),
+                func.max(LoginAudit.login_time).label("last_login_time"),
+            )
+            .where(
+                    LoginAudit.status_code == RefmLoginStatusConstants.SUCCESS,                
+                    LoginAudit.actor_chamber_id == chamber_id, 
+                )
+            .group_by(LoginAudit.actor_user_id)
+            .subquery()
+        )
 
         # Build base query with all joins
         stmt = (
@@ -52,6 +67,7 @@ class UsersRepository(BaseRepository[Users]):
                 Users.email,
                 Users.phone,
                 Users.advocate_ind,
+                latest_login_subq.c.last_login_time,
                 UserChamberLink.status_ind,
                 Users.created_date,
                 # Profile fields
@@ -96,6 +112,10 @@ class UsersRepository(BaseRepository[Users]):
                 )
             )
             .outerjoin(ChamberRoles, UserRoles.role_id == ChamberRoles.role_id)
+            .outerjoin(
+                latest_login_subq,
+                Users.user_id == latest_login_subq.c.user_id,
+            )
             .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .where(Users.deleted_ind.is_(False))
         )
@@ -131,6 +151,7 @@ class UsersRepository(BaseRepository[Users]):
             "created_date": row.created_date,
             "image_id":row.image_id,
             "image_data":row.image_data,
+            "last_login_time": row.last_login_time,
             "profile": {
                 "header_color": row.header_color,
                 "sidebar_color": row.sidebar_color,
@@ -170,6 +191,20 @@ class UsersRepository(BaseRepository[Users]):
         Paginated users for a chamber with role.
         Returns list of dicts for service to transform into DTOs.
         """
+
+        latest_login_subq = (
+            select(
+                LoginAudit.actor_user_id.label("user_id"),
+                func.max(LoginAudit.login_time).label("last_login_time"),
+            )
+            .where(
+                    LoginAudit.status_code == RefmLoginStatusConstants.SUCCESS,                
+                    LoginAudit.actor_chamber_id == chamber_id, 
+                )
+            .group_by(LoginAudit.actor_user_id)
+            .subquery()
+        )
+
         stmt = (
             select(
                 Users.user_id,
@@ -194,6 +229,7 @@ class UsersRepository(BaseRepository[Users]):
                 Chamber.chamber_name,
                 ProfileImages.image_id,
                 ProfileImages.image_data,
+                latest_login_subq.c.last_login_time,
             )
             .join(UserChamberLink, Users.user_id == UserChamberLink.user_id)
             .outerjoin(ProfileImages, Users.user_id == ProfileImages.user_id)
@@ -206,6 +242,10 @@ class UsersRepository(BaseRepository[Users]):
             )
             .outerjoin(ChamberRoles, UserRoles.role_id == ChamberRoles.role_id)
             .outerjoin(UserProfiles, Users.user_id == UserProfiles.user_id)
+            .outerjoin(
+                latest_login_subq,
+                Users.user_id == latest_login_subq.c.user_id,
+            )
             .join(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .where(
                 Users.deleted_ind.is_(False),
@@ -257,6 +297,7 @@ class UsersRepository(BaseRepository[Users]):
                 "created_date": row.created_date,
                 "image_id": row.image_id,
                 "image_data": row.image_data,
+                "last_login_time": row.last_login_time,
                 "role": {
                     "role_id": row.role_id,
                     "role_code": row.role_code,

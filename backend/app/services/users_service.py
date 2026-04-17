@@ -224,6 +224,7 @@ class UsersService(BaseSecuredService):
             advocate_ind=user_data["advocate_ind"],
             image_id=user_data["image_id"],
             image_data=user_data["image_data"],
+            last_login_time=user_data["last_login_time"],
             created_date=user_data["created_date"],
             chamber_name=user_data.get("chamber", {}).get("chamber_name"),
             profile=profile,
