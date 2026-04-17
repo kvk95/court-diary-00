@@ -3,6 +3,7 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.csrf_token_util import validate_csrf
 from app.auth.deps import get_current_user
 from app.auth.permissions import PType, require_permission
 from app.database.models.refm_modules import RefmModulesEnum
@@ -36,12 +37,18 @@ def get_auth_service(
 ) -> AuthService:
     return AuthService(session)
 
+async def get_contact_messages_service(
+    session: AsyncSession = Depends(get_session),
+) -> ContactMessagesService:
+    return ContactMessagesService(session=session)
+
 
 # ── Auth-only services (no specific module restriction) ───────────────────────
 
 async def get_chamber_service(
     session: AsyncSession = Depends(get_session),
-    _ = Depends(get_current_user)
+    _ = Depends(get_current_user),
+    __: None = Depends(validate_csrf),
 ) -> ChamberService:
     return ChamberService(session=session)
 
@@ -99,6 +106,7 @@ async def get_calendar_service(
 async def get_dashboard_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.DASHBOARD, PType.READ)),
+    __: None = Depends(validate_csrf),
 ) -> DashboardService:
     return DashboardService(session=session)
 
@@ -125,8 +133,3 @@ async def get_support_ticket_service(
     _ = Depends(get_current_user)
 ) -> SupportTicketService:
     return SupportTicketService(session=session)
-
-async def get_contact_messages_service(
-    session: AsyncSession = Depends(get_session),
-) -> ContactMessagesService:
-    return ContactMessagesService(session=session)

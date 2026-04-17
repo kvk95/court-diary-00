@@ -2,7 +2,6 @@
 
 import asyncio
 
-from app.core.config import Settings
+from app.core.config import settings
 
-
-audit_queue: asyncio.Queue = asyncio.Queue(maxsize=Settings().LOGGING.LOG_QUEUE_MAXSIZE)
+audit_queue: asyncio.Queue = asyncio.Queue(maxsize=settings.LOGGING.LOG_QUEUE_MAXSIZE)

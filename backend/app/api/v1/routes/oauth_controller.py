@@ -2,7 +2,7 @@ import base64
 from datetime import datetime, timezone
 import uuid
 
-from fastapi import Body, Depends, Path, Request
+from fastapi import Body, Depends, Path, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
 from google.auth.transport import requests as google_requests
@@ -10,7 +10,8 @@ from google.oauth2 import id_token
 import requests
 
 from app.api.v1.routes.base.base_controller import BaseController
-from app.core.config import Settings
+from app.auth.csrf_token_util import generate_csrf_token
+from app.core.config import settings
 from app.database.models.base.session import AsyncSession
 from app.dtos.oauth_dtos import LoginRequest, OAuthLoginRequest, RefreshRequest, TokenOut
 from app.dependencies import get_anonymous_service, get_auth_service, get_session
@@ -67,6 +68,7 @@ class OAuthController(BaseController):
     async def login(
         self,
         request: Request,
+        response: Response,
         loginRequest: LoginRequest = Body(..., description="Login credentials"),
         service: AuthService = Depends(get_auth_service),
     ) -> BaseOutDto[TokenOut]:
@@ -77,7 +79,10 @@ class OAuthController(BaseController):
         loginRequest.user_agent = ua
 
         token_out: TokenOut = await service.login(loginRequest)
-        self.set_token_expiry(token_out)
+
+        # ✅ Set cookies (single call)
+        await self.set_auth_cookies(response, token_out)
+        token_out = self.clear_tokens_from_response(token_out)
         return self.success(result=token_out)
 
     @BaseController.post(
@@ -87,21 +92,27 @@ class OAuthController(BaseController):
     )
     async def refresh_token(
         self,
-        payload: RefreshRequest = Body(..., description="Refresh token payload"),
+        response: Response,
+        payload: RefreshRequest = Body(...),
         session: AsyncSession = Depends(get_session),
         service: AuthService = Depends(get_auth_service),
     ) -> BaseOutDto[TokenOut]:
-        token_out: TokenOut = await service.refresh(session, payload)
-        self.set_token_expiry(token_out)
-        return self.success(result=token_out)   
+
+        token_out = await service.refresh(session, payload)
+
+        await self.set_auth_cookies(response, token_out)
+        self.clear_tokens_from_response(token_out)
+
+        return self.success(result=token_out) 
 
     @BaseController.post(
         "/{provider}/login",
-        summary="Refresh access token",
+        summary="Login through oAuth",
         response_model=BaseOutDto[TokenOut],
     )
     async def oauth_login(
         self,
+        response: Response,
         service: AuthService = Depends(get_auth_service),
         anonymous_service: AnonymousService = Depends(get_anonymous_service),
         provider: str = Path(description="oAuth Token"),
@@ -149,13 +160,14 @@ class OAuthController(BaseController):
             chamber_id=loginRequest.chamber_id
         )
         token_out: TokenOut = await service.login(login_request, is_oAuth=True)
-        self.set_token_expiry(token_out)
-        print(f"************** token out ***********\n{token_out.model_dump_json(indent=4)}")
+        await self.set_auth_cookies(response, token_out)
+        self.clear_tokens_from_response(token_out)
+
         return self.success(result=token_out)
 
     def __google_user_info(self,code):
         # Retrieve the environment variable
-        clock_skew = Settings().GOOGLE_OAUTH_CLOCK_SKEW_IN_SECONDS
+        clock_skew = settings.GOOGLE_OAUTH_CLOCK_SKEW_IN_SECONDS
         clock_skew = f"{clock_skew}"
 
         # Check and convert if the value is a string
@@ -204,7 +216,91 @@ class OAuthController(BaseController):
         }
         return user_data
 
+    @BaseController.post(
+        "/logout",
+        summary="Logout of application",
+        response_model=BaseOutDto[TokenOut],
+    )
+    async def logout(
+        self,
+        response: Response,
+    ) -> BaseOutDto[str]:
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        response.delete_cookie("csrf_token")
+        return self.success("Logged out")
+
     def set_token_expiry(self, token_out):
         access_token = token_out.access_token
         claims = jwt.get_unverified_claims(access_token)
         token_out.expires_in = claims["exp"] - int(datetime.now(timezone.utc).timestamp())
+
+
+    async def set_auth_cookies(self, response: Response, token_out) -> None:
+        """
+        Sets access + refresh tokens as cookies.
+        Uses ONLY Max-Age to avoid proxy/header merging issues with Expires.
+        """
+
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+
+        # Decode tokens
+        access_claims = jwt.get_unverified_claims(token_out.access_token)
+        access_exp = access_claims["exp"]
+        access_max_age = max(access_exp - now_ts, 1)
+
+        print("**************************************")
+        print("**************************************")
+        print("**************************************")
+        print("**************************************")
+        print(f"access_max_age :: {access_max_age}")
+
+        secure_flag = settings.APP_ENV == "prod"
+
+        # ✅ Access token cookie
+        response.headers.append(
+            "Set-Cookie",
+            (
+                f"access_token={token_out.access_token}; "
+                f"Path=/; "
+                f"HttpOnly; "
+                f"SameSite=Lax; "
+                f"Max-Age={access_max_age}"
+                f"{'; Secure' if secure_flag else ''}"
+            ),
+        )
+        
+        refresh_claims = jwt.get_unverified_claims(token_out.refresh_token)
+        refresh_exp = refresh_claims["exp"]
+        refresh_max_age = max(refresh_exp - now_ts, 1)
+
+        response.headers.append(
+            "Set-Cookie",
+            (
+                f"refresh_token={token_out.refresh_token}; "
+                f"Path=/; "
+                f"HttpOnly; "
+                f"SameSite=Lax; "
+                f"Max-Age={refresh_max_age}"
+                f"{'; Secure' if secure_flag else ''}"
+            ),
+        )
+
+        csrf_token = generate_csrf_token()
+
+        response.headers.append(
+            "Set-Cookie",
+            (
+                f"csrf_token={csrf_token}; "
+                f"Path=/; "
+                f"SameSite=Lax; "
+                f"Max-Age={access_max_age}"
+                # ❗ NOT HttpOnly (frontend must read it)
+                f"{'; Secure' if secure_flag else ''}"
+            ),
+        )
+
+    def clear_tokens_from_response(self, token_out):
+        token_out.access_token = ""
+        token_out.refresh_token = ""
+        return token_out

@@ -20,10 +20,10 @@ class SupportTicketCreate(SupportTicketBase):
     """Payload for creating a new support ticket"""
 
 
-class SupportTicketEdit(SupportTicketBase):
+class SupportTicketEdit(BaseInData):
     """Payload for updating a support ticket"""
     ticket_id: str
-    ticket_number: str = Field(..., max_length=50)
+    description: Optional[str] = Field(None, min_length=1)
     status_code: Optional[str] = Field(None, max_length=4)
     assigned_to: Optional[str] = None
     due_date: Optional[date] = None

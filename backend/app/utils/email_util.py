@@ -7,7 +7,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from app.core.config import Settings
+from app.core.config import settings
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplates, RefmEmailTemplatesEnum
 from app.services.base.base_service import BaseService
@@ -19,7 +19,6 @@ class EmailUtil (BaseService):
             session,
                  ):
         super().__init__(session)
-        settings = Settings() 
         self.smtp_server = settings.SMTP_SERVER
         self.smtp_server_port = settings.SMTP_SERVER_PORT
         self.smtp_server_username = settings.SMTP_SERVER_USERNAME

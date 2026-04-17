@@ -43,7 +43,7 @@ class SupportTicketsRepository(BaseRepository[SupportTickets]):
     async def list_by_chamber(
         self,
         session: AsyncSession,
-        chamber_id: str,
+        chamber_id: Optional[str] = None,
         status_code: Optional[str] = None,
         module_code: Optional[str] = None,
         assigned_to: Optional[str] = None,
@@ -53,7 +53,8 @@ class SupportTicketsRepository(BaseRepository[SupportTickets]):
     ) -> Tuple[List[SupportTickets], int]:
         """List tickets with filtering, pagination, and sorting."""
 
-        filters = {SupportTickets.chamber_id: chamber_id}
+        if chamber_id:
+            filters = {SupportTickets.chamber_id: chamber_id}
         where = [SupportTickets.deleted_ind == False]
 
         if status_code:

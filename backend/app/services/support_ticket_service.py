@@ -175,11 +175,15 @@ class SupportTicketService(BaseSecuredService):
         search: Optional[str] = None,
         sort_by: str = "reported_date",
         sort_order: str = "desc",
+        is_chamber:bool = False,
     ) -> PagingData[SupportTicketListOut]:
         """Paginated list of support tickets"""
+
+        chamber_id = self.chamber_id if is_chamber else None
+
         rows, total = await self.tickets_repo.list_by_chamber(
             session=self.session,
-            chamber_id=self.chamber_id,
+            chamber_id=chamber_id,
             status_code=status_code,
             module_code=module_code,
             assigned_to=assigned_to,
@@ -314,9 +318,8 @@ class SupportTicketService(BaseSecuredService):
         
         if data:
             # Auto-set resolved_date when status changes to RESL
-            if data.get("status_code") == "RESL" and ticket.status_code != "RESL":
-                from datetime import datetime
-                data["resolved_date"] = datetime.utcnow()
+            if payload.status_code != ticket.status_code:
+                data["resolved_date"] = datetime.today()
             
             data["updated_by"] = self.user_id
             await self.tickets_repo.update(

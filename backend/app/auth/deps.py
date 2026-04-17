@@ -29,6 +29,12 @@ async def get_current_user(
     if ctx.get("current_user"):
         return cast(CurrentUserContext, ctx["current_user"])
 
+    # ✅ Prefer cookie over header
+    cookie_token = request.cookies.get("access_token")
+
+    if cookie_token:
+        token = cookie_token
+
     # No token → anonymous
     if not token:
         raise ValidationErrorDetail(

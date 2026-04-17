@@ -6,7 +6,7 @@ import hmac
 import secrets
 import string
 
-from app.core.config import Settings
+from app.core.config import settings
 from app.validators.password_policy_helper import PasswordPolicy
 
 PASSWORD_LENGTH = 15
@@ -34,7 +34,7 @@ def generate_password():
 
 # 🔑 Generate & store this key securely (e.g., env var, secret manager)
 # DO NOT hardcode it in production
-SECRET_KEY = (Settings().CIPHER_SECRET_KEY or "b3-2QWAOSouiqeCaZgFzHCaIYGl7RvCRtmK6OExNnqA=").encode()
+SECRET_KEY = (settings.CIPHER_SECRET_KEY or "b3-2QWAOSouiqeCaZgFzHCaIYGl7RvCRtmK6OExNnqA=").encode()
     
 def generate_lid(link_id: str) -> str:
     sig = hmac.new(SECRET_KEY, link_id.encode(), hashlib.sha256).digest()

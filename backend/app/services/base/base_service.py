@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession    
 
-from app.core.config import Settings
+from app.core.config import settings
 from app.utils.logging_framework.activity_logger import log_activity
 from app.utils.refm.refm_resolver import RefmResolver
 
@@ -10,7 +10,7 @@ class BaseService:
     def __init__(self, session: AsyncSession):
         self._session: AsyncSession = session
         self.refm_resolver:RefmResolver = RefmResolver(session=self.session)
-        self.settings = Settings()
+        self.settings = settings
 
     @property
     def session(self) -> AsyncSession:

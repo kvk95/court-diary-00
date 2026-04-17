@@ -113,21 +113,36 @@ class RequestContextMiddleware:
         async def send_wrapper(message):
             nonlocal response_bytes, status_code, content_type, content_disposition
             if message["type"] == "http.response.start":
-                status_code = message["status"]
-                headers = dict(message.get("headers", []))
+                headers = message.get("headers", [])
 
-                # ✅ Add security headers here
-                headers[b"x-content-type-options"] = b"nosniff"
-                headers[b"x-frame-options"] = b"DENY"
-                headers[b"x-xss-protection"] = b"1; mode=block"
+                new_headers = []                
 
-                message["headers"] = list(headers.items())
+                # add security headers (avoid duplicates)
+                def add_header(key: bytes, value: bytes):
+                    if not any(k.lower() == key for k, _ in new_headers):
+                        new_headers.append((key, value))
 
-                for k, v in headers.items():
-                    if k.lower() == b"content-type":
-                        content_type = v.decode(errors="ignore").lower()
-                    elif k.lower() == b"content-disposition":
-                        content_disposition = v.decode(errors="ignore")
+                # keep all existing headers (including multiple Set-Cookie)
+                for k, v in headers:
+                    new_headers.append((k, v))
+
+                # add security headers
+                add_header(b"x-content-type-options", b"nosniff")
+                add_header(b"x-frame-options", b"DENY")
+                add_header(b"x-xss-protection", b"1; mode=block")
+                add_header(b"content-security-policy", b"frame-ancestors 'none'")
+                add_header(b"cache-control", b"no-store")
+                add_header(b"referrer-policy", b"no-referrer")
+                add_header(b"permissions-policy", b"geolocation=(), camera=(), microphone=()")
+
+                # 🔥 HSTS only in production (HTTPS only)
+                if settings.APP_ENV == "prod":
+                    add_header(
+                        b"strict-transport-security",
+                        b"max-age=31536000; includeSubDomains; preload",
+                    )
+
+                message["headers"] = new_headers
             elif message["type"] == "http.response.body":
                 response_bytes += message.get("body", b"")
             await send_(message)

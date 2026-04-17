@@ -64,6 +64,36 @@ class SupportTicketController(BaseController):
         ))
     
     @BaseController.get(
+        "/chamber",
+        summary="List support tickets (paginated) by chamber",
+        response_model=BaseOutDto[PagingData[SupportTicketListOut]],
+    )
+    async def tickets_get_paged_chamber(
+        self,
+        page: int = Query(1, ge=1),
+        limit: int = Query(50, ge=1, le=100),
+        status_code: str | None = Query(None, description="Filter by status code"),
+        module_code: str | None = Query(None, description="Filter by module code"),
+        assigned_to: str | None = Query(None, description="Filter by assigned user ID"),
+        search: str | None = Query(None, description="Search in subject/description/ticket_number"),
+        sort_by: str = Query("reported_date", description="Field to sort by"),
+        sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort direction"),
+        service: SupportTicketService = Depends(get_support_ticket_service),
+    ) -> BaseOutDto[PagingData[SupportTicketListOut]]:
+        """Return paginated list of support tickets with filtering"""
+        return self.success(result=await service.tickets_get_paged(
+            page=page,
+            limit=limit,
+            status_code=status_code,
+            module_code=module_code,
+            assigned_to=assigned_to,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            is_chamber=True
+        ))
+    
+    @BaseController.get(
         "/{ticket_id}",
         summary="Get support ticket by ID",
         response_model=BaseOutDto[SupportTicketOut],
