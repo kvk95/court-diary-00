@@ -3,7 +3,7 @@
 from datetime import date
 from typing import List, Optional
 
-from sqlalchemy import func, select, or_, case
+from sqlalchemy import and_, func, select, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_aors import CaseAors
@@ -49,33 +49,55 @@ class CasesRepository(BaseRepository[Cases]):
         r = row.one()
         return dict(r._mapping)
     
-    async def get_case_summary(self,
-        session: AsyncSession, 
-        today,   
+    async def get_case_summary(
+        self,
+        session: AsyncSession,
+        chamber_id: str,
+        today: date,
     ):
-        row = await self.execute(
-            session=session,
-            stmt=select(
-                func.count(Cases.case_id).label("total"),
-                func.count(
-                    case((Cases.status_code == RefmCaseStatusConstants.ACTIVE, Cases.case_id), else_=None)
-                ).label("active"),
-                func.count(
-                    case((Cases.status_code == RefmCaseStatusConstants.ADJOURNED, Cases.case_id), else_=None)
-                ).label("adjourned"),
-                func.count(
-                    case(
-                        (
-                            (Cases.status_code == RefmCaseStatusConstants.ACTIVE)
-                            & (Cases.next_hearing_date < today),
-                            Cases.case_id,
-                        ),
-                        else_=None,
-                    )
-                ).label("overdue"),
-            )
+        """
+        Returns basic case summary counts for the dashboard.
+        """
+        stmt = select(
+            func.count(Cases.case_id).label("total"),
+
+            func.count(
+                case(
+                    (and_(
+                        Cases.status_code == RefmCaseStatusConstants.ACTIVE,
+                        Cases.deleted_ind.is_(False)
+                    ), 1),
+                    else_=0
+                )
+            ).label("active"),
+
+            func.count(
+                case(
+                    (and_(
+                        Cases.status_code == RefmCaseStatusConstants.ADJOURNED,
+                        Cases.deleted_ind.is_(False)
+                    ), 1),
+                    else_=0
+                )
+            ).label("adjourned"),
+
+            func.count(
+                case(
+                    (and_(
+                        Cases.status_code == RefmCaseStatusConstants.ACTIVE,
+                        Cases.next_hearing_date < today,
+                        Cases.deleted_ind.is_(False)
+                    ), 1),
+                    else_=0
+                )
+            ).label("overdue"),
+        ).where(
+            Cases.chamber_id == chamber_id,
+            Cases.deleted_ind.is_(False)          # Global safety filter
         )
-        r = row.one()
+
+        result = await self.execute(session=session, stmt=stmt)
+        r = result.one()
         return r
 
     async def get_cases_by_status(

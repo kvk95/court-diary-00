@@ -249,12 +249,6 @@ class OAuthController(BaseController):
         access_exp = access_claims["exp"]
         access_max_age = max(access_exp - now_ts, 1)
 
-        print("**************************************")
-        print("**************************************")
-        print("**************************************")
-        print("**************************************")
-        print(f"access_max_age :: {access_max_age}")
-
         secure_flag = settings.APP_ENV == "prod"
 
         # ✅ Access token cookie

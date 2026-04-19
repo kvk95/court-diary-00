@@ -44,6 +44,7 @@ from app.database.models.refm_modules import RefmModulesConstants
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
 from app.dtos.roles_dto import RoleOut
 from app.dtos.users_dto import UserOut
+from app.utils.constants import SUPERADMIN_ROLE_CODE
 from .model_helpers import get_writable_columns
 
 from sqlalchemy import Select
@@ -101,12 +102,15 @@ class BaseRepository(Generic[ModelType]):
 
         user: UserOut = cast(UserOut, ctx.get("user_details"))
         self.anonymous = True
+        self.suad = False
         if user:
             self.chamber_id = user.chamber_id
             self.user_id = user.user_id
 
             role: Optional[RoleOut] = user.role
             self.is_admin = bool(role.admin_ind) if role else False
+            self.suad = True if role and role.role_code == SUPERADMIN_ROLE_CODE else False
+            
 
             permissions: List[RolePermissionModuleOut] = user.permissions or []
             self.has_case_access = any(
@@ -300,11 +304,15 @@ class BaseRepository(Generic[ModelType]):
 
     def _apply_case_visibility(self, stmt: Select) -> Select:
         stmt = stmt.where(
-            Cases.chamber_id == self.chamber_id,
             Cases.deleted_ind.is_(False),
         )
 
-        if self.is_admin:
+        if not self.suad:
+            stmt = stmt.where(
+                Cases.chamber_id == self.chamber_id,
+            )
+
+        if self.is_admin or self.suad:
             return stmt
 
         if not self.has_case_access:
@@ -333,6 +341,9 @@ class BaseRepository(Generic[ModelType]):
     ) -> Select:
         # Restrictions only apply to SELECT statements
         if not isinstance(stmt, Select):
+            return stmt
+
+        if self.suad:
             return stmt
 
         inner_tables, outer_tables = self._collect_tables(stmt)
@@ -996,7 +1007,7 @@ class BaseRepository(Generic[ModelType]):
                 obj.deleted_date = now_utc
             if hasattr(obj, "deleted_by"):
                 obj.deleted_by = user_id
-            if hasattr(obj, "chamber_id"):
+            if hasattr(obj, "chamber_id") and not self.suad:
                 obj.chamber_id = chamber_id
             session.add(obj)
         else:

@@ -1,11 +1,13 @@
 """activity_formatter.py — Human-readable activity log formatting"""
 
 from typing import Any, Dict, Optional, Callable
+from app.database.models.refm_modules import RefmModulesConstants
 from app.dtos.cases_dto import RecentActivityItem
 
 
 def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivityItem:
-    """Format an ActivityLog entry into a RecentActivityItem DTO."""
+    """Unified formatter (supports both explicit + generic actions)"""
+
     action = str(log.action or "").upper()
     metadata: Dict[str, Any] = log.metadata_json or {}
 
@@ -15,7 +17,40 @@ def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivit
         "timestamp": getattr(log, "created_date", None) or getattr(log, "timestamp", None),
     }
 
-    # Registry: map action suffix → formatter function
+    # ------------------------------------------------------------------
+    # 🔥 1. EXPLICIT ACTION MAPPING (NEW - from format_activity_item)
+    # ------------------------------------------------------------------
+    explicit_map = {
+        "USER_CREATED": ("New User Created", "user-plus", "SUCCESS"),
+        "USER_DELETED": ("User Deleted", "user-x", "DANGER"),
+        "CHAMBER_CREATED": ("New Chamber Registered", "building", "SUCCESS"),
+        "SUBSCRIPTION_UPDATED": ("Subscription Updated", "credit-card", "INFO"),
+        "CASE_CREATED": ("New Case Added", "briefcase", "INFO"),
+        "LOGIN_SUCCESS": ("User Logged In", "login", "INFO"),
+    }
+
+    if action in explicit_map:
+        title, _, _ = explicit_map[action]
+
+        module_code = _resolve_module_code(action)
+        type_ = _resolve_type(action)
+
+        description = (
+            metadata.get("description")
+            or f"{base['actor_name']} {title.lower()}"
+        )
+
+        return RecentActivityItem(
+            **base,
+            title=title,
+            description=description,
+            type=type_,
+            icon=module_code,
+        )
+
+    # ------------------------------------------------------------------
+    # 🔥 2. EXISTING SUFFIX HANDLERS
+    # ------------------------------------------------------------------
     handlers: Dict[str, Callable] = {
         "CREATED": _format_create,
         "UPDATED": _format_update,
@@ -29,24 +64,59 @@ def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivit
         "REOPENED": _format_reopen,
     }
 
-    # Find matching handler by suffix
-    formatter = None
     for suffix, func in handlers.items():
         if action.endswith(suffix):
-            formatter = func
-            break
+            return func(base, metadata, action)
 
-    if formatter:
-        return formatter(base, metadata, action)
-
-    # Fallback for unknown actions
+    # ------------------------------------------------------------------
+    # 🔥 3. FALLBACK
+    # ------------------------------------------------------------------
+    module_code = _resolve_module_code(action)
+    type_ = _resolve_type(action)
+    
     return RecentActivityItem(
         **base,
         title=action.replace("_", " ").title(),
         description=metadata.get("description") or "Activity recorded",
-        type="INFO",
-        icon="activity",
+        type=type_,
+        icon=module_code,  # 🔥 now module-driven
     )
+
+def _resolve_module_code(action: str) -> str:
+    action = action.upper()
+
+    if "USER" in action:
+        return RefmModulesConstants.USER_MANAGEMENT
+    if "CLIENT" in action:
+        return RefmModulesConstants.CLIENTS
+    if "CASE" in action:
+        return RefmModulesConstants.CASES
+    if "HEARING" in action:
+        return RefmModulesConstants.HEARINGS
+    if "CALENDAR" in action:
+        return RefmModulesConstants.CALENDAR
+    if "SETTING" in action:
+        return RefmModulesConstants.SETTINGS
+    if "CHAMBER" in action or "SUBSCRIPTION" in action or "LOGIN" in action:
+        return RefmModulesConstants.SUPER_USER
+
+    return RefmModulesConstants.DASHBOARD
+
+def _resolve_type(action: str) -> str:
+    action = action.upper()
+
+    if action.endswith("CREATED"):
+        return "SUCCESS"
+    if action.endswith("DELETED"):
+        return "DANGER"
+    if action.endswith("UPDATED"):
+        return "INFO"
+    if "STATUS" in action:
+        return "WARNING"
+    if "LOGIN" in action:
+        return "INFO"
+
+    return "INFO"
 
 
 def humanize_field(field: str) -> str:

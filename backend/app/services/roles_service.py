@@ -43,6 +43,7 @@ class RolesService(BaseSecuredService):
             page=page,
             limit= limit, 
             role_code=role_code,
+            chamber_id=self.chamber_id,
             search=search, 
             status=status)
 
@@ -312,7 +313,9 @@ class RolesService(BaseSecuredService):
         # Read-only: No logging
         roles = await self.chamber_roles_repo.list_all(
             session=self.session,
-            where=[ChamberRoles.deleted_ind.is_(False), ChamberRoles.status_ind.is_(True)],
+            where=[ChamberRoles.deleted_ind.is_(False), 
+                   ChamberRoles.status_ind.is_(True)
+                   ,ChamberRoles.chamber_id == self.chamber_id],
             order_by=[ChamberRoles.role_name.asc()],
         )
         return [RoleOut.model_validate(r) for r in roles]

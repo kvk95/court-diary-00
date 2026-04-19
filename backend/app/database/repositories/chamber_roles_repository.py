@@ -18,6 +18,7 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
         *,
         page, limit, 
         role_code,
+        chamber_id,
         search, status):
         stmt = (
             select(
@@ -31,7 +32,10 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
                     UserRoles.end_date.is_(None),
                 ),
             )
-            .where(ChamberRoles.deleted_ind.is_(False))
+            .where(
+                ChamberRoles.chamber_id == chamber_id,
+                ChamberRoles.deleted_ind.is_(False)
+            )
             .group_by(ChamberRoles.role_id)
         )
 

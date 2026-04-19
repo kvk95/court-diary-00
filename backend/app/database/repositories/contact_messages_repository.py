@@ -1,9 +1,10 @@
 from typing import Optional, List, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, case
 
 from app.database.models.contact_messages import ContactMessages
+from app.database.models.refm_ticket_status import RefmTicketStatusConstants
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
 
@@ -18,48 +19,44 @@ class ContactMessagesRepository(BaseRepository[ContactMessages]):
     async def list_messages(
         self,
         session: AsyncSession,
+        status_code: Optional[str] = None,
         search: Optional[str] = None,
     ) -> Tuple[List[ContactMessages], int]:
 
-        filters = {}
         where = [ContactMessages.deleted_ind == False]
 
-        # 🔹 Search (OR condition — this is important)
+        if status_code:
+            where.append(ContactMessages.status_code == status_code)
+
         if search:
-            search_term = f"%{search}%"
+            kw = f"%{search}%"
             where.append(
                 or_(
-                    ContactMessages.full_name.ilike(search_term),
-                    ContactMessages.email.ilike(search_term),
-                    ContactMessages.subject.ilike(search_term),
-                    ContactMessages.message.ilike(search_term),
+                    ContactMessages.full_name.ilike(kw),
+                    ContactMessages.email.ilike(kw),
+                    ContactMessages.subject.ilike(kw),
+                    ContactMessages.message.ilike(kw),
                 )
             )
 
-        # 🔹 Fetch rows
         rows = await self.list_all(
             session=session,
-            filters=filters,
             where=where,
             order_by=[ContactMessages.created_date.desc()],
         )
 
-        # 🔹 Count query
-        count_stmt = select(func.count(ContactMessages.message_id)).where(
-            ContactMessages.deleted_ind == False
-        )
-
-        if search:
-            search_term = f"%{search}%"
-            count_stmt = count_stmt.where(
-                or_(
-                    ContactMessages.full_name.ilike(search_term),
-                    ContactMessages.email.ilike(search_term),
-                    ContactMessages.subject.ilike(search_term),
-                    ContactMessages.message.ilike(search_term),
-                )
-            )
-
+        count_stmt = select(func.count(ContactMessages.message_id)).where(*where)
         total = (await session.execute(count_stmt)).scalar() or 0
 
         return rows, total
+    
+    async def get_stats(self, session: AsyncSession):
+        stmt = select(
+            func.count(ContactMessages.message_id).label("total"),
+            func.sum(case((ContactMessages.status_code == RefmTicketStatusConstants.OPEN, 1), else_=0)).label("open"),
+            func.sum(case((ContactMessages.status_code == RefmTicketStatusConstants.IN_PROGRESS, 1), else_=0)).label("in_progress"),
+            func.sum(case((ContactMessages.status_code == RefmTicketStatusConstants.RESOLVED, 1), else_=0)).label("resolved"),
+        ).where(ContactMessages.deleted_ind == False)
+
+        result = await session.execute(stmt)
+        return result.first()

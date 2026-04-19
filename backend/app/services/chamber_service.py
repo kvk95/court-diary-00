@@ -8,6 +8,7 @@ from app.database.models.chamber import Chamber
 from app.database.models.chamber_modules import ChamberModules
 from app.database.models.refm_modules import RefmModulesConstants
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
+from app.database.models.security_roles import SecurityRoles
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
 from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
@@ -17,8 +18,9 @@ from app.database.repositories.security_roles_repository import SecurityRolesRep
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
-from app.dtos.chamber_dto import ChamberAddAdditional, ChamberEdit, ChamberOut
+from app.dtos.chamber_dto import ChamberAddAdditional, ChamberEdit, ChamberIdInput, ChamberOut, ChamberStatus
 from app.services.base.secured_base_service import BaseSecuredService
+from app.utils.constants import SUPERADMIN_ROLE_CODE
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
 from app.validators.field_validations import FieldValidator
@@ -94,11 +96,15 @@ class ChamberService(BaseSecuredService):
                 message="You do not have permission to edit Settings",
             )
 
-    async def _get_chamber(self) -> Chamber:
+    async def _get_chamber(self,
+                            chamber_id:str|None = None 
+                           ) -> Chamber:
         """Fetch chamber scoped to the authenticated chamber_id."""
+        chamber_id = chamber_id or self.chamber_id
+
         chamber = await self.chamber_repo.get_by_id(
             session=self.session,
-            filters={Chamber.chamber_id: self.chamber_id},
+            filters={Chamber.chamber_id: chamber_id},
         )
         if not chamber:
             raise ValidationErrorDetail(
@@ -189,6 +195,7 @@ class ChamberService(BaseSecuredService):
         security_roles = await self.security_role_repo.list_all(
             session=self.session,
             include_chamber_id=False,
+            where=[SecurityRoles.role_code != SUPERADMIN_ROLE_CODE]
         )
 
         created_roles = await self.chamber_role_repo.bulk_create(
@@ -343,7 +350,9 @@ class ChamberService(BaseSecuredService):
     # Public API
     # ------------------------------------------------------------------
 
-    async def chamber_get_by_id(self) -> ChamberOut:
+    async def chamber_get_by_id(self,
+                                chamber_id:str|None = None 
+                            ) -> ChamberOut:
         """
         GET /settings/chamber/{chamber_id}
 
@@ -356,7 +365,7 @@ class ChamberService(BaseSecuredService):
         # await self._assert_read_permission()
 
         # 3. Fetch & return
-        chamber = await self._get_chamber()
+        chamber = await self._get_chamber(chamber_id)
         return await self._to_out(chamber)
 
     async def chamber_add(self) -> ChamberOut:
@@ -467,6 +476,89 @@ class ChamberService(BaseSecuredService):
             session=self.session,
             filters={Chamber.chamber_id: self.chamber_id},
             data=self.chamber_repo.map_fields_to_db_column(data),
+        )
+        
+        # 📝 LOG ACTIVITY (before delete to preserve context)
+        await self.log_entity_change(
+            action="Chamber Updated",
+            entity_type="chamber",
+            entity_id=self.chamber_id,
+            extra_metadata={"updated_fields": list(data.keys())},
+        )
+
+        return await self._to_out(updated_chamber)
+
+    async def chamber_status(self, payload: ChamberStatus) -> ChamberOut:
+
+        # 2. Permission check
+        await self._assert_write_permission()
+
+        # 5. Build update dict — only fields explicitly supplied in the request
+        data = payload.model_dump(exclude_unset=True, exclude_none=True)
+
+        if not data:
+            # Nothing to update; return current state
+            chamber = await self._get_chamber(payload.chamber_id)
+            return await self._to_out(chamber)
+
+        # Stamp who last updated
+        data["updated_by"] = self.user_id
+
+        updated_chamber = await self.chamber_repo.update(
+            session=self.session,
+            filters={Chamber.chamber_id: payload.chamber_id},
+            data=self.chamber_repo.map_fields_to_db_column(data),
+        )
+        
+        # 📝 LOG ACTIVITY (before delete to preserve context)
+        await self.log_entity_change(
+            action="Chamber Activated" if payload.status_ind else "Chamber deactivated",
+            entity_type="Chamber",
+            entity_id=payload.chamber_id,
+            extra_metadata={"updated_fields": list(data.keys())},
+        )
+
+        return await self._to_out(updated_chamber)
+
+    async def chamber_delete(self, payload: ChamberIdInput) -> dict:
+
+        # 2. Permission check
+        await self._assert_write_permission()
+        
+        await self.chamber_repo.delete(session=self.session, id_values=payload.chamber_id)
+        
+        # 📝 LOG ACTIVITY (before delete to preserve context)
+        await self.log_entity_change(
+            action="Chamber Deleted",
+            entity_type="Chamber",
+            entity_id=payload.chamber_id,
+        )
+        return {"chamber_id": payload.chamber_id}
+
+    async def chamber_undelete(self, payload: ChamberIdInput) -> ChamberOut:
+
+        # 2. Permission check
+        await self._assert_write_permission()
+
+        # Stamp who last updated
+        data={
+                "deleted_ind": False,
+                "deleted_date": None,
+                "deleted_by": None,
+                "status_ind": True, 
+            }
+
+        updated_chamber = await self.chamber_repo.update(
+            session=self.session,
+            filters={Chamber.chamber_id: payload.chamber_id},
+            data=data,
+        )
+        
+        # 📝 LOG ACTIVITY (before delete to preserve context)
+        await self.log_entity_change(
+            action="Chamber undelete",
+            entity_type="Chamber",
+            entity_id=payload.chamber_id,
         )
 
         return await self._to_out(updated_chamber)

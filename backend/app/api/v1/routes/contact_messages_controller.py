@@ -9,6 +9,7 @@ from app.dtos.base.paginated_out import PagingData
 from app.dtos.contact_message_dto import (
     ContactMessageCreate,
     ContactMessageDelete,
+    ContactMessageEdit,
     ContactMessageOut,
     ContactMessageListOut,
 )
@@ -28,6 +29,7 @@ class ContactMessagesController(BaseController):
         self,
         page: int = Query(1, ge=1),
         limit: int = Query(50, ge=1, le=100),
+        status_code: str | None = Query(None),
         search: str | None = Query(None),
         service: ContactMessagesService = Depends(get_contact_messages_service),
     ):
@@ -35,6 +37,7 @@ class ContactMessagesController(BaseController):
             result=await service.get_paged(
                 page=page,
                 limit=limit,
+                status_code=status_code,
                 search=search,
             )
         )
@@ -64,6 +67,18 @@ class ContactMessagesController(BaseController):
         service: ContactMessagesService = Depends(get_contact_messages_service),
     ):
         return self.success(result=await service.add(payload=payload))
+
+    @BaseController.put(
+        "",
+        summary="Update contact message",
+        response_model=BaseOutDto[ContactMessageOut],
+    )
+    async def update_status(
+        self,
+        payload: ContactMessageEdit = Body(...),
+        service: ContactMessagesService = Depends(get_contact_messages_service),
+    ):
+        return self.success(result=await service.update_status(payload=payload))
 
     @BaseController.delete(
         "",

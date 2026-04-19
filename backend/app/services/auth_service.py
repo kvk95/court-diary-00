@@ -83,7 +83,10 @@ class AuthService(BaseService):
         return chamber
 
     async def _get_chambers(self, chamber_ids: list[str]) -> list[Chamber]:
-        stmt = select(Chamber).where(Chamber.chamber_id.in_(chamber_ids))
+        stmt = select(Chamber).where(
+            Chamber.chamber_id.in_(chamber_ids),
+            Chamber.status_ind.is_(True),
+            )
         result = await self.session.execute(stmt)
         chambers = result.scalars().all()
 
@@ -163,15 +166,8 @@ class AuthService(BaseService):
             UserChamberLink.status_ind == True,
         ).order_by(desc(UserChamberLink.primary_ind))
 
-        chamber_link_rows = await self.user_chamber_link_repo.list_all(
-            session=self.session,
-            where=[
-                UserChamberLink.user_id == user.user_id,
-                UserChamberLink.left_date.is_(None),
-                UserChamberLink.status_ind == True,
-            ],
-            order_by=[UserChamberLink.primary_ind.desc()]
-        )
+        chamber_link_rows = (await self.user_chamber_link_repo.execute(session=self.session,
+                                                                      stmt=stmt)).scalars().all()
 
         # ✅ fetch ALL chambers using IN clause
         chamber_link_data = {row.chamber_id: row for row in chamber_link_rows}

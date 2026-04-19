@@ -52,6 +52,7 @@ class UserOut(UserBasicInfoOut):
     Full user output with profile, permissions, and chamber info.
     Used for login, /me, /{user_id}, and /paged endpoints.
     """
+    super_admin_ind: bool
     role: Optional[RoleOut] = None
     created_date: Optional[datetime] = None
     chamber_name: Optional[str] = None

@@ -3,7 +3,7 @@
 from datetime import date, timedelta
 from typing import Dict, Any
 
-from sqlalchemy import func, select, case, distinct, exists, and_
+from sqlalchemy import exists, func, select, case, distinct, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -41,92 +41,93 @@ class DashboardRepository(BaseRepository[Cases]):
         week_end = today + timedelta(days=6)
 
         # =========================
-        # CASE METRICS (apply visibility)
+        # CASE METRICS
         # =========================
         case_stmt = select(
             func.count(
-                case((Cases.status_code == RefmCaseStatusConstants.ACTIVE, 1))
+                case((and_(
+                    Cases.status_code == RefmCaseStatusConstants.ACTIVE,
+                    Cases.chamber_id == chamber_id
+                ), 1))
             ).label("total_active_cases"),
 
             func.count(
-                case((
-                    (Cases.status_code == RefmCaseStatusConstants.ACTIVE) &
-                    (Cases.next_hearing_date < today),
-                    1
-                ))
+                case((and_(
+                    Cases.status_code == RefmCaseStatusConstants.ACTIVE,
+                    Cases.next_hearing_date < today,
+                    Cases.chamber_id == chamber_id
+                ), 1))
             ).label("overdue_cases"),
         )
 
-        case_result = (await self.execute( session=session, stmt=case_stmt)).one()
+        case_result = (await self.execute(session=session, stmt=case_stmt)).one()
 
         # =========================
-        # HEARING METRICS (FIXED 🔥)
+        # HEARING METRICS
         # =========================
         hearing_stmt = (
             select(
                 func.count(case((Hearings.hearing_date == today, 1))).label("today_total"),
-
                 func.count(
-                    case((
-                        (Hearings.hearing_date == today) &
-                        (Hearings.status_code.in_([
+                    case((and_(
+                        Hearings.hearing_date == today,
+                        Hearings.status_code.in_([
                             RefmHearingStatusConstants.COMPLETED,
                             RefmHearingStatusConstants.DISPOSED,
-                        ])),
-                        1
-                    ))
+                        ])
+                    ), 1))
                 ).label("today_completed"),
-
                 func.count(
-                    case((
-                        (Hearings.hearing_date == today) &
-                        (Hearings.status_code.notin_([
+                    case((and_(
+                        Hearings.hearing_date == today,
+                        Hearings.status_code.notin_([
                             RefmHearingStatusConstants.COMPLETED,
                             RefmHearingStatusConstants.DISPOSED,
-                        ])),
-                        1
-                    ))
+                        ])
+                    ), 1))
                 ).label("today_pending"),
-
                 func.count(
-                    case((
-                        Hearings.hearing_date.between(today, week_end),
-                        1
-                    ))
+                    case((Hearings.hearing_date.between(today, week_end), 1))
                 ).label("this_week_total"),
-
                 func.count(
-                    case((
-                        (Hearings.hearing_date < today) &
-                        (Hearings.status_code.notin_([
+                    case((and_(
+                        Hearings.hearing_date < today,
+                        Hearings.status_code.notin_([
                             RefmHearingStatusConstants.COMPLETED,
                             RefmHearingStatusConstants.DISPOSED,
-                        ])),
-                        1
-                    ))
+                        ])
+                    ), 1))
                 ).label("overdue_hearings"),
             )
             .select_from(Hearings)
-            .join(Cases, Hearings.case_id == Cases.case_id)  # ✅ IMPORTANT
-            .where(Hearings.deleted_ind.is_(False))
+            .join(Cases, Hearings.case_id == Cases.case_id)
+            .where(
+                Hearings.chamber_id == chamber_id,      # ← Added
+                Cases.chamber_id == chamber_id,         # ← Added
+                Hearings.deleted_ind.is_(False),
+                Cases.deleted_ind.is_(False),
+            )
         )
 
-        hearing_result = (await self.execute( session=session, stmt=hearing_stmt)).one()
+        hearing_result = (await self.execute(session=session, stmt=hearing_stmt)).one()
 
         # =========================
-        # CASES WITH HEARING TODAY (FIXED 🔥)
+        # CASES WITH HEARING TODAY
         # =========================
         cases_today_stmt = (
             select(func.count(distinct(Hearings.case_id)))
             .select_from(Hearings)
             .join(Cases, Hearings.case_id == Cases.case_id)
             .where(
+                Hearings.chamber_id == chamber_id,      # ← Added
+                Cases.chamber_id == chamber_id,         # ← Added
                 Hearings.deleted_ind.is_(False),
+                Cases.deleted_ind.is_(False),
                 Hearings.hearing_date == today,
             )
         )
 
-        cases_today = await self.execute_scalar( session=session, stmt=cases_today_stmt)
+        cases_today = await self.execute_scalar(session=session, stmt=cases_today_stmt)
 
         return {
             "cases_overview": {
@@ -155,15 +156,14 @@ class DashboardRepository(BaseRepository[Cases]):
         self, session: AsyncSession, chamber_id: str, today: date, limit: int = 10
     ) -> list:
 
-        # =========================
-        # SUBQUERY: LAST HEARING
-        # =========================
+        # Subquery: LAST HEARING (filter by chamber)
         last_hearing_sq = (
             select(
                 Hearings.case_id.label("case_id"),
                 func.max(Hearings.hearing_date).label("last_hearing_date"),
             )
             .where(
+                Hearings.chamber_id == chamber_id,      # ← Added
                 Hearings.deleted_ind.is_(False),
                 Hearings.hearing_date < today,
             )
@@ -173,15 +173,14 @@ class DashboardRepository(BaseRepository[Cases]):
 
         last_hearing = aliased(Hearings)
 
-        # =========================
-        # SUBQUERY: NEXT HEARING
-        # =========================
+        # Subquery: NEXT HEARING (filter by chamber)
         next_hearing_sq = (
             select(
                 Hearings.case_id.label("case_id"),
                 func.min(Hearings.hearing_date).label("next_hearing_date"),
             )
             .where(
+                Hearings.chamber_id == chamber_id,      # ← Added
                 Hearings.deleted_ind.is_(False),
                 Hearings.hearing_date >= today,
             )
@@ -191,9 +190,7 @@ class DashboardRepository(BaseRepository[Cases]):
 
         next_hearing = aliased(Hearings)
 
-        # =========================
-        # MAIN QUERY
-        # =========================
+        # Main Query
         stmt = (
             select(
                 Cases.case_id,
@@ -202,61 +199,44 @@ class DashboardRepository(BaseRepository[Cases]):
                 Cases.respondent,
                 Cases.status_code,
                 RefmCourts.court_name,
-
-                # from cases (fast access)
                 Cases.next_hearing_date.label("case_next_hearing_date"),
-
-                # derived
                 last_hearing_sq.c.last_hearing_date,
                 next_hearing_sq.c.next_hearing_date,
-
-                # purpose (prefer next, fallback last)
                 func.coalesce(
                     next_hearing.purpose_code,
                     last_hearing.purpose_code
                 ).label("purpose_code"),
             )
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
-
-            # last hearing join
-            .outerjoin(
-                last_hearing_sq,
-                last_hearing_sq.c.case_id == Cases.case_id
-            )
+            .outerjoin(last_hearing_sq, last_hearing_sq.c.case_id == Cases.case_id)
             .outerjoin(
                 last_hearing,
                 and_(
                     last_hearing.case_id == last_hearing_sq.c.case_id,
                     last_hearing.hearing_date == last_hearing_sq.c.last_hearing_date,
+                    last_hearing.chamber_id == chamber_id,   # ← Added
                 )
             )
-
-            # next hearing join
-            .outerjoin(
-                next_hearing_sq,
-                next_hearing_sq.c.case_id == Cases.case_id
-            )
+            .outerjoin(next_hearing_sq, next_hearing_sq.c.case_id == Cases.case_id)
             .outerjoin(
                 next_hearing,
                 and_(
                     next_hearing.case_id == next_hearing_sq.c.case_id,
                     next_hearing.hearing_date == next_hearing_sq.c.next_hearing_date,
+                    next_hearing.chamber_id == chamber_id,   # ← Added
                 )
             )
-
-            # filters
             .where(
                 Cases.chamber_id == chamber_id,
                 Cases.deleted_ind.is_(False),
                 Cases.status_code == RefmCaseStatusConstants.ACTIVE,
-                Cases.next_hearing_date < today,  # overdue
+                Cases.next_hearing_date < today,
             )
-
             .order_by(Cases.next_hearing_date.asc())
             .limit(limit)
         )
-        rows = await self.execute( session=session, stmt=stmt)
 
+        rows = await self.execute(session=session, stmt=stmt)
         return [dict(row._mapping) for row in rows.all()]
 
     # ===================================================================
@@ -282,20 +262,19 @@ class DashboardRepository(BaseRepository[Cases]):
             .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
             .where(
                 Hearings.chamber_id == chamber_id,
-                Hearings.hearing_date == hearing_date,
                 Cases.chamber_id == chamber_id,
+                Hearings.hearing_date == hearing_date,
                 Hearings.deleted_ind.is_(False),
-                Cases.deleted_ind.is_(False),                
-                Hearings.deleted_ind.is_(False)
+                Cases.deleted_ind.is_(False),
             )
             .order_by(Cases.case_number.asc())
         )
 
-        rows = await self.execute( session=session, stmt=stmt)
+        rows = await self.execute(session=session, stmt=stmt)
         return [dict(row._mapping) for row in rows.all()]
 
     # ===================================================================
-    # CHAMBER MANAGEMENT STATS + TREND (Moved here)
+    # CHAMBER MANAGEMENT STATS + TREND
     # ===================================================================
 
     async def get_chamber_management_stats(
@@ -303,15 +282,15 @@ class DashboardRepository(BaseRepository[Cases]):
     ) -> Dict[str, Any]:
         """Returns stats + MoM trends."""
 
-        total_users = await self.execute_scalar( session=session, stmt=
+        total_users = await self.execute_scalar(session=session, stmt=
             select(func.count(UserChamberLink.link_id)).where(
                 UserChamberLink.chamber_id == chamber_id,
                 UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind.is_(True),
             )
-        ) 
+        )
 
-        active_users = await self.execute_scalar( session=session, stmt=
+        active_users = await self.execute_scalar(session=session, stmt=
             select(func.count(UserChamberLink.link_id))
             .join(Users, UserChamberLink.user_id == Users.user_id)
             .where(
@@ -323,7 +302,7 @@ class DashboardRepository(BaseRepository[Cases]):
             )
         )
 
-        roles_count = await self.execute_scalar( session=session, stmt=
+        roles_count = await self.execute_scalar(session=session, stmt=
             select(func.count(func.distinct(UserRoles.role_id)))
             .join(UserChamberLink, UserChamberLink.link_id == UserRoles.link_id)
             .where(
@@ -334,8 +313,10 @@ class DashboardRepository(BaseRepository[Cases]):
             )
         )
 
-        # --- MoM Trend Calculation ---
+        # MoM Trend Calculation (unchanged - already filters by chamber_id)
         month_start = date(today.year, today.month, 1)
+
+        
 
         prev_total_users = await self.execute_scalar( session=session, stmt=
             select(func.count(UserChamberLink.link_id)).where(
@@ -381,6 +362,8 @@ class DashboardRepository(BaseRepository[Cases]):
             "users_trend_pct": users_trend,
             "active_users_trend_pct": active_trend,
         }
+
+    
 
     async def get_case_count(
         self,

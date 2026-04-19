@@ -417,7 +417,11 @@ class CasesService(BaseSecuredService):
         # aggregation using conditional COUNT (CASE WHEN ... END).  One
         # round-trip instead of four.
         today = date.today()
-        r = await self.cases_repo.get_case_summary(self.session, today)
+        r = await self.cases_repo.get_case_summary(
+                session=self.session,
+                chamber_id=self.chamber_id,
+                today=today
+            )
         return CaseSummaryStats(
             total=r.total or 0,
             active=r.active or 0,

@@ -1,6 +1,7 @@
 """contact_messages"""
 
-from sqlalchemy import BigInteger, Boolean, CHAR, DateTime, String, Text
+from sqlalchemy import ForeignKey, BigInteger, Boolean, CHAR, DateTime, String, Text
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from datetime import datetime
@@ -27,6 +28,9 @@ class ContactMessages(BaseModel, TimestampMixin):
     # message : TEXT COLLATE "utf8mb4_unicode_ci"
     message: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
+    status_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_ticket_status.code", ondelete="RESTRICT"), default='OPEN', nullable=False)
+
     # chamber_id : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     chamber_id: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
@@ -45,7 +49,12 @@ class ContactMessages(BaseModel, TimestampMixin):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    #    -- No relationships defined. --
+    # contact_messages.status_code -> refm_ticket_status.code
+    contact_messages_status_code_refm_ticket_status = relationship(
+        "RefmTicketStatus",
+        foreign_keys=[status_code], 
+        backref=backref("contact_messages_status_code_refm_ticket_statuss", cascade="all, delete-orphan")
+    )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 

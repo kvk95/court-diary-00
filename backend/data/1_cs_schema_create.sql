@@ -1354,17 +1354,24 @@ CREATE TABLE contact_messages (
     email           VARCHAR(150) NOT NULL,
     subject         VARCHAR(255),
     message         TEXT NOT NULL,
+    
+    status_code     CHAR(4) NOT NULL DEFAULT 'OPEN',
 
     chamber_id      CHAR(36) NULL,
     audit_user_id   CHAR(36) NULL,
 
-    created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     deleted_ind     BOOLEAN DEFAULT FALSE,
-    deleted_date TIMESTAMP NULL,
-    deleted_by CHAR(36) NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Contact Us / Message';
+    deleted_date    TIMESTAMP NULL,
+    deleted_by      CHAR(36) NULL,
+
+    CONSTRAINT fk_contact_messages_status
+        FOREIGN KEY (status_code)
+        REFERENCES refm_ticket_status(code)
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
 
 
 -- =============================================================================

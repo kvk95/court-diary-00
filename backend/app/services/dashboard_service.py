@@ -50,11 +50,6 @@ class DashboardService(BaseSecuredService):
             return "Good afternoon"
         return "Good evening"
 
-
-    def _full_name(self, first: Optional[str], last: Optional[str]) -> str:
-        return " ".join(p for p in [first, last] if p) or "User"
-
-
     def _trend_pct(self, current: int, previous: int) -> Optional[float]:
         """Calculate month-over-month percentage change. Returns None if previous is 0."""
         if previous == 0:
@@ -79,37 +74,46 @@ class DashboardService(BaseSecuredService):
 
     async def _get_hearing_status_maps(self):
         """Load both description and color maps once."""
-        desc_rows = await self.session.execute(
-            select(RefmHearingStatus.code, RefmHearingStatus.description)
-        )
-        color_rows = await self.session.execute(
-            select(RefmHearingStatus.code, RefmHearingStatus.color_code)
-        )
-        return (
-            {r.code: r.description for r in desc_rows},
-            {r.code: r.color_code for r in color_rows},
+        hearing_status_maps = await self.refm_resolver.get_refm_map(column_attr=Hearings.status_code)
+        return hearing_status_maps
+
+    async def _to_hearing_item(self, r: dict, hearing_status_maps: dict) -> DashboardHearingItem:
+        """Convert dict row to DashboardHearingItem DTO."""
+        
+        purpose_description = await self.refm_resolver.from_column(
+            column_attr=Hearings.purpose_code,
+            code=r.get("purpose_code"),
+            value_column=RefmHearingPurpose.description,
+            default=None
         )
 
-    async def _to_hearing_item(self, r: dict, desc_map: dict, color_map: dict) -> DashboardHearingItem:
-        """Convert dict row to DashboardHearingItem DTO."""
+        status_description = await self.refm_resolver.get_value_from_map(
+            desc_map=hearing_status_maps,
+            code=r.get("status_code"),
+            value_column=RefmHearingStatus.description,
+            default=None
+        )
+
+        color = await self.refm_resolver.get_value_from_map(
+            desc_map=hearing_status_maps,
+            code=r.get("status_code"),
+            value_column=RefmHearingStatus.color_code,
+            default=None
+        )
+
         return DashboardHearingItem(
-            hearing_id=r["hearing_id"],
-            case_id=r["case_id"],
-            case_number=r["case_number"],
-            court_name=r["court_name"],
-            petitioner=r["petitioner"],
-            respondent=r["respondent"],
-            hearing_date=r["hearing_date"],
-            purpose_code=r["purpose_code"],            
-            purpose_description=await self.refm_resolver.from_column(
-                column_attr=Hearings.purpose_code,
-                code=r["purpose_code"],
-                value_column=RefmHearingPurpose.description,
-                default=None
-            ),
-            status_code=r["status_code"],
-            status_description=desc_map.get(r["status_code"]),
-            color=color_map.get(r["status_code"]),
+            hearing_id=r.get("hearing_id") or "",
+            case_id=r.get("case_id") or "",
+            case_number=r.get("case_number") or "",
+            court_name=r.get("court_name") or "",
+            petitioner=r.get("petitioner") or "",
+            respondent=r.get("respondent") or "",
+            hearing_date=r.get("hearing_date") or date.today(),
+            purpose_code=r.get("purpose_code"),
+            purpose_description=purpose_description,
+            status_code=r.get("status_code"),
+            status_description=status_description,
+            color=color,
         )
 
     # ===================================================================
@@ -139,13 +143,15 @@ class DashboardService(BaseSecuredService):
             session=self.session, chamber_id=cid, hearing_date=tomorrow
         )
 
-        desc_map, color_map = await self._get_hearing_status_maps()
+        hearing_status_maps = await self._get_hearing_status_maps()
 
         # =========================
         # EXTRACT NEW STRUCTURE
         # =========================
         cases_overview = overview["cases_overview"]
         hearings_overview = overview["hearings_overview"]
+        last_hearing_purpose_map = await self.refm_resolver.get_desc_map(column_attr=Hearings.purpose_code, 
+                                                                         value_column=RefmHearingPurpose.description)
 
         # =========================
         # Convert overdue cases
@@ -163,17 +169,14 @@ class DashboardService(BaseSecuredService):
                     if (r.get("case_next_hearing_date") or r.get("next_hearing_date"))
                     else 0
                 ),
-                last_hearing_purpose=await self.refm_resolver.from_column(
-                    column_attr=Hearings.purpose_code,
+                last_hearing_purpose=await self.refm_resolver.get_value(
+                    desc_map=last_hearing_purpose_map,
                     code=r.get("purpose_code"),
-                    value_column=RefmHearingPurpose.description,
-                    default=None,
+                    default=None   # better to be explicit
                 ),
             )
             for r in overdue_rows
         ]
-
-        print(f"*****************************{chamber_stats}")
 
         # =========================
         # BUILD RESPONSE
@@ -207,12 +210,12 @@ class DashboardService(BaseSecuredService):
             overdue_cases=overdue_cases,
 
             todays_hearings=[
-                await self._to_hearing_item(r, desc_map, color_map)
+                await self._to_hearing_item(r, hearing_status_maps)
                 for r in today_rows
             ],
 
             tomorrows_hearings=[
-                await self._to_hearing_item(r, desc_map, color_map)
+                await self._to_hearing_item(r, hearing_status_maps)
                 for r in tomorrow_rows
             ],
         )

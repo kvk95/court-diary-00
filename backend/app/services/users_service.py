@@ -219,6 +219,7 @@ class UsersService(BaseSecuredService):
             last_name=user_data["last_name"],
             email=user_data["email"],
             phone=user_data["phone"],
+            super_admin_ind=user_data["super_admin_ind"],
             role=role,
             active_ind=user_data["status_ind"],
             advocate_ind=user_data["advocate_ind"],

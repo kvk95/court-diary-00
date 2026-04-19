@@ -21,6 +21,10 @@ class ContactMessageCreate(ContactMessageBase):
     """Payload for creating message"""
     pass
 
+class ContactMessageEdit(BaseInData):
+    message_id: int
+    status_code: str
+
 
 class ContactMessageDelete(BaseInData):
     """Payload for deleting message"""
@@ -28,8 +32,6 @@ class ContactMessageDelete(BaseInData):
 
 
 class ContactMessageOut(BaseRecordData):
-    """Response DTO"""
-
     message_id: int
     chamber_id: Optional[str]
 
@@ -37,6 +39,9 @@ class ContactMessageOut(BaseRecordData):
     email: str
     subject: Optional[str]
     message: str
+
+    status_code: str
+    status_description: Optional[str]
 
     created_date: datetime
     updated_date: datetime

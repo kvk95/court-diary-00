@@ -16,6 +16,7 @@ from app.database.models.chamber import Chamber
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.base.repo_context import apply_repo_context
+from app.utils.constants import SUPERADMIN_ROLE_CODE
 
 
 @apply_repo_context
@@ -148,6 +149,7 @@ class UsersRepository(BaseRepository[Users]):
             "phone": row.phone,
             "status_ind": row.status_ind,
             "advocate_ind":row.advocate_ind,
+            "super_admin_ind": row.role_code == SUPERADMIN_ROLE_CODE,
             "created_date": row.created_date,
             "image_id":row.image_id,
             "image_data":row.image_data,
@@ -292,6 +294,7 @@ class UsersRepository(BaseRepository[Users]):
                 "last_name": row.last_name or "",
                 "email": row.email,
                 "phone": row.phone,
+                "super_admin_ind": row.role_code == SUPERADMIN_ROLE_CODE,
                 "status_ind": row.status_ind,
                 "advocate_ind": row.advocate_ind,
                 "created_date": row.created_date,
@@ -424,41 +427,57 @@ class UsersRepository(BaseRepository[Users]):
         Get user management statistics for a chamber.
         Returns dict with total_users, active_users, total_roles.
         """
-        # 1. Total users in chamber (all time, including left)
-        total_users_stmt = select(func.count(func.distinct(UserChamberLink.user_id))).where(
+        # 1. Total users linked to this chamber (including historical)
+        total_users_stmt = select(
+            func.count(func.distinct(UserChamberLink.user_id))
+        ).where(
             UserChamberLink.chamber_id == chamber_id
         )
-        total_users_result = await self.execute( session=session, stmt=total_users_stmt)
-        total_users = total_users_result.scalar_one() or 0
 
-        # 2. Active users in chamber (not left, status_ind=True)
-        active_users_stmt = select(func.count(func.distinct(UserChamberLink.user_id))).where(
-            and_(
-                UserChamberLink.chamber_id == chamber_id,
-                UserChamberLink.left_date.is_(None),
-                UserChamberLink.status_ind.is_(True),
-            )
+        total_users = await self.execute_scalar(
+            session=session, stmt=total_users_stmt, default=0
         )
-        active_users_result = await self.execute( session=session, stmt=active_users_stmt)
-        active_users = active_users_result.scalar_one() or 0
 
-        # 3. Total roles defined for chamber (via user_roles)
-        total_roles_stmt = select(func.count(func.distinct(UserRoles.role_id))).join(
-            UserChamberLink,
-            UserChamberLink.link_id == UserRoles.link_id
+        # 2. Active users (currently linked and active)
+        active_users_stmt = select(
+            func.count(func.distinct(UserChamberLink.user_id))
         ).where(
             and_(
                 UserChamberLink.chamber_id == chamber_id,
                 UserChamberLink.left_date.is_(None),
                 UserChamberLink.status_ind.is_(True),
-                UserRoles.end_date.is_(None),
+                # Optional: exclude deleted users
+                # Users.status_ind.is_(True),   # if you join with Users
             )
         )
-        total_roles_result = await self.execute( session=session, stmt=total_roles_stmt)
-        total_roles = total_roles_result.scalar_one() or 0
+
+        active_users = await self.execute_scalar(
+            session=session, stmt=active_users_stmt, default=0
+        )
+
+        # 3. Total unique roles currently assigned in this chamber
+        total_roles_stmt = (
+            select(func.count(func.distinct(UserRoles.role_id)))
+            .join(
+                UserChamberLink,
+                UserChamberLink.link_id == UserRoles.link_id
+            )
+            .where(
+                and_(
+                    UserChamberLink.chamber_id == chamber_id,
+                    UserChamberLink.left_date.is_(None),
+                    UserChamberLink.status_ind.is_(True),
+                    UserRoles.end_date.is_(None),
+                )
+            )
+        )
+
+        total_roles = await self.execute_scalar(
+            session=session, stmt=total_roles_stmt, default=0
+        )
 
         return {
             "total_users": total_users,
             "active_users": active_users,
-            "total_roles": total_roles,
+            "total_roles": total_roles,        # or "roles_count" to match other methods
         }

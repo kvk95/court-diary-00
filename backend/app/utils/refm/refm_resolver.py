@@ -107,6 +107,30 @@ class RefmResolver:
     # ------------------------------------------------------------------
     # Convenience Method
     # ------------------------------------------------------------------
+    
+    async def get_value_from_map(
+        self,
+        desc_map: dict,
+        code: str | None,
+        value_column: InstrumentedAttribute,
+        default: Any = None,           # Changed default to None (more neutral)
+    ) -> Any:                          # Changed return type to Any
+        """
+        Safely get a value from a reference map returned by get_refm_map().
+        """
+        if code is None:
+            return default
+
+        row = desc_map.get(code)
+        if row is None:
+            return default
+
+        value_key = value_column.key
+        value = row.get(value_key)     # Use .get() instead of direct access + truthy check
+
+        # Return the actual value if it exists (even if it's falsy like 0, "", False)
+        return value if value is not None else default
+
     async def get_value(
         self,
         desc_map: dict,

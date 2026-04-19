@@ -60,6 +60,12 @@ class ChamberAdd(BaseInData):
 class ChamberEdit(ChamberAdd):
     pass
 
+class ChamberIdInput(BaseInData):
+    chamber_id: str
+    
+class ChamberStatus(ChamberIdInput):
+    status_ind: bool
+
 class ChamberAddAdditional(ChamberAdd):    
     first_name: Optional[str] = None
     last_name: Optional[str] = None
