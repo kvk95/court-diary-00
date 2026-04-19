@@ -12,6 +12,7 @@ from app.dtos.contact_message_dto import (
     ContactMessageEdit,
     ContactMessageOut,
     ContactMessageListOut,
+    ContactMessageStats,
 )
 from app.services.contact_messages_service import ContactMessagesService
 
@@ -19,6 +20,18 @@ from app.services.contact_messages_service import ContactMessagesService
 class ContactMessagesController(BaseController):
 
     CONTROLLER_NAME = "contact-messages"
+    
+    @BaseController.get(
+        "/stats",
+        summary="Get support ticket statistics",
+        response_model=BaseOutDto[ContactMessageStats],
+    )
+    async def contact_messages_get_stats(
+        self,
+        service: ContactMessagesService = Depends(get_contact_messages_service),
+    ) -> BaseOutDto[ContactMessageStats]:
+        """Return summary statistics for support tickets"""
+        return self.success(result=await service.contact_messages_get_stats())
 
     @BaseController.get(
         "",

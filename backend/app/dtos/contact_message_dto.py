@@ -49,3 +49,9 @@ class ContactMessageOut(BaseRecordData):
 
 class ContactMessageListOut(ContactMessageOut):
     pass
+
+class ContactMessageStats(BaseRecordData):
+    total: int = 0
+    open: int = 0
+    in_progress: int = 0
+    resolved: int = 0

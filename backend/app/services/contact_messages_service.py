@@ -14,6 +14,7 @@ from app.dtos.contact_message_dto import (
     ContactMessageEdit,
     ContactMessageOut,
     ContactMessageListOut,
+    ContactMessageStats,
 )
 from app.services.base.secured_base_service import BaseSecuredService
 from app.validators import ErrorCodes, ValidationErrorDetail
@@ -54,6 +55,18 @@ class ContactMessagesService(BaseSecuredService):
         ]
 
         return PagingBuilder(total_records=total, page=page, limit=limit).build(records)
+    
+    async def contact_messages_get_stats(self) -> ContactMessageStats:
+        """Get summary statistics for contact messages"""
+        r = await self.contact_messages_repo.get_stats(self.session)
+        if not r:
+            return ContactMessageStats()
+        return ContactMessageStats(
+            total=r.total or 0,
+            open=r.open or 0,
+            in_progress=r.in_progress or 0,
+            resolved=r.resolved or 0,
+        )
 
     async def __to_out(self, r):        
 
