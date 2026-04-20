@@ -65,13 +65,14 @@ class UserItem(BaseRecordData):
     status: str
     last_login: Optional[datetime]
 
-class GlobalSettingsOut(BaseRecordData):
+class GlobalSettingsBasic(BaseRecordData):
     # branding
     platform_name: str
     company_name: str
     support_email: str
     primary_color: str
 
+class GlobalSettingsOut(GlobalSettingsBasic):
     # smtp
     smtp_host: Optional[str]
     smtp_user_name: Optional[str]

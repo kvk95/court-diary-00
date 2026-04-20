@@ -9,6 +9,7 @@ from app.dependencies import (
 )
 from app.dtos.anonymous_dtos import ServerDateTimeOut
 from app.dtos.base.base_out_dto import BaseOutDto
+from app.dtos.suad_dto import GlobalSettingsBasic
 from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
 from app.services.anonymous_service import AnonymousService
 
@@ -106,3 +107,14 @@ class AnonymousController(BaseController):
     ) -> BaseOutDto[dict[str, str]]:
         result: dict[str, str] = await service.users_new_password(link_id=link_id, payload=payload)
         return self.success(result=result)
+    
+    @BaseController.get(
+        "/gset",
+        summary="Get global settings (public)",
+        response_model=BaseOutDto[GlobalSettingsBasic],
+    )
+    async def get_settings(
+        self,
+        service: AnonymousService = Depends(get_anonymous_service),
+    )->BaseOutDto[GlobalSettingsBasic]:
+        return self.success(result=await service.get_settings())

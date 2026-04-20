@@ -20,8 +20,4 @@ async def load_global_settings(session):
         "SMTP_USE_TLS": row.smtp_use_tls,
     }
 
-    print("*******************************")
-    print(smtp_settings)
-    print("*******************************")
-
     set_runtime_settings(smtp_settings)

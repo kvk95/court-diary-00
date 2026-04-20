@@ -11,7 +11,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api import api_router
 from app.core.config import settings
-from app.core.load_settings import load_global_settings
+from app.startup.load_settings import load_global_settings
 from app.database.models.base.session import async_engine
 from app.middleware.request_context_middleware import RequestContextMiddleware
 from app.middleware.exception_handler import add_exception_handlers
@@ -26,36 +26,24 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    # 1) Validate secret key (your existing logic)
-    # try:
-    #     settings.validate_secret_key()
-    # except ValueError as e:
-    #     print(str(e))
-    #     raise
-
-    # 2) Attach listeners for DB logging, Request Response
+    # 1) Attach listeners for DB logging, Request Response
     attach_listeners(async_engine=async_engine)
 
-    # 3) Start the logging queue workers
+    # 2) Start the logging queue workers
     qm = get_queue_manager()
-    await qm.start()
+    await qm.start()    
 
     print("✅ Logging Framework Started")
+
+    # 3) startup 
+    
+    # start_scheduler(send_tomorrow_hearings_job)
 
     # Run blocking I/O in a thread during startup
     # ✅ Just await the async startup job
     # 🔑 Create DB session manually (no user, no Depends)
     async with async_sessionmaker(bind=async_engine)() as session:
         await load_global_settings(session)
-        # try:
-        #     async with session.begin():  # 🔒 atomic transaction
-        #         service = FxRatesService(session)
-        #         _ = await service.run_fx_startup_job()
-        #     # commit happens automatically here
-        # except Exception:
-        #     # rollback happens automatically
-        #     raise
-        pass
 
     # FastAPI lifecycle enters running state
     # App is now ready to serve requests

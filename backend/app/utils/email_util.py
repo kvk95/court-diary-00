@@ -22,7 +22,7 @@ class EmailUtil (BaseService):
         self.smtp_server = get_runtime_setting("SMTP_SERVER")
         self.smtp_server_port = get_runtime_setting("SMTP_SERVER_PORT")
         self.smtp_server_username = get_runtime_setting("SMTP_SERVER_USERNAME")
-        self.smtp_server_password = get_runtime_setting("SMTSMTP_SERVER_PASSWORDP_SERVER")
+        self.smtp_server_password = get_runtime_setting("SMTP_SERVER_PASSWORD")
         # self.smtp_server_use_tls = get_runtime_setting("SMTP_USE_TLS")strtobool(os.getenv("SMTP_USE_TLS"))
 
     async def get_email_content(self, template_code: RefmEmailTemplatesEnum, dynamic_values):
@@ -46,8 +46,6 @@ class EmailUtil (BaseService):
             raise ValueError(f"Email template '{template_code}' not found!")
         
         body = body.format(**dynamic_values)  # Fill placeholders
-        return subject, body
-
         return subject, body
 
     async def send_email_from_template(self, to_emails, template_code: RefmEmailTemplatesEnum, dynamic_values):

@@ -13,6 +13,7 @@ from app.database.models.users import Users
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
 from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
+from app.database.repositories.global_settings_repository import GlobalSettingsRepository
 from app.database.repositories.role_permission_master_repository import RolePermissionMasterRepository
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
 from app.database.repositories.security_roles_repository import SecurityRolesRepository
@@ -21,6 +22,7 @@ from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.anonymous_dtos import ServerDateTimeOut
 from app.dtos.chamber_dto import ChamberAddAdditional
+from app.dtos.suad_dto import GlobalSettingsBasic
 from app.dtos.users_dto import UserCreateBasic, UserCreateoAuth, UserEmailIn, UserPasswordIn
 from app.services.chamber_service import ChamberService
 from app.services.email_link_service import EmailLinkService
@@ -47,9 +49,11 @@ class AnonymousService(BaseService):
         user_role_repo: Optional[UserRolesRepository] = None,
         role_permission_master_repo: Optional[RolePermissionMasterRepository] = None,
         role_permission_repo: Optional[RolePermissionsRepository] = None,
+        global_settings_repo: Optional[GlobalSettingsRepository] = None,
         email_link_service: Optional[EmailLinkService] = None,
         image_service: Optional[ImageService] = None,
         chamber_service: Optional[ChamberService] = None,
+        
     ):
         super().__init__(session)
         self.chamber_repo: ChamberRepository = chamber_repo or ChamberRepository()
@@ -61,6 +65,7 @@ class AnonymousService(BaseService):
         self.user_role_repo: UserRolesRepository = user_role_repo or UserRolesRepository()
         self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
+        self.global_settings_repo = global_settings_repo or GlobalSettingsRepository()
         self.email_link_service = email_link_service or EmailLinkService(session=self.session)
         self.image_service = image_service or ImageService(session) 
         self.chamber_service: ChamberService = chamber_service or ChamberService(session=self.session)
@@ -454,4 +459,23 @@ class AnonymousService(BaseService):
             "msg":"Password Changed Sussessfully, relogin"
         }
         return ret_value
+    
+    
+    async def get_settings(self) -> GlobalSettingsBasic:
+
+        row = await self.global_settings_repo.get_first(session=self.session)
+
+        if not row:
+            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Settings not Found")
+
+        return self._to_out(row)
+
+    def _to_out(self, row):
+        return GlobalSettingsBasic(
+            # branding
+            platform_name=row.platform_name,
+            company_name=row.company_name,
+            support_email=row.support_email,
+            primary_color=row.primary_color,
+        )
 

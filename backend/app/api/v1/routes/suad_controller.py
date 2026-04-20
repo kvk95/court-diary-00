@@ -23,9 +23,10 @@ class SuadController(BaseController):
     CONTROLLER_NAME = "suad"
     
     @BaseController.get(
-        "",
+        "/gset",
         summary="Get global settings (public)",
         response_model=BaseOutDto[GlobalSettingsOut],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))],
     )
     async def get_settings(
         self,
@@ -35,7 +36,7 @@ class SuadController(BaseController):
 
     # 🔐 EDIT (SUAD ONLY)
     @BaseController.put(
-        "",
+        "/gset",
         summary="Update global settings",
         response_model=BaseOutDto[GlobalSettingsOut],
         dependencies=[Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.WRITE))]

@@ -71,9 +71,7 @@ class SuadService(BaseSecuredService):
 
     # ---------------------------------------------------------------------
     # GLOBAL SETTINGS
-    # ---------------------------------------------------------------------# -----------------------------
-    # PUBLIC GET (no auth)
-    # -----------------------------
+    # ---------------------------------------------------------------------
     async def get_settings(self) -> GlobalSettingsOut:
 
         row = await self.global_settings_repo.get_first(session=self.session)
