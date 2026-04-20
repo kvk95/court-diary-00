@@ -10,15 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.activity_log import ActivityLog
 from app.database.models.users import Users
 from app.database.repositories.suad_repository import SuadRepository
+from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.cases_dto import RecentActivityItem
 from app.dtos.suad_dto import (
     ChamberItem,
-    ChamberListOut,
     ChamberStatsOut,
     SuperAdminDashboardOut,
+    SuperAdminDashboardStats,
     TopChamberItem,
     UserItem,
-    UserListOut,
     UserStatsOut,
 )
 from app.services.base.secured_base_service import BaseSecuredService
@@ -69,14 +69,6 @@ class SuadService(BaseSecuredService):
         Main Super Admin Dashboard
         """
 
-        now = datetime.now(timezone.utc)
-
-        # --- Core Stats ---
-        stats = await self.suad_repo.get_dashboard_stats(
-            session=self.session,
-            today=now.date(),
-        )
-
         # --- Top Chambers ---
         top_chambers_raw = await self.suad_repo.get_top_chambers_by_cases(
             session=self.session,
@@ -88,19 +80,30 @@ class SuadService(BaseSecuredService):
             TopChamberItem(**item) for item in top_chambers_raw
         ]
 
-        # --- Recent Activity (placeholder for now) ---
-        # TODO: Replace with real activity_log table
-        recent_activity = await self.get_recent_activity(limit=limit)
-
         return SuperAdminDashboardOut(
+            top_chambers=top_chambers,
+        )
+    
+    async def get_dashboard_stats(self) -> SuperAdminDashboardStats:
+        """
+        Main Super Admin Dashboard Stats
+        """
+
+        now = datetime.now(timezone.utc)
+
+        # --- Core Stats ---
+        stats = await self.suad_repo.get_dashboard_stats(
+            session=self.session,
+            today=now.date(),
+        )
+
+        return SuperAdminDashboardStats(
             total_chambers=stats["total_chambers"],
             total_users=stats["total_users"],
             active_cases=stats["active_cases"],
             active_subscriptions=stats["active_subscriptions"],
             monthly_revenue=stats["monthly_revenue"],
             system_health=stats["system_health"],
-            top_chambers=top_chambers,
-            recent_activity=recent_activity,
         )
 
 
@@ -159,9 +162,7 @@ class SuadService(BaseSecuredService):
         limit: int,
         search: str | None,
         status: str | None,
-    ) -> ChamberListOut:
-
-        stats = await self.suad_repo.get_stats(self.session)
+    ) -> PagingData[ChamberItem]:
 
         items_raw, total = await self.suad_repo.list_chambers(
             session=self.session,
@@ -171,11 +172,23 @@ class SuadService(BaseSecuredService):
             status=status,
         )
 
-        return ChamberListOut(
-            stats=ChamberStatsOut(**stats),
-            items=[ChamberItem(**i) for i in items_raw],
+        records = [ChamberItem(**i) for i in items_raw]
+
+        return PagingBuilder(
             total_records=total,
-        )
+            page=page,
+            limit=limit
+        ).build(records=records)
+    
+    async def get_chambers_stats(
+        self,
+    ) -> ChamberStatsOut:
+
+        stats = await self.suad_repo.get_stats(self.session)
+
+        stats=ChamberStatsOut(**stats)
+
+        return stats
     
     async def get_users(
         self,
@@ -183,9 +196,7 @@ class SuadService(BaseSecuredService):
         limit: int,
         search: str | None,
         status: str | None,
-    ) -> UserListOut:
-
-        stats = await self.suad_repo.get_user_stats(self.session)
+    ) -> PagingData[UserItem]:
 
         items_raw, total = await self.suad_repo.list_users(
             session=self.session,
@@ -195,8 +206,18 @@ class SuadService(BaseSecuredService):
             status=status,
         )
 
-        return UserListOut(
-            stats=UserStatsOut(**stats),
-            items=[UserItem(**i) for i in items_raw],
+        records = [UserItem(**i) for i in items_raw]
+
+        return PagingBuilder(
             total_records=total,
-        )
+            page=page,
+            limit=limit
+        ).build(records=records)
+    
+    async def get_user_stats(
+        self,
+    ) -> UserStatsOut:
+
+        stats = await self.suad_repo.get_user_stats(self.session)
+
+        return (UserStatsOut(**stats))

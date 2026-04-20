@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import List, Optional
 
 from app.dtos.base.base_data import BaseRecordData
-from app.dtos.cases_dto import RecentActivityItem
 
 
 class TopChamberItem(BaseRecordData):
@@ -17,7 +16,9 @@ class TopChamberItem(BaseRecordData):
     plan: str
 
 
-class SuperAdminDashboardOut(BaseRecordData):
+
+
+class SuperAdminDashboardStats(BaseRecordData):
     total_chambers: int
     total_users: int
     active_cases: int
@@ -25,8 +26,10 @@ class SuperAdminDashboardOut(BaseRecordData):
     monthly_revenue: float
     system_health: float
 
+
+class SuperAdminDashboardOut(BaseRecordData):
+
     top_chambers: List[TopChamberItem]
-    recent_activity: List[RecentActivityItem]
 
 
 class ChamberStatsOut(BaseRecordData):
@@ -50,12 +53,6 @@ class ChamberItem(BaseRecordData):
     joined_date: datetime
 
 
-class ChamberListOut(BaseRecordData):
-    stats: ChamberStatsOut
-    items: List[ChamberItem]
-    total_records: int
-
-
 class UserStatsOut(BaseRecordData):
     total: int
     active: int
@@ -71,9 +68,3 @@ class UserItem(BaseRecordData):
 
     status: str
     last_login: Optional[datetime]
-
-
-class UserListOut(BaseRecordData):
-    stats: UserStatsOut
-    items: List[UserItem]
-    total_records: int

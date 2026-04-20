@@ -53,6 +53,7 @@ class SupportTicketsRepository(BaseRepository[SupportTickets]):
     ) -> Tuple[List[SupportTickets], int]:
         """List tickets with filtering, pagination, and sorting."""
 
+        filters = None
         if chamber_id:
             filters = {SupportTickets.chamber_id: chamber_id}
         where = [SupportTickets.deleted_ind == False]
