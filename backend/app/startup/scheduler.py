@@ -1,6 +1,7 @@
 import asyncio
 from collections import defaultdict
 from datetime import date, timedelta
+import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -23,7 +24,7 @@ from app.utils.logging_framework.exception_logger import log_exception
 # Scheduler
 # -----------------------------------------------------------------------------
 scheduler = AsyncIOScheduler()
-
+_logger = logging.getLogger(__name__)
 def start_scheduler(job_fn):
 
     scheduler.add_job(
@@ -33,7 +34,8 @@ def start_scheduler(job_fn):
         replace_existing=True,
     )
     scheduler.start()
-    print("✅ Scheduler started (8 PM job registered)")
+    
+    _logger.info(f"✅ Scheduler started (8 PM job registered)")
 
 
 # -----------------------------------------------------------------------------
@@ -48,34 +50,40 @@ def get_tomorrow():
 # -----------------------------------------------------------------------------
 async def send_tomorrow_hearings_job():
 
-    async for session in get_session():
-        email_util = EmailUtil(session=session)
+    try:
 
-        rows = await get_tomorrow_hearings(session)
+        async for session in get_session():
+            email_util:EmailUtil = EmailUtil(session=session)
 
-        if not rows:
-            return
+            rows = await get_tomorrow_hearings(session)
 
-        grouped = group_hearings_by_user(rows)
+            if not rows:
+                return
 
-        tasks = [
-            safe_send(email_util, email, hearings)
-                for email, hearings in grouped.items()
-        ]
+            grouped = group_hearings_by_user(rows)
 
-        # 🚀 parallel execution
-        await asyncio.gather(*tasks, return_exceptions=True)
+            tasks = [
+                safe_send(email_util, email, hearings)
+                    for email, hearings in grouped.items()
+            ]
+
+            # 🚀 parallel execution
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    except Exception as e:
+        await log_exception(e)
 
 
 # -----------------------------------------------------------------------------
 # QUERY
 # -----------------------------------------------------------------------------
+from sqlalchemy import select, union_all
+
 async def get_tomorrow_hearings(session):
+
     tomorrow = get_tomorrow()
 
-    # -----------------------------
-    # 1. AOR USERS
-    # -----------------------------
+    # ---------------- AOR ----------------
     aor_stmt = (
         select(
             Cases.case_id,
@@ -92,15 +100,10 @@ async def get_tomorrow_hearings(session):
         .join(RefmCourts, RefmCourts.court_id == Cases.court_id)
         .join(CaseAors, CaseAors.case_id == Cases.case_id)
         .join(Users, Users.user_id == CaseAors.user_id)
-        .where(
-            Hearings.hearing_date == tomorrow,
-            Cases.deleted_ind.is_(False),
-        )
+        .where(Hearings.hearing_date == tomorrow)
     )
 
-    # -----------------------------
-    # 2. ADMIN / SENIOR USERS
-    # -----------------------------
+    # ---------------- ADMIN ----------------
     admin_stmt = (
         select(
             Cases.case_id,
@@ -120,19 +123,18 @@ async def get_tomorrow_hearings(session):
         .join(ChamberRoles, ChamberRoles.role_id == UserRoles.role_id)
         .join(Users, Users.user_id == UserChamberLink.user_id)
         .where(
-            Hearings.hearing_date == tomorrow,
-            Cases.deleted_ind.is_(False),
+            # Hearings.hearing_date == tomorrow,
             ChamberRoles.role_code.in_(["ADMIN", "ASSO", "CNSL"]),
         )
     )
 
-    # -----------------------------
-    # UNION
-    # -----------------------------
+    # ---------------- UNION ----------------
     stmt = union_all(aor_stmt, admin_stmt)
 
     result = await session.execute(stmt)
-    return result.fetchall()
+    rows = result.fetchall()
+
+    return rows
 
 
 # -----------------------------------------------------------------------------
@@ -149,7 +151,7 @@ def group_hearings_by_user(rows):
             "title": f"{r.petitioner} vs {r.respondent}",
             "court_name": r.court_name,
             "hearing_date": r.hearing_date,
-            "hearing_time": r.hearing_time,
+            # "hearing_time": r.hearing_time,
         }
 
     return {
@@ -163,53 +165,56 @@ def group_hearings_by_user(rows):
 # -----------------------------------------------------------------------------
 semaphore = asyncio.Semaphore(10)
 
-async def safe_send(email_util, email, hearings):
+async def safe_send(email_util:EmailUtil, email, hearings):
     async with semaphore:
         await send_hearing_email(email_util, email, hearings)
 
-async def send_hearing_email(email_util, email, hearings):
+async def send_hearing_email(email_util:EmailUtil, email, hearings):
     try:
         # 🔥 build table rows
-        rows_html = ""
-        for i, h in enumerate(hearings, start=1):
-            rows_html += f"""
-            <tr>
-                <td>{i}</td>
-                <td>{h['case_number']}</td>
-                <td>{h['title']}</td>
-                <td>{h['court_name']}</td>
-                <td>{h['hearing_time'] or '-'}</td>
-            </tr>
-            """
-
-        body = f"""
-        <div style="font-family:Arial">
-
-            <h2>📜 Cause List - Tomorrow</h2>
-
-            <table border="1" cellspacing="0" cellpadding="8" style="border-collapse:collapse;width:100%">
-                <tr style="background:#7C3AED;color:white">
-                    <th>#</th>
-                    <th>Case No</th>
-                    <th>Parties</th>
-                    <th>Court</th>
-                    <th>Time</th>
-                </tr>
-                {rows_html}
-            </table>
-
-            <p style="margin-top:20px;color:#777;">
-                Generated by Court Diary System
-            </p>
-
-        </div>
-        """
-
-        email_util.send_email(
-            to_emails=[email],
-            subject=f"Tomorrow Hearings ({len(hearings)} Cases)",
-            body=body,
+        email = "kvk9540@gmail.com"
+        await asyncio.to_thread(
+            email_util.send_email,
+            [email],
+            "Tomorrow Hearings",
+            build_body(hearings),
         )
 
     except Exception as e:
+        _logger.info(f"sending mail to exception {e}")
         await log_exception(e)
+
+def build_body(hearings):
+    rows_html = ""
+    for i, h in enumerate(hearings, start=1):
+        rows_html += f"""
+            <tr>
+                <td style="padding:10px;border:1px solid #ddd;color:#000;">{i}</td>
+                <td style="padding:10px;border:1px solid #ddd;color:#000;">{h['case_number']}</td>
+                <td style="padding:10px;border:1px solid #ddd;color:#000;">{h['title']}</td>
+                <td style="padding:10px;border:1px solid #ddd;color:#000;">{h['court_name']}</td>
+            </tr>
+            """
+
+    body = f"""
+        <div style="font-family:Arial, sans-serif; color:#000;">
+            <h2 style="margin-bottom:5px; color:#000;">
+                Tomorrow’s Hearings
+            </h2>
+            <table width="100%" cellpadding="0" cellspacing="0" 
+                style="border-collapse:collapse; background:#ffffff;">
+                <tr style="background:#7C3AED;">
+                    <th style="padding:10px;border:1px solid #ddd;color:#ffffff;">#</th>
+                    <th style="padding:10px;border:1px solid #ddd;color:#ffffff;">Case No</th>
+                    <th style="padding:10px;border:1px solid #ddd;color:#ffffff;">Parties</th>
+                    <th style="padding:10px;border:1px solid #ddd;color:#ffffff;">Court</th>
+                </tr>
+                {rows_html}
+            </table>
+            <p style="margin-top:20px;font-size:12px;color:#555;">
+                This is an automated notification from Court Diary.
+            </p>
+        </div>
+        """
+    
+    return body
