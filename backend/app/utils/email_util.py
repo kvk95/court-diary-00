@@ -7,7 +7,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from app.core.config import settings
+from app.core.runtime_settings import get_runtime_setting
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplates, RefmEmailTemplatesEnum
 from app.services.base.base_service import BaseService
@@ -19,11 +19,11 @@ class EmailUtil (BaseService):
             session,
                  ):
         super().__init__(session)
-        self.smtp_server = settings.SMTP_SERVER
-        self.smtp_server_port = settings.SMTP_SERVER_PORT
-        self.smtp_server_username = settings.SMTP_SERVER_USERNAME
-        self.smtp_server_password = settings.SMTP_SERVER_PASSWORD
-        # self.smtp_server_use_tls = strtobool(os.getenv("SMTP_USE_TLS"))
+        self.smtp_server = get_runtime_setting("SMTP_SERVER")
+        self.smtp_server_port = get_runtime_setting("SMTP_SERVER_PORT")
+        self.smtp_server_username = get_runtime_setting("SMTP_SERVER_USERNAME")
+        self.smtp_server_password = get_runtime_setting("SMTSMTP_SERVER_PASSWORDP_SERVER")
+        # self.smtp_server_use_tls = get_runtime_setting("SMTP_USE_TLS")strtobool(os.getenv("SMTP_USE_TLS"))
 
     async def get_email_content(self, template_code: RefmEmailTemplatesEnum, dynamic_values):
         """

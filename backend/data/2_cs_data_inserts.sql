@@ -15,6 +15,56 @@ USE courtdiary;
 -- 15. SEED DATA — TIER 0  (Pure REFM — no dependencies)
 -- =============================================================================
 
+INSERT INTO global_settings (
+    settings_id,
+    platform_name,
+    company_name,
+    support_email,
+    primary_color,
+
+    smtp_host,
+	smtp_user_name,
+	smtp_password,
+	smtp_use_tls,
+    smtp_port,
+
+    sms_provider,
+    sms_api_key,
+
+    maintenance_enabled,
+
+    allow_user_registration,
+    enable_case_collaboration,
+    enable_reports_module,
+    enable_api_rate_limit,
+
+    created_by
+) VALUES (
+    1,
+    'Nyadesk',
+    'Nyainfo Pvt Ltd',
+    'support@nyainfo.com',
+    '#7C3AED',
+
+    'smtp.gmail.com',
+	'bG9rZXNoLnByb3RlY2hAZ21haWwuY29tLmjTR9ocT0y3',
+	'ZG1zdyBwZmVmIGFicWwgc3Nvci4cT3Jd38I4Zw==',
+	TRUE,
+    465,
+
+    'MSG91',
+    NULL, -- 🔐 keep null or encrypted value
+
+    FALSE,
+
+    TRUE,
+    TRUE,
+    TRUE,
+    TRUE,
+
+    NULL
+);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.1  Geographic
 -- ─────────────────────────────────────────────────────────────────────────────

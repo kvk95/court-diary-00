@@ -3,7 +3,7 @@
 
 from typing import List
 
-from fastapi import Depends, Query
+from fastapi import Body, Depends, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
 from app.auth.permissions import PType, require_permission
@@ -12,7 +12,7 @@ from app.dependencies import get_suad_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import RecentActivityItem
-from app.dtos.suad_dto import ChamberItem, ChamberStatsOut, SuperAdminDashboardOut, SuperAdminDashboardStats, UserItem, UserStatsOut
+from app.dtos.suad_dto import ChamberItem, ChamberStatsOut, GlobalSettingsEdit, GlobalSettingsOut, SuperAdminDashboardStats, TopChamberItem, UserItem, UserStatsOut
 from app.services.suad_service import SuadService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
@@ -21,6 +21,31 @@ _SUAD = RefmModulesEnum.SUPER_USER
 
 class SuadController(BaseController):
     CONTROLLER_NAME = "suad"
+    
+    @BaseController.get(
+        "",
+        summary="Get global settings (public)",
+        response_model=BaseOutDto[GlobalSettingsOut],
+    )
+    async def get_settings(
+        self,
+        service: SuadService = Depends(get_suad_service),
+    )->BaseOutDto[GlobalSettingsOut]:
+        return self.success(result=await service.get_settings())
+
+    # 🔐 EDIT (SUAD ONLY)
+    @BaseController.put(
+        "",
+        summary="Update global settings",
+        response_model=BaseOutDto[GlobalSettingsOut],
+        dependencies=[Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.WRITE))]
+    )
+    async def update_settings(
+        self,
+        payload: GlobalSettingsEdit = Body(...),
+        service: SuadService = Depends(get_suad_service),
+    )->BaseOutDto[GlobalSettingsOut]:
+        return self.success(result=await service.update_settings(payload))
 
     @BaseController.get(
         "/dashboard/stats",
@@ -55,18 +80,16 @@ class SuadController(BaseController):
     @BaseController.get(
         "/dashboard",
         summary="Super Admin Dashboard - Chambers",
-        response_model=BaseOutDto[SuperAdminDashboardOut],
+        response_model=BaseOutDto[List[TopChamberItem]],
         dependencies=[Depends(require_permission(_SUAD, PType.READ))],
     )
     async def get_superadmin_dashboard(
         self,
         service: SuadService = Depends(get_suad_service),
         search: str | None = Query(None, description="Search chambers"),
-        limit: int = Query(5, ge=1, le=100),
-    ) -> BaseOutDto[SuperAdminDashboardOut]:
+    ) -> BaseOutDto[List[TopChamberItem]]:
         """Get Super Admin platform-wide dashboard"""
         result = await service.get_superadmin_dashboard(
-            limit=limit,
             search=search)
         return self.success(result=result)
     

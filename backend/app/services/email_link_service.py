@@ -7,7 +7,7 @@ from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
 from app.database.repositories.email_link_repository import EmailLinkRepository
 from app.services.base.base_service import BaseService
 from app.utils.email_util import EmailUtil
-from app.utils.utilities import parse_lid, generate_lid
+from app.utils.utilities import decode_text, encode_text
 from app.validators.validation_errors import ValidationErrorDetail
 from app.validators.error_codes import ErrorCodes
 
@@ -67,7 +67,7 @@ class EmailLinkService(BaseService):
         )
 
         # 3. ENCRYPT
-        encrypted_id = generate_lid(link.link_id)
+        encrypted_id = encode_text(link.link_id)
 
         # 4. BUILD URL
         link_url = f"{self.ui_url}login?lid={encrypted_id}&code={template_code.value}"
@@ -99,7 +99,7 @@ class EmailLinkService(BaseService):
         encrypted_id: str,
     ) -> EmailLink:
         
-        link_id = parse_lid(encrypted_id)
+        link_id = decode_text(encrypted_id)
 
         row = await self.email_link_repo.get_first(
             session=self.session,
@@ -133,7 +133,7 @@ class EmailLinkService(BaseService):
             encrypted_id=encrypted_id
         )
 
-        link_id = parse_lid(encrypted_id)
+        link_id = decode_text(encrypted_id)
 
         await self.email_link_repo.delete(
             session=self.session,

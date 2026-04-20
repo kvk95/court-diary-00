@@ -16,6 +16,61 @@ CREATE DATABASE courtdiary
     COLLATE utf8mb4_unicode_ci;
 USE courtdiary;
 
+DROP TABLE IF EXISTS global_settings;
+
+CREATE TABLE global_settings (
+    settings_id     TINYINT PRIMARY KEY DEFAULT 1,
+
+    -- 🎨 Branding
+    platform_name   VARCHAR(150) NOT NULL,
+    company_name    VARCHAR(150) NOT NULL,
+    support_email   VARCHAR(150) NOT NULL,
+    primary_color   VARCHAR(20)  NOT NULL,
+
+    -- 📧 Email (SMTP)
+    smtp_host       VARCHAR(255) NULL,
+	smtp_user_name  VARCHAR(255) NULL,
+	smtp_password   VARCHAR(255) NULL,
+	smtp_use_tls    BOOLEAN DEFAULT TRUE,
+    smtp_port       INT NULL,
+
+    -- 📱 SMS
+    sms_provider    VARCHAR(100) NULL,
+    sms_api_key     TEXT NULL,
+
+    -- ⚙️ Maintenance
+    maintenance_enabled BOOLEAN DEFAULT FALSE,
+    maintenance_start   TIMESTAMP NULL,
+    maintenance_end     TIMESTAMP NULL,
+
+    -- 🚀 Feature Flags
+    allow_user_registration   BOOLEAN DEFAULT TRUE,
+    enable_case_collaboration BOOLEAN DEFAULT TRUE,
+    enable_reports_module     BOOLEAN DEFAULT TRUE,
+    enable_api_rate_limit     BOOLEAN DEFAULT TRUE,
+
+    -- 🧾 AUDIT
+    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by      CHAR(36) NULL,
+
+    updated_date    TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    updated_by      CHAR(36) NULL,
+
+    -- 🔗 FK
+    CONSTRAINT fk_global_settings_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_global_settings_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    -- 🔒 Singleton enforcement
+    CONSTRAINT chk_single_row CHECK (settings_id = 1)
+) ENGINE=InnoDB COMMENT='Global platform configuration';
+
 -- =============================================================================
 -- 2. REFERENCE TABLES — TIER 0 (No foreign key dependencies)
 -- =============================================================================

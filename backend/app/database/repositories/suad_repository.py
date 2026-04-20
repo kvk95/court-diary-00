@@ -122,7 +122,6 @@ class SuadRepository(BaseRepository[Chamber]):
     async def get_top_chambers_by_cases(
         self,
         session: AsyncSession,
-        limit: int,
         search: str | None = None,
     ) -> List[Dict]:
 
@@ -153,7 +152,6 @@ class SuadRepository(BaseRepository[Chamber]):
                 Chamber.plan_code,
             )
             .order_by(func.count(func.distinct(Cases.case_id)).desc())
-            .limit(limit)
         )
 
         result = await self.execute(

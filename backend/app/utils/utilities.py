@@ -36,19 +36,19 @@ def generate_password():
 # DO NOT hardcode it in production
 SECRET_KEY = (settings.CIPHER_SECRET_KEY or "b3-2QWAOSouiqeCaZgFzHCaIYGl7RvCRtmK6OExNnqA=").encode()
     
-def generate_lid(link_id: str) -> str:
-    sig = hmac.new(SECRET_KEY, link_id.encode(), hashlib.sha256).digest()
-    token = base64.urlsafe_b64encode(link_id.encode() + b"." + sig[:8])
+def encode_text(text: str) -> str:
+    sig = hmac.new(SECRET_KEY, text.encode(), hashlib.sha256).digest()
+    token = base64.urlsafe_b64encode(text.encode() + b"." + sig[:8])
     return token.decode()
 
 
-def parse_lid(token: str) -> str:
-    data = base64.urlsafe_b64decode(token.encode())
-    link_id, sig = data.split(b".")
+def decode_text(encoded_text: str) -> str:
+    data = base64.urlsafe_b64decode(encoded_text.encode())
+    text, sig = data.rsplit(b".", 1)
 
-    expected_sig = hmac.new(SECRET_KEY, link_id, hashlib.sha256).digest()[:8]
+    expected_sig = hmac.new(SECRET_KEY, text, hashlib.sha256).digest()[:8]
 
     if not hmac.compare_digest(sig, expected_sig):
         raise ValueError("Invalid signature")
 
-    return link_id.decode()
+    return text.decode()

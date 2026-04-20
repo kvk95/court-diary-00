@@ -2,20 +2,24 @@
 
 from collections.abc import Iterable
 from datetime import datetime, timezone
+import re
 from typing import Any, Callable, Dict, Optional, List, TypeVar
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.runtime_settings import set_runtime_settings
 from app.database.models.activity_log import ActivityLog
 from app.database.models.users import Users
+from app.database.repositories.global_settings_repository import GlobalSettingsRepository
 from app.database.repositories.suad_repository import SuadRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.cases_dto import RecentActivityItem
 from app.dtos.suad_dto import (
     ChamberItem,
     ChamberStatsOut,
-    SuperAdminDashboardOut,
+    GlobalSettingsEdit,
+    GlobalSettingsOut,
     SuperAdminDashboardStats,
     TopChamberItem,
     UserItem,
@@ -23,6 +27,11 @@ from app.dtos.suad_dto import (
 )
 from app.services.base.secured_base_service import BaseSecuredService
 from app.utils.activity_formatter import format_activity
+from app.utils.utilities import decode_text, encode_text
+from app.validators import aggregate_errors
+from app.validators.error_codes import ErrorCodes
+from app.validators.field_validations import FieldValidator
+from app.validators.validation_errors import ValidationErrorDetail
 
 
 class SuadService(BaseSecuredService):
@@ -34,9 +43,11 @@ class SuadService(BaseSecuredService):
         self,
         session: AsyncSession,
         suad_repo: Optional[SuadRepository] = None,
+        global_settings_repo: Optional[GlobalSettingsRepository] = None,
     ):
         super().__init__(session)
         self.suad_repo = suad_repo or SuadRepository()
+        self.global_settings_repo = global_settings_repo or GlobalSettingsRepository()
 
     # ---------------------------------------------------------------------
     # HELPERS
@@ -59,12 +70,164 @@ class SuadService(BaseSecuredService):
         return {key_fn(r): value_fn(r) for r in rows}
 
     # ---------------------------------------------------------------------
+    # GLOBAL SETTINGS
+    # ---------------------------------------------------------------------# -----------------------------
+    # PUBLIC GET (no auth)
+    # -----------------------------
+    async def get_settings(self) -> GlobalSettingsOut:
+
+        row = await self.global_settings_repo.get_first(session=self.session)
+
+        if not row:
+            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Settings not Found")
+
+        return self._to_out(row)
+
+    def _to_out(self, row):
+        return GlobalSettingsOut(
+            # branding
+            platform_name=row.platform_name,
+            company_name=row.company_name,
+            support_email=row.support_email,
+            primary_color=row.primary_color,
+            # smtp
+            smtp_host=row.smtp_host,
+            smtp_user_name=decode_text(row.smtp_user_name) if row.smtp_user_name else None,
+            smtp_password=decode_text(row.smtp_password) if row.smtp_password else None,
+            smtp_use_tls=row.smtp_use_tls,
+            smtp_port=row.smtp_port,
+            # sms
+            sms_provider=row.sms_provider,
+            sms_api_key=decode_text(row.sms_api_key) if row.sms_api_key else None,
+            # maintenance
+            maintenance_enabled=row.maintenance_enabled if row.maintenance_enabled != None else False,
+            maintenance_start=row.maintenance_start,
+            maintenance_end=row.maintenance_end,
+            # feature flags
+            allow_user_registration=row.allow_user_registration if row.allow_user_registration != None else False,
+            enable_case_collaboration=row.enable_case_collaboration if row.enable_case_collaboration != None else False,
+            enable_reports_module=row.enable_reports_module if row.enable_reports_module != None else False,
+            enable_api_rate_limit=row.enable_api_rate_limit if row.enable_api_rate_limit != None else False,
+        )
+
+    # -----------------------------
+    # EDIT (protected)
+    # -----------------------------
+    async def update_settings(self, payload: GlobalSettingsEdit) -> GlobalSettingsOut:
+
+        errors = []
+        # -----------------------------
+        # 📧 Email
+        # -----------------------------
+        if payload.support_email:
+            if err := FieldValidator.validate_email(payload.support_email):
+                errors.append(err)
+
+        # -----------------------------
+        # 🎨 Color (hex validation)
+        # -----------------------------
+        if payload.primary_color:
+            if not re.match(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", payload.primary_color):
+                errors.append(
+                    ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message="Invalid hex color code"
+                    )
+                )
+
+        # -----------------------------
+        # 📧 SMTP Validation
+        # -----------------------------
+        # validate individual fields
+        if payload.smtp_port is not None:
+            if not (1 <= payload.smtp_port <= 65535):
+                errors.append(ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,message="Invalid SMTP port"))
+
+        if payload.smtp_user_name:
+            if "@" not in payload.smtp_user_name:
+                errors.append(ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,message="Invalid SMTP username/email"))
+
+        # -----------------------------
+        # 📱 SMS Validation
+        # -----------------------------
+        if payload.sms_provider and not payload.sms_api_key:
+            errors.append(
+                ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,message="SMS API key required for provider")
+            )
+
+        if payload.sms_api_key and len(payload.sms_api_key) < 10:
+            errors.append(
+                ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,message="Invalid SMS API key")
+            )
+
+        # -----------------------------
+        # ⚙️ Maintenance Validation
+        # -----------------------------
+        if payload.maintenance_start and payload.maintenance_end:
+            if payload.maintenance_start >= payload.maintenance_end:
+                errors.append(
+                    ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                        message="Maintenance start must be before end"
+                    )
+                )
+
+        # Optional: prevent past scheduling
+        now = datetime.now(timezone.utc)
+
+        if payload.maintenance_start and payload.maintenance_start < now:
+            errors.append(
+                ValidationErrorDetail(
+                        code=ErrorCodes.VALIDATION_ERROR,
+                    message="Maintenance start cannot be in the past"
+                )
+            )
+
+        if errors:
+            aggregate_errors(errors=errors)
+            
+        row = await self.global_settings_repo.get_first(session=self.session)
+
+        if not row:
+            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Settings not Found")
+
+        data = payload.model_dump(exclude_unset=True, exclude_none=True)
+
+        if "sms_api_key" in data:
+            data["sms_api_key"] = encode_text(data["sms_api_key"]) 
+
+        if "smtp_password" in data:
+            data["smtp_password"] = encode_text(data["smtp_password"]) 
+
+        if "smtp_user_name" in data:
+            data["smtp_user_name"] = encode_text(data["smtp_user_name"]) 
+
+        updated = await self.global_settings_repo.update(
+            session=self.session,
+            data=data,
+            id_values=row.settings_id
+        )
+
+        set_runtime_settings({
+            "SMTP_SERVER": updated.smtp_host,
+            "SMTP_SERVER_PORT": updated.smtp_port,
+            "SMTP_SERVER_USERNAME": updated.smtp_user_name,
+            "SMTP_SERVER_PASSWORD": updated.smtp_password,
+            "SMTP_USE_TLS": updated.smtp_use_tls,
+        })
+
+        return self._to_out(updated)
+
+    # ---------------------------------------------------------------------
     # DASHBOARD
     # ---------------------------------------------------------------------
     async def get_superadmin_dashboard(self,
-                                       limit: int,
                                        search: str | None = None,
-                                       ) -> SuperAdminDashboardOut:
+                                       ) -> List[TopChamberItem]:
         """
         Main Super Admin Dashboard
         """
@@ -73,16 +236,13 @@ class SuadService(BaseSecuredService):
         top_chambers_raw = await self.suad_repo.get_top_chambers_by_cases(
             session=self.session,
             search=search,
-            limit=limit,
         )
 
         top_chambers: List[TopChamberItem] = [
             TopChamberItem(**item) for item in top_chambers_raw
         ]
 
-        return SuperAdminDashboardOut(
-            top_chambers=top_chambers,
-        )
+        return top_chambers
     
     async def get_dashboard_stats(self) -> SuperAdminDashboardStats:
         """

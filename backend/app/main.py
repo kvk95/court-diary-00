@@ -11,6 +11,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api import api_router
 from app.core.config import settings
+from app.core.load_settings import load_global_settings
 from app.database.models.base.session import async_engine
 from app.middleware.request_context_middleware import RequestContextMiddleware
 from app.middleware.exception_handler import add_exception_handlers
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
     # ✅ Just await the async startup job
     # 🔑 Create DB session manually (no user, no Depends)
     async with async_sessionmaker(bind=async_engine)() as session:
+        await load_global_settings(session)
         # try:
         #     async with session.begin():  # 🔒 atomic transaction
         #         service = FxRatesService(session)

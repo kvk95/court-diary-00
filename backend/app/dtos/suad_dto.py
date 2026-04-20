@@ -2,9 +2,10 @@
 
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
-from app.dtos.base.base_data import BaseRecordData
+
+from app.dtos.base.base_data import BaseInData, BaseRecordData
 
 
 class TopChamberItem(BaseRecordData):
@@ -25,11 +26,6 @@ class SuperAdminDashboardStats(BaseRecordData):
     active_subscriptions: int
     monthly_revenue: float
     system_health: float
-
-
-class SuperAdminDashboardOut(BaseRecordData):
-
-    top_chambers: List[TopChamberItem]
 
 
 class ChamberStatsOut(BaseRecordData):
@@ -68,3 +64,57 @@ class UserItem(BaseRecordData):
 
     status: str
     last_login: Optional[datetime]
+
+class GlobalSettingsOut(BaseRecordData):
+    # branding
+    platform_name: str
+    company_name: str
+    support_email: str
+    primary_color: str
+
+    # smtp
+    smtp_host: Optional[str]
+    smtp_user_name: Optional[str]
+    smtp_password: Optional[str]
+    smtp_use_tls: Optional[bool]
+    smtp_port: Optional[int]
+
+    # sms
+    sms_provider: Optional[str]
+    sms_api_key: Optional[str]
+
+    # maintenance
+    maintenance_enabled: bool
+    maintenance_start: Optional[datetime]
+    maintenance_end: Optional[datetime]
+
+    # feature flags
+    allow_user_registration: bool
+    enable_case_collaboration: bool
+    enable_reports_module: bool
+    enable_api_rate_limit: bool
+
+
+class GlobalSettingsEdit(BaseInData):
+    platform_name: Optional[str] = None
+    company_name: Optional[str] = None
+    support_email: Optional[str] = None
+    primary_color: Optional[str] = None
+
+    smtp_host: Optional[str] = None
+    smtp_user_name: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: Optional[bool] = None
+    smtp_port: Optional[int] = None
+
+    sms_provider: Optional[str] = None
+    sms_api_key: Optional[str] = None
+
+    maintenance_enabled: Optional[bool] = None
+    maintenance_start: Optional[datetime] = None
+    maintenance_end: Optional[datetime] = None
+
+    allow_user_registration: Optional[bool] = None
+    enable_case_collaboration: Optional[bool] = None
+    enable_reports_module: Optional[bool] = None
+    enable_api_rate_limit: Optional[bool] = None
