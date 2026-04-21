@@ -44,7 +44,7 @@ INSERT INTO global_settings (
     'Nyadesk',
     'Nyainfo Pvt Ltd',
     'support@nyainfo.com',
-    '#7C3AED',
+    '#0EA5E9',
 
     'smtp.gmail.com',
 	'bG9rZXNoLnByb3RlY2hAZ21haWwuY29tLmjTR9ocT0y3',
@@ -52,7 +52,7 @@ INSERT INTO global_settings (
 	TRUE,
     465,
 
-    'MSG91',
+    NULL,
     NULL, -- 🔐 keep null or encrypted value
 
     FALSE,

@@ -22,21 +22,21 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------------------------------
+    # Server Settings
+    # -------------------------------------------------------------------------
+    APP_PORT: int = 5000
+    APP_ENV: str = "development"  # development | staging | production
+
+    # -------------------------------------------------------------------------
     # Project Metadata
     # -------------------------------------------------------------------------
     PROJECT_NAME: str = "Court Diary FastAPI"
     VERSION: str = "1.0"
     DESCRIPTION: str = "Production-ready backend for Court Diary POS"
 
-    DOCS_URL: Optional[str] = "/docs"
-    REDOC_URL: Optional[str] = "/redoc"
-    OPENAPI_URL: Optional[str] = "/openapi.json"
-
-    # -------------------------------------------------------------------------
-    # Server Settings
-    # -------------------------------------------------------------------------
-    APP_PORT: int = 5000
-    APP_ENV: str = "development"  # development | staging | production
+    DOCS_URL: Optional[str] = None
+    REDOC_URL: Optional[str] = None
+    OPENAPI_URL: Optional[str] = None
 
     # -------------------------------------------------------------------------
     # Security / Secrets
@@ -193,6 +193,13 @@ class Settings(BaseSettings):
             )
 
         return self
+
+    def model_post_init(self, __context):
+        # Runs AFTER env vars are loaded
+        if self.APP_ENV != "development":
+            self.DOCS_URL = None
+            self.REDOC_URL = None
+            self.OPENAPI_URL = None
 
     # ---------------------------------------------------------------------
     # Subsystems (composition)

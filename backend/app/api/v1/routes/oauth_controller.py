@@ -34,6 +34,7 @@ class OAuthController(BaseController):
     async def login_for_swagger(
         self,
         request: Request,
+        response: Response,
         form_data: OAuth2PasswordRequestForm = Depends(),
         service: AuthService = Depends(get_auth_service),
     ):
@@ -50,6 +51,15 @@ class OAuthController(BaseController):
 
         try:
             token_out: TokenOut = await service.login(login_request, is_regular=False)
+            response.headers.append(
+                "Set-Cookie",
+                (
+                    f"x-swagger=nya_swagger; "
+                    f"Path=/; "
+                    f"HttpOnly; "
+                    f"SameSite=Lax; "
+                ),
+            )
         except ValidationErrorDetail as e:
             raise ValidationErrorDetail(
                 code=ErrorCodes.PERMISSION_DENIED,

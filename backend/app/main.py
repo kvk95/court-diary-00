@@ -56,11 +56,10 @@ async def lifespan(app: FastAPI):
     await qm.stop()
     print("🛑 Logging Framework Stopped")
 
-
 app: FastAPI = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description=settings.DESCRIPTION,
+    description=settings.DESCRIPTION,    
     docs_url=settings.DOCS_URL,
     redoc_url=settings.REDOC_URL,
     openapi_url=settings.OPENAPI_URL,
