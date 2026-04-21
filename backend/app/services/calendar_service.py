@@ -2,13 +2,13 @@
 
 from calendar import monthrange
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models.cases import Cases
+from app.database.models.courts import Courts
 from app.database.models.hearings import Hearings
-from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.refm_hearing_status import RefmHearingStatus, RefmHearingStatusConstants
 from app.database.repositories.hearings_repository import HearingsRepository
@@ -25,6 +25,26 @@ class CalendarService(BaseSecuredService):
         super().__init__(session)
         self.hearings_repo = hearings_repo or HearingsRepository()
 
+    # ─────────────────────────────────────────────────────────────────────
+    # HELPERS
+    # ─────────────────────────────────────────────────────────────────────
+
+    K = TypeVar("K")
+    V = TypeVar("V")
+
+    async def _load_map(
+        self,
+        ids: Iterable[K],
+        query_builder: Callable[[list[K]], Any],
+        key_fn: Callable[[Any], K],
+        value_fn: Callable[[Any], V],
+    ) -> Dict[K, V]:
+        ids = list({i for i in ids if i})
+        if not ids:
+            return {}
+        rows = (await self.session.execute(query_builder(ids))).all()
+        return {key_fn(r): value_fn(r) for r in rows}
+
     def _make_title(self, case_number: str, purpose: Optional[str]) -> str:
         return f"{case_number} — {purpose}" if purpose else case_number
 
@@ -38,7 +58,7 @@ class CalendarService(BaseSecuredService):
             case_number=r.case_number,
             hearing_id=r.hearing_id,
             event_date=r.hearing_date,
-            court_name=court_map.get(r.court_id),
+            court_name=court_map.get(r.court_code),
             petitioner=r.petitioner,
             respondent=r.respondent,
             status_code=r.status_code,
@@ -59,9 +79,10 @@ class CalendarService(BaseSecuredService):
         color_map = await self.refm_resolver.get_desc_map(
             column_attr=Hearings.status_code,
             value_column=RefmHearingStatus.color_code)
-        court_map = await self.refm_resolver.get_desc_map(
-            column_attr=Cases.court_id,
-            value_column=RefmCourts.court_name)
+        q = await self.session.execute(
+                select(Courts.court_code,Courts.court_name)
+            )
+        court_map = {r.court_code: r.court_name for r in q}
         purpose_map = await self.refm_resolver.get_desc_map(
             column_attr=Hearings.purpose_code,
             value_column=RefmHearingPurpose.description,

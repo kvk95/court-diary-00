@@ -42,21 +42,19 @@ class RefmStates(BaseModel):
 
 class RefmStatesConstants:
     ANDHRA_PRADESH = 'AP'
-    TAMIL_NADU = 'TN'
     ARUNACHAL_PRADESH = 'AR'
-    KERALA = 'KL'
     ASSAM = 'AS'
-    KARNATAKA = 'KA'
     BIHAR = 'BR'
-    MAHARASHTRA = 'MH'
     CHHATTISGARH = 'CG'
-    DELHI = 'DL'
     GOA = 'GA'
     GUJARAT = 'GJ'
     HARYANA = 'HR'
     HIMACHAL_PRADESH = 'HP'
     JHARKHAND = 'JH'
+    KARNATAKA = 'KA'
+    KERALA = 'KL'
     MADHYA_PRADESH = 'MP'
+    MAHARASHTRA = 'MH'
     MANIPUR = 'MN'
     MEGHALAYA = 'ML'
     MIZORAM = 'MZ'
@@ -65,6 +63,7 @@ class RefmStatesConstants:
     PUNJAB = 'PB'
     RAJASTHAN = 'RJ'
     SIKKIM = 'SK'
+    TAMIL_NADU = 'TN'
     TELANGANA = 'TS'
     TRIPURA = 'TR'
     UTTAR_PRADESH = 'UP'
@@ -73,6 +72,7 @@ class RefmStatesConstants:
     ANDAMAN_NICOBAR_ISLANDS = 'AN'
     CHANDIGARH = 'CH'
     DADRA_NAGAR_HAVELI_AND_DAMAN_DIU = 'DN'
+    DELHI_NCT = 'DL'
     JAMMU_KASHMIR = 'JK'
     LADAKH = 'LA'
     LAKSHADWEEP = 'LD'
@@ -80,21 +80,19 @@ class RefmStatesConstants:
 
 class RefmStatesEnum(str, PyEnum):
     ANDHRA_PRADESH = RefmStatesConstants.ANDHRA_PRADESH
-    TAMIL_NADU = RefmStatesConstants.TAMIL_NADU
     ARUNACHAL_PRADESH = RefmStatesConstants.ARUNACHAL_PRADESH
-    KERALA = RefmStatesConstants.KERALA
     ASSAM = RefmStatesConstants.ASSAM
-    KARNATAKA = RefmStatesConstants.KARNATAKA
     BIHAR = RefmStatesConstants.BIHAR
-    MAHARASHTRA = RefmStatesConstants.MAHARASHTRA
     CHHATTISGARH = RefmStatesConstants.CHHATTISGARH
-    DELHI = RefmStatesConstants.DELHI
     GOA = RefmStatesConstants.GOA
     GUJARAT = RefmStatesConstants.GUJARAT
     HARYANA = RefmStatesConstants.HARYANA
     HIMACHAL_PRADESH = RefmStatesConstants.HIMACHAL_PRADESH
     JHARKHAND = RefmStatesConstants.JHARKHAND
+    KARNATAKA = RefmStatesConstants.KARNATAKA
+    KERALA = RefmStatesConstants.KERALA
     MADHYA_PRADESH = RefmStatesConstants.MADHYA_PRADESH
+    MAHARASHTRA = RefmStatesConstants.MAHARASHTRA
     MANIPUR = RefmStatesConstants.MANIPUR
     MEGHALAYA = RefmStatesConstants.MEGHALAYA
     MIZORAM = RefmStatesConstants.MIZORAM
@@ -103,6 +101,7 @@ class RefmStatesEnum(str, PyEnum):
     PUNJAB = RefmStatesConstants.PUNJAB
     RAJASTHAN = RefmStatesConstants.RAJASTHAN
     SIKKIM = RefmStatesConstants.SIKKIM
+    TAMIL_NADU = RefmStatesConstants.TAMIL_NADU
     TELANGANA = RefmStatesConstants.TELANGANA
     TRIPURA = RefmStatesConstants.TRIPURA
     UTTAR_PRADESH = RefmStatesConstants.UTTAR_PRADESH
@@ -111,6 +110,7 @@ class RefmStatesEnum(str, PyEnum):
     ANDAMAN_NICOBAR_ISLANDS = RefmStatesConstants.ANDAMAN_NICOBAR_ISLANDS
     CHANDIGARH = RefmStatesConstants.CHANDIGARH
     DADRA_NAGAR_HAVELI_AND_DAMAN_DIU = RefmStatesConstants.DADRA_NAGAR_HAVELI_AND_DAMAN_DIU
+    DELHI_NCT = RefmStatesConstants.DELHI_NCT
     JAMMU_KASHMIR = RefmStatesConstants.JAMMU_KASHMIR
     LADAKH = RefmStatesConstants.LADAKH
     LAKSHADWEEP = RefmStatesConstants.LAKSHADWEEP

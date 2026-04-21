@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple, Dict
+from typing import Optional
 
 from sqlalchemy import select, func
 
@@ -20,7 +20,7 @@ class AnnouncementsRepository(BaseRepository[Announcements]):
         status: Optional[str],
         type_code: Optional[str],
         audience_code: Optional[str],
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ):
 
         stmt = (
             select(
@@ -64,18 +64,4 @@ class AnnouncementsRepository(BaseRepository[Announcements]):
 
         rows = (await session.execute(stmt)).all()
 
-        result = []
-        for r in rows:
-            result.append({
-                "announcement_id": r.announcement_id,
-                "title": r.title,
-                "content": r.content,
-                "type_code": r.type_code,
-                "audience_code": r.audience_code,
-                "status_code": r.status_code,
-                "scheduled_at": r.scheduled_at,
-                "expires_at": r.expires_at,
-                "created_date": r.created_date,
-            })
-
-        return result, total
+        return rows, total

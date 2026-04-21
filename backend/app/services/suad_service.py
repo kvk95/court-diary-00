@@ -117,10 +117,7 @@ class SuadService(BaseSecuredService):
             enable_api_rate_limit=row.enable_api_rate_limit if row.enable_api_rate_limit != None else False,
         )
 
-    def _to_out(self, row:Announcements):
-
-
-        
+    def _to_out(self, row:Announcements):        
         return AnnouncementOut(
             announcement_id = row.announcement_id,
             title = row.title,
@@ -440,8 +437,10 @@ class SuadService(BaseSecuredService):
         type_code: str | None,
         audience_code: str | None,
     ) -> PagingData[AnnouncementOut]:
+        
+        rows:List[Announcements]
 
-        items_raw, total = await self.announcement_repo.list_announcements(
+        rows, total = await self.announcement_repo.list_announcements(
             session=self.session,
             page=page,
             limit=limit,
@@ -451,7 +450,7 @@ class SuadService(BaseSecuredService):
             audience_code=audience_code,
         )
 
-        records = [AnnouncementOut(**i) for i in items_raw]
+        records = [self._to_out(row) for row in rows]
 
         return PagingBuilder(
             total_records=total,

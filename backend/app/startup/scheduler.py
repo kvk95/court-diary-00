@@ -11,8 +11,8 @@ from app.database.models.base.session import get_session
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
 from app.database.models.chamber_roles import ChamberRoles
+from app.database.models.courts import Courts
 from app.database.models.hearings import Hearings
-from app.database.models.refm_courts import RefmCourts
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
@@ -91,13 +91,13 @@ async def get_tomorrow_hearings(session):
             Cases.petitioner,
             Cases.respondent,
             Hearings.hearing_date,
-            RefmCourts.court_name,
+            Courts.court_name,
             Users.email,
             Users.first_name,
             Users.last_name,
         )
         .join(Hearings, Hearings.case_id == Cases.case_id)
-        .join(RefmCourts, RefmCourts.court_id == Cases.court_id)
+        .join(Courts, Courts.court_code == Cases.court_code)
         .join(CaseAors, CaseAors.case_id == Cases.case_id)
         .join(Users, Users.user_id == CaseAors.user_id)
         .where(Hearings.hearing_date == tomorrow)
@@ -111,13 +111,13 @@ async def get_tomorrow_hearings(session):
             Cases.petitioner,
             Cases.respondent,
             Hearings.hearing_date,
-            RefmCourts.court_name,
+            Courts.court_name,
             Users.email,
             Users.first_name,
             Users.last_name,
         )
         .join(Hearings, Hearings.case_id == Cases.case_id)
-        .join(RefmCourts, RefmCourts.court_id == Cases.court_id)
+        .join(Courts, Courts.court_code == Cases.court_code)
         .join(UserChamberLink, UserChamberLink.chamber_id == Cases.chamber_id)
         .join(UserRoles, UserRoles.link_id == UserChamberLink.link_id)
         .join(ChamberRoles, ChamberRoles.role_id == UserRoles.role_id)

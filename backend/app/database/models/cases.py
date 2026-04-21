@@ -22,8 +22,8 @@ class Cases(BaseModel, TimestampMixin):
     # case_number : VARCHAR(120) COLLATE "utf8mb4_unicode_ci"
     case_number: Mapped[str] = mapped_column(String(120), nullable=False)
 
-    # court_id : INTEGER
-    court_id: Mapped[int] = mapped_column(Integer, ForeignKey("refm_courts.court_id", ondelete="RESTRICT"), nullable=False)
+    # court_code : VARCHAR(12) COLLATE "utf8mb4_unicode_ci"
+    court_code: Mapped[str] = mapped_column(String(12), ForeignKey("courts.court_code", ondelete="RESTRICT"), nullable=False)
 
     # case_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     case_type_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_case_types.code", ondelete="RESTRICT"))
@@ -74,11 +74,11 @@ class Cases(BaseModel, TimestampMixin):
         backref=backref("cases_chamber_id_chambers", cascade="all, delete-orphan")
     )
 
-    # cases.court_id -> refm_courts.court_id
-    cases_court_id_refm_courts = relationship(
-        "RefmCourts",
-        foreign_keys=[court_id], 
-        backref=backref("cases_court_id_refm_courtss", cascade="all, delete-orphan")
+    # cases.court_code -> courts.court_code
+    cases_court_code_courts = relationship(
+        "Courts",
+        foreign_keys=[court_code], 
+        backref=backref("cases_court_code_courtss", cascade="all, delete-orphan")
     )
 
     # cases.case_type_code -> refm_case_types.code

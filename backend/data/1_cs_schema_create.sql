@@ -16,61 +16,6 @@ CREATE DATABASE courtdiary
     COLLATE utf8mb4_unicode_ci;
 USE courtdiary;
 
-DROP TABLE IF EXISTS global_settings;
-
-CREATE TABLE global_settings (
-    settings_id     TINYINT PRIMARY KEY DEFAULT 1,
-
-    -- 🎨 Branding
-    platform_name   VARCHAR(150) NOT NULL,
-    company_name    VARCHAR(150) NOT NULL,
-    support_email   VARCHAR(150) NOT NULL,
-    primary_color   VARCHAR(20)  NOT NULL,
-
-    -- 📧 Email (SMTP)
-    smtp_host       VARCHAR(255) NULL,
-	smtp_user_name  VARCHAR(255) NULL,
-	smtp_password   VARCHAR(255) NULL,
-	smtp_use_tls    BOOLEAN DEFAULT TRUE,
-    smtp_port       INT NULL,
-
-    -- 📱 SMS
-    sms_provider    VARCHAR(100) NULL,
-    sms_api_key     TEXT NULL,
-
-    -- ⚙️ Maintenance
-    maintenance_enabled BOOLEAN DEFAULT FALSE,
-    maintenance_start   TIMESTAMP NULL,
-    maintenance_end     TIMESTAMP NULL,
-
-    -- 🚀 Feature Flags
-    allow_user_registration   BOOLEAN DEFAULT TRUE,
-    enable_case_collaboration BOOLEAN DEFAULT TRUE,
-    enable_reports_module     BOOLEAN DEFAULT TRUE,
-    enable_api_rate_limit     BOOLEAN DEFAULT TRUE,
-
-    -- 🧾 AUDIT
-    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by      CHAR(36) NULL,
-
-    updated_date    TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    updated_by      CHAR(36) NULL,
-
-    -- 🔗 FK
-    CONSTRAINT fk_global_settings_created_by
-        FOREIGN KEY (created_by)
-        REFERENCES users(user_id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_global_settings_updated_by
-        FOREIGN KEY (updated_by)
-        REFERENCES users(user_id)
-        ON DELETE SET NULL,
-
-    -- 🔒 Singleton enforcement
-    CONSTRAINT chk_single_row CHECK (settings_id = 1)
-) ENGINE=InnoDB COMMENT='Global platform configuration';
-
 -- =============================================================================
 -- 2. REFERENCE TABLES — TIER 0 (No foreign key dependencies)
 -- =============================================================================
@@ -300,7 +245,7 @@ CREATE TABLE refm_states (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='States / Union Territories';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3.2  Courts  →  refm_states (Keep INT AUTO_INCREMENT - small lookup table)
+-- 3.2  refm_court_type
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS refm_court_type;
@@ -309,24 +254,8 @@ CREATE TABLE refm_court_type (
     description VARCHAR(50)
 );
 
-
-DROP TABLE IF EXISTS refm_courts;
-CREATE TABLE refm_courts (
-    court_id      INT          AUTO_INCREMENT PRIMARY KEY,
-    court_name    VARCHAR(150) NOT NULL,
-    state_code    CHAR(4)      NOT NULL,
-    court_type    VARCHAR(60)  NULL,
-    address       TEXT         NULL,
-    sort_order    INT          NOT NULL DEFAULT 0,
-    status_ind    BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    updated_date  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_courts_state
-        FOREIGN KEY (state_code) REFERENCES refm_states(code) ON DELETE RESTRICT
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Courts / benches';
-
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3.2  Courts  →  refm_announcement
+-- 3.3  refm_announcement
 -- ─────────────────────────────────────────────────────────────────────────────
 DROP TABLE IF EXISTS refm_announcement_type;
 CREATE TABLE refm_announcement_type (
@@ -345,6 +274,28 @@ CREATE TABLE refm_announcement_status (
     code VARCHAR(20) PRIMARY KEY,
     name VARCHAR(50)
 );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3.4  Courts  →  refm_court_type
+-- ─────────────────────────────────────────────────────────────────────────────
+
+DROP TABLE IF EXISTS courts;
+
+CREATE TABLE courts (
+    court_code VARCHAR(12) PRIMARY KEY,
+    court_name VARCHAR(255) NOT NULL,
+    state_code CHAR(2)      NULL,
+    court_type_code VARCHAR(4) NOT NULL,
+    parent_court_code VARCHAR(12) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_courts_state
+        FOREIGN KEY (state_code)   REFERENCES refm_states(code)      ON DELETE RESTRICT,
+    CONSTRAINT fk_courts_type_code
+		FOREIGN KEY (court_type_code) REFERENCES refm_court_type(court_code),
+    CONSTRAINT code
+		FOREIGN KEY (parent_court_code) REFERENCES courts(court_code)
+);
+
 -- =============================================================================
 -- 4. CORE ENTITIES — TIER 2 (UUID v7 Primary Keys)
 --    chamber  →  REFM only   (user FKs deferred — Section 11)
@@ -698,7 +649,7 @@ CREATE TABLE role_permissions (
 
 -- =============================================================================
 -- 8. TIER 6  —  Core Business: Cases
---    →  chamber, refm_courts, refm_case_types, refm_case_status, users
+--    →  chamber, courts, refm_case_types, refm_case_status, users
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -706,38 +657,63 @@ CREATE TABLE role_permissions (
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS cases;
+
 CREATE TABLE cases (
-    case_id           CHAR(36)     PRIMARY KEY,  
-    chamber_id        CHAR(36)     NOT NULL,  
+    case_id           CHAR(36)     PRIMARY KEY,
+
+    chamber_id        CHAR(36)     NOT NULL,
     case_number       VARCHAR(120) NOT NULL,
-    court_id          INT          NOT NULL,
+
+    court_code        VARCHAR(12)  NOT NULL,
+
     case_type_code    CHAR(4)      NULL,
     filing_year       INT          NULL,
+
     petitioner        TEXT         NOT NULL,
     respondent        TEXT         NOT NULL,
     case_summary      TEXT         NULL,
+
     status_code       CHAR(4)      DEFAULT 'AC',
+
     next_hearing_date DATE         NULL,
     last_hearing_date DATE         NULL,
-    deleted_ind        BOOLEAN      DEFAULT FALSE,
+
+    deleted_ind       BOOLEAN      DEFAULT FALSE,
     deleted_date      TIMESTAMP    NULL,
-    deleted_by        CHAR(36)     NULL,  
+    deleted_by        CHAR(36)     NULL,
+
     created_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    created_by        CHAR(36)     NULL,  
+    created_by        CHAR(36)     NULL,
+
     updated_date      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        CHAR(36)     NULL,  
+    updated_by        CHAR(36)     NULL,
+
     CONSTRAINT uk_case_chamber_number
         UNIQUE KEY (chamber_id, case_number),
+
     CONSTRAINT fk_cases_chamber
-        FOREIGN KEY (chamber_id)     REFERENCES chamber(chamber_id)        ON DELETE CASCADE,
+        FOREIGN KEY (chamber_id)
+        REFERENCES chamber(chamber_id)
+        ON DELETE CASCADE,
+
     CONSTRAINT fk_cases_court
-        FOREIGN KEY (court_id)       REFERENCES refm_courts(court_id)      ON DELETE RESTRICT,
+        FOREIGN KEY (court_code)
+        REFERENCES courts(court_code)
+        ON DELETE RESTRICT,
+
     CONSTRAINT fk_cases_type
-        FOREIGN KEY (case_type_code) REFERENCES refm_case_types(code)      ON DELETE RESTRICT,
+        FOREIGN KEY (case_type_code)
+        REFERENCES refm_case_types(code)
+        ON DELETE RESTRICT,
+
     CONSTRAINT fk_cases_status
-        FOREIGN KEY (status_code)    REFERENCES refm_case_status(code)     ON DELETE RESTRICT,
+        FOREIGN KEY (status_code)
+        REFERENCES refm_case_status(code)
+        ON DELETE RESTRICT,
+
     INDEX idx_cases_chamber_status (chamber_id, status_code),
-    INDEX idx_cases_next_hearing (next_hearing_date)
+    INDEX idx_cases_next_hearing (next_hearing_date),
+    INDEX idx_cases_court (court_code)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Legal cases';
 
 
@@ -1355,7 +1331,65 @@ CREATE TABLE email_link (
 ) ENGINE=InnoDB;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 11.6  Support Ticket
+-- 11.6  Global Settings
+-- ─────────────────────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS global_settings;
+
+CREATE TABLE global_settings (
+    settings_id     TINYINT PRIMARY KEY DEFAULT 1,
+
+    -- 🎨 Branding
+    platform_name   VARCHAR(150) NOT NULL,
+    company_name    VARCHAR(150) NOT NULL,
+    support_email   VARCHAR(150) NOT NULL,
+    primary_color   VARCHAR(20)  NOT NULL,
+
+    -- 📧 Email (SMTP)
+    smtp_host       VARCHAR(255) NULL,
+	smtp_user_name  VARCHAR(255) NULL,
+	smtp_password   VARCHAR(255) NULL,
+	smtp_use_tls    BOOLEAN DEFAULT TRUE,
+    smtp_port       INT NULL,
+
+    -- 📱 SMS
+    sms_provider    VARCHAR(100) NULL,
+    sms_api_key     TEXT NULL,
+
+    -- ⚙️ Maintenance
+    maintenance_enabled BOOLEAN DEFAULT FALSE,
+    maintenance_start   TIMESTAMP NULL,
+    maintenance_end     TIMESTAMP NULL,
+
+    -- 🚀 Feature Flags
+    allow_user_registration   BOOLEAN DEFAULT TRUE,
+    enable_case_collaboration BOOLEAN DEFAULT TRUE,
+    enable_reports_module     BOOLEAN DEFAULT TRUE,
+    enable_api_rate_limit     BOOLEAN DEFAULT TRUE,
+
+    -- 🧾 AUDIT
+    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by      CHAR(36) NULL,
+
+    updated_date    TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    updated_by      CHAR(36) NULL,
+
+    -- 🔗 FK
+    CONSTRAINT fk_global_settings_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_global_settings_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    -- 🔒 Singleton enforcement
+    CONSTRAINT chk_single_row CHECK (settings_id = 1)
+) ENGINE=InnoDB COMMENT='Global platform configuration';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11.7  Support Ticket
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP TABLE IF EXISTS support_tickets;

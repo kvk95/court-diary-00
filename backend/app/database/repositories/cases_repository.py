@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.case_aors import CaseAors
 from app.database.models.case_clients import CaseClients
 from app.database.models.cases import Cases
+from app.database.models.courts import Courts
 from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
 from app.database.models.refm_case_types import RefmCaseTypes
-from app.database.models.refm_courts import RefmCourts
 from app.database.models.hearings import Hearings
 from app.database.models.users import Users
 from app.database.repositories.base.base_repository import BaseRepository
@@ -138,12 +138,12 @@ class CasesRepository(BaseRepository[Cases]):
 
         stmt = (
             select(
-                Cases.court_id,
-                RefmCourts.court_name,
+                Cases.court_code,
+                Courts.court_name,
                 count_expr.label("cnt"),
             )
-            .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
-            .group_by(Cases.court_id, RefmCourts.court_name)
+            .join(Courts, Cases.court_code == Courts.court_code)
+            .group_by(Cases.court_code, Courts.court_name)
             .order_by(count_expr.desc())
             .limit(limit)
         )
@@ -151,7 +151,7 @@ class CasesRepository(BaseRepository[Cases]):
         rows = await self.execute(
             session=session,
             stmt=stmt)
-        return [{"court_id": r.court_id, "court_name": r.court_name, "count": r.cnt} for r in rows]
+        return [{"court_code": r.court_code, "court_name": r.court_name, "count": r.cnt} for r in rows]
 
     async def get_cases_by_type(
         self, session: AsyncSession
@@ -211,7 +211,7 @@ class CasesRepository(BaseRepository[Cases]):
         chamber_id: str,
         search: Optional[str] = None,
         status_code: Optional[str] = None,
-        court_id: Optional[int] = None,
+        court_code: Optional[int] = None,
         sort_by: str = "updated_date",
     ):
         # ------------------------------------------------
@@ -305,8 +305,8 @@ class CasesRepository(BaseRepository[Cases]):
         if status_code and status_code.upper() != "ALL":
             base_filters.append(Cases.status_code == status_code.upper())
 
-        if court_id:
-            base_filters.append(Cases.court_id == court_id)
+        if court_code:
+            base_filters.append(Cases.court_code == court_code)
 
         if search and search.strip():
             kw = f"%{search.strip()}%"

@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_clients import CaseClients
 from app.database.models.clients import Clients
+from app.database.models.courts import Courts
 from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
-from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
 from app.database.models.refm_party_roles import RefmPartyRoles
@@ -73,19 +73,19 @@ class ClientsService(BaseSecuredService):
             client_id=client_id,
         )
 
-        used_court_ids      = {r.Cases.court_id       for r in rows if r.Cases.court_id}
+        used_court_codes      = {r.Cases.court_code       for r in rows if r.Cases.court_code}
         used_case_statuses  = {r.Cases.status_code    for r in rows if r.Cases.status_code}
         used_case_types     = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
         used_hearing_status = {r.hearing_status_code  for r in rows if r.hearing_status_code}
         used_party_roles    = {r.party_role_code       for r in rows if r.party_role_code}
 
         court_map = {}
-        if used_court_ids:
+        if used_court_codes:
             q = await self.session.execute(
-                select(RefmCourts.court_id, RefmCourts.court_name)
-                .where(RefmCourts.court_id.in_(used_court_ids))
+                select(Courts.court_code,Courts.court_name)
+                .where(Courts.court_code.in_(used_court_codes))
             )
-            court_map = {r.court_id: r.court_name for r in q}
+            court_map = {r.court_code: r.court_name for r in q}
 
         status_map = {}
         if used_case_statuses:
@@ -134,8 +134,8 @@ class ClientsService(BaseSecuredService):
                 case_id=cases.case_id,
                 chamber_id=cases.chamber_id,
                 case_number=cases.case_number,
-                court_id=cases.court_id,
-                court_name=court_map.get(cases.court_id),
+                court_code=cases.court_code,
+                court_name=court_map.get(cases.court_code),
                 status_code=cases.status_code,
                 status_description=status_map.get(cases.status_code),
                 case_type_code=cases.case_type_code,

@@ -14,7 +14,7 @@ from app.dtos.cases_dto import (
     CaseClientLinkPayload, CaseClientLinkedOut, CaseClientOut,
     CaseCreate, CaseDelete, CaseDetailOut, CaseEdit, CaseListOut,
     CaseNoteCreate, CaseNoteDelete, CaseNoteEdit, CaseNoteOut,
-    CaseQuickHearingOut, CaseSummaryStats, HearingCreate, HearingDelete,
+    CaseQuickHearingOut, CaseSummaryStats, CourtItem, HearingCreate, HearingDelete,
     HearingEdit, HearingOut, RecentActivityItem,
 )
 from app.services.cases_service import CasesService
@@ -25,6 +25,31 @@ _CASE = RefmModulesEnum.CASES
 
 class CasesController(BaseController):
     CONTROLLER_NAME = "cases"
+    
+    # ── Courts ────────────────────────────────────────────────────────────
+    
+    @BaseController.get(
+        "/courts",
+        summary="Get Courts",
+        response_model=BaseOutDto[list[CourtItem]],
+    )
+    async def get_courts(
+        self,
+        limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
+        search: str | None = Query(None),
+        state_code: str | None = Query(None),
+        court_type_code: str | None = Query(None),
+        service: CasesService = Depends(get_cases_service),
+    ) -> BaseOutDto[list[CourtItem]]:
+
+        result = await service.get_courts(
+            limit=limit,
+            search=search,
+            state_code=state_code,
+            court_type_code=court_type_code,
+        )
+
+        return self.success(result=result)
 
     # ── Stats ─────────────────────────────────────────────────────────────
 
@@ -69,13 +94,13 @@ class CasesController(BaseController):
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
         search: Optional[str] = Query(None, description="Search case number, petitioner, respondent"),
         status_code: Optional[str] = Query(None, description="AC | ADJ | DIS | CLO | OVD"),
-        court_id: Optional[int] = Query(None),
+        court_code: Optional[int] = Query(None),
         sort_by: str = Query("updated_date", description="updated_date | hearing_date | case_number"),
         service: CasesService = Depends(get_cases_service),  # read enforced in factory
     ) -> BaseOutDto[PagingData[CaseListOut]]:
         return self.success(result=await service.cases_get_paged(
             page=page, limit=limit, search=search,
-            status_code=status_code, court_id=court_id, sort_by=sort_by,
+            status_code=status_code, court_code=court_code, sort_by=sort_by,
         ))
 
     # ── Single ────────────────────────────────────────────────────────────

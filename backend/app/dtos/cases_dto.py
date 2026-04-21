@@ -19,7 +19,7 @@ class CaseBasicInfoOut(BaseRecordData):
     case_id: str
     chamber_id: str
     case_number: str 
-    court_id: int
+    court_code: str
     court_name: Optional[str] = None   
     case_type_code: Optional[str] = None
     case_type_description:Optional[str] = None
@@ -57,7 +57,7 @@ class CaseSummaryStats(BaseRecordData):
 
 class CaseCreate(BaseInData):
     case_number: str
-    court_id: int
+    court_code: str
     case_type_code: Optional[str] = None
     filing_year: Optional[int] = None
     petitioner: str
@@ -91,7 +91,7 @@ class CaseCreate(BaseInData):
 class CaseEdit(BaseInData):
     case_id: str
     case_number: Optional[str] = None
-    court_id: Optional[int] = None
+    court_code: Optional[str] = None
     case_type_code: Optional[str] = None
     filing_year: Optional[int] = None
     petitioner: Optional[str] = None
@@ -242,3 +242,17 @@ class RecentActivityItem(BaseRecordData):
 from app.dtos.clients_dto import ClientDetailsOut
 CaseClientLinkedOut.model_rebuild()
 CaseDetailOut.model_rebuild()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Court Details
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CourtItem(BaseRecordData):
+    court_code: str
+    court_name: str
+
+    court_type_code: str
+    court_type_name: str
+
+    state_code: str | None
+    state_name: str | None

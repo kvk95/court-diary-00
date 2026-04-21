@@ -15,63 +15,6 @@ USE courtdiary;
 -- 15. SEED DATA — TIER 0  (Pure REFM — no dependencies)
 -- =============================================================================
 
-INSERT INTO global_settings (
-    settings_id,
-    platform_name,
-    company_name,
-    support_email,
-    primary_color,
-
-    smtp_host,
-	smtp_user_name,
-	smtp_password,
-	smtp_use_tls,
-    smtp_port,
-
-    sms_provider,
-    sms_api_key,
-
-    maintenance_enabled,
-
-    allow_user_registration,
-    enable_case_collaboration,
-    enable_reports_module,
-    enable_api_rate_limit,
-
-    created_by
-) VALUES (
-    1,
-    'Nyadesk',
-    'Nyainfo Pvt Ltd',
-    'support@nyainfo.com',
-    '#0EA5E9',
-
-    'smtp.gmail.com',
-	'bG9rZXNoLnByb3RlY2hAZ21haWwuY29tLmjTR9ocT0y3',
-	'ZG1zdyBwZmVmIGFicWwgc3Nvci4cT3Jd38I4Zw==',
-	TRUE,
-    465,
-
-    NULL,
-    NULL, -- 🔐 keep null or encrypted value
-
-    FALSE,
-
-    TRUE,
-    TRUE,
-    TRUE,
-    TRUE,
-
-    NULL
-);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 15.1  Geographic
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT IGNORE INTO refm_countries (code, description, phone_code, sort_order) VALUES
-('IN  ', 'India', '+91', 1);
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.2  Plans & Modules
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -257,76 +200,6 @@ INSERT IGNORE INTO refm_aor_status (code, description, color_code, sort_order) V
 ('ASAC', 'Active',      '#22c55e', 10),
 ('ASWD', 'Withdrawn',   '#64748b', 20),
 ('ASSU', 'Substituted', '#f97316', 30);
-
-
--- =============================================================================
--- 16. SEED DATA — TIER 1  (REFM with FK to other REFM)
--- =============================================================================
-
-INSERT INTO refm_states (code, description, country_code, sort_order) 
-SELECT code, description, country_code, sort_order FROM (
-  VALUES 
-    -- 28 STATES ─────────────────────────────────────────────
-    ROW('AP', 'Andhra Pradesh',              'IN', 1),
-    ROW('AR', 'Arunachal Pradesh',           'IN', 2),
-    ROW('AS', 'Assam',                       'IN', 3),
-    ROW('BR', 'Bihar',                       'IN', 4),
-    ROW('CG', 'Chhattisgarh',                'IN', 5),
-    ROW('GA', 'Goa',                         'IN', 6),
-    ROW('GJ', 'Gujarat',                     'IN', 7),
-    ROW('HR', 'Haryana',                     'IN', 8),
-    ROW('HP', 'Himachal Pradesh',            'IN', 9),
-    ROW('JH', 'Jharkhand',                   'IN', 10),
-    ROW('KA', 'Karnataka',                   'IN', 11),
-    ROW('KL', 'Kerala',                      'IN', 12),
-    ROW('MP', 'Madhya Pradesh',              'IN', 13),
-    ROW('MH', 'Maharashtra',                 'IN', 14),
-    ROW('MN', 'Manipur',                     'IN', 15),
-    ROW('ML', 'Meghalaya',                   'IN', 16),
-    ROW('MZ', 'Mizoram',                     'IN', 17),
-    ROW('NL', 'Nagaland',                    'IN', 18),
-    ROW('OD', 'Odisha',                      'IN', 19),
-    ROW('PB', 'Punjab',                      'IN', 20),
-    ROW('RJ', 'Rajasthan',                   'IN', 21),
-    ROW('SK', 'Sikkim',                      'IN', 22),
-    ROW('TN', 'Tamil Nadu',                  'IN', 23),
-    ROW('TS', 'Telangana',                   'IN', 24),
-    ROW('TR', 'Tripura',                     'IN', 25),
-    ROW('UP', 'Uttar Pradesh',               'IN', 26),
-    ROW('UK', 'Uttarakhand',                 'IN', 27),
-    ROW('WB', 'West Bengal',                 'IN', 28),
-    
-    -- 8 UNION TERRITORIES ───────────────────────────────────
-    ROW('AN', 'Andaman & Nicobar Islands',   'IN', 29),
-    ROW('CH', 'Chandigarh',                  'IN', 30),
-    ROW('DN', 'Dadra & Nagar Haveli and Daman & Diu', 'IN', 31),
-    ROW('DL', 'Delhi (NCT)',                 'IN', 32),
-    ROW('JK', 'Jammu & Kashmir',             'IN', 33),
-    ROW('LA', 'Ladakh',                      'IN', 34),
-    ROW('LD', 'Lakshadweep',                 'IN', 35),
-    ROW('PY', 'Puducherry',                  'IN', 36)
-) AS new_states(code, description, country_code, sort_order)
-WHERE NOT EXISTS (
-    SELECT 1 FROM refm_states r WHERE r.code = new_states.code
-);
-
-INSERT INTO refm_court_type (court_code, description) VALUES 
-('HIGH', 'High Court'),
-('TRIB', 'Tribunal'),
-('SPEC', 'Special Court'),
-('MAGI', 'Magistrate'),
-('CIVI', 'Civil Court'),
-('DIST', 'District Court'),
-('FAMI', 'Family Court'),
-('SUPR', 'Supreme Court');
-
-INSERT INTO refm_courts (court_name, state_code, court_type, sort_order) VALUES
-('Madras High Court',                    'TN  ', 'High Court',     10),
-('City Civil Court, Chennai',            'TN  ', 'Civil Court',    20),
-('District Court, Chengalpattu',         'TN  ', 'District Court', 30),
-('Principal District Court, Coimbatore', 'TN  ', 'District Court', 40),
-('Family Court, Chennai',                'TN  ', 'Family Court',   50),
-('JM Court, Saidapet',                   'TN  ', 'Magistrate',     60);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3.2  Courts  →  refm_announcement
@@ -588,55 +461,55 @@ CALL apply_role_permissions(@chamber_system, @user_suad_lokesh);
 -- 20. SEED DATA — TIER 6  (Cases — Dashboard Ready)
 -- =============================================================================
 
-INSERT INTO cases (chamber_id, case_number, court_id, case_type_code, filing_year,
+INSERT INTO cases (chamber_id, case_number, court_code, case_type_code, filing_year,
                    petitioner, respondent, case_summary, status_code,
                    next_hearing_date, last_hearing_date, created_by) VALUES
 -- OVERDUE CASES
-(@chamber_ca, 'Crl.O.P.No.234/2025',   1, 'CTCR', 2025,
+(@chamber_ca, 'Crl.O.P.No.234/2025',   'HCTN001', 'CTCR', 2025,
  'State of Tamil Nadu', 'Arjun Prasad',      
  'Quashing of FIR u/s 420 IPC – financial fraud',                      'CSAC',  '2026-03-20', '2026-03-15', @user_caadmin),
 
-(@chamber_ca, 'W.P.(MD)No.5678/2025',  1, 'CTWR', 2025,
+(@chamber_ca, 'W.P.(MD)No.5678/2025',  'HCTN001', 'CTWR', 2025,
  'Tmt. Saraswathi',     'The Tahsildar',     
  'Challenge to patta cancellation order',                               'CSAC',  '2026-03-22', '2026-03-18', @user_caadmin),
 
-(@chamber_ca, 'Crl.M.C.No.89/2026',    6, 'CTCR', 2026,
+(@chamber_ca, 'Crl.M.C.No.89/2026',    'MAGITN600', 'CTCR', 2026,
  'Ramesh Kumar',        'Inspector of Police', 
  'Anticipatory bail petition',                                         'CSAC',  '2026-03-18', '2026-03-10', @user_caadmin),
 
 -- UPCOMING THIS WEEK
-(@chamber_ca, 'O.S.No.456/2025',       2, 'CTCV', 2025,
+(@chamber_ca, 'O.S.No.456/2025',       'CIVITN015', 'CTCV', 2025,
  'Meenkshi Textiles',   'Global Exports Ltd',  
  'Suit for specific performance of sale agreement',                     'CSAC',  '2026-03-26', '2026-03-19', @user_caadmin),
 
-(@chamber_ca, 'F.C.No.123/2025',       5, 'CTFM', 2025,
+(@chamber_ca, 'F.C.No.123/2025',       'FCTN500', 'CTFM', 2025,
  'Lakshmi Devi',        'Suresh Babu',         
  'Divorce petition under Hindu Marriage Act',                           'CSAC',  '2026-03-27', '2026-03-12', @user_caadmin),
 
-(@chamber_ca, 'L.C.No.78/2025',        3, 'CTLB', 2025,
+(@chamber_ca, 'L.C.No.78/2025',        'DCTN030', 'CTLB', 2025,
  'Workmen Union',       'ABC Manufacturing',   
  'Labour dispute – wrongful termination',                                'CSAC',  '2026-03-28', '2026-03-14', @user_caadmin),
 
 -- FUTURE CASES
-(@chamber_ca, 'Crl.O.P.No.567/2026',   1, 'CTCR', 2026,
+(@chamber_ca, 'Crl.O.P.No.567/2026',   'HCTN001', 'CTCR', 2026,
  'State of Tamil Nadu', 'Murugan',             
  'Quashing of criminal proceedings',                                    'CSAC',  '2026-04-15', NULL,         @user_caadmin),
 
-(@chamber_ca, 'W.P.No.9012/2026',      1, 'CTWR', 2026,
+(@chamber_ca, 'W.P.No.9012/2026',      'HCTN001', 'CTWR', 2026,
  'Chennai Developers',  'DTCP',                
  'Writ against planning permission denial',                             'CSAC',  '2026-04-20', NULL,         @user_caadmin),
 
 -- ADJOURNED CASES
-(@chamber_ca, 'O.S.No.789/2024',       2, 'CTCV', 2024,
+(@chamber_ca, 'O.S.No.789/2024',       'CIVITN015', 'CTCV', 2024,
  'Subramanian',         'Venkatesh',           
  'Property partition suit',                                             'CSAD', '2026-04-05', '2026-03-21', @user_caadmin),
 
 -- DISPOSED/CLOSED
-(@chamber_ca, 'Crl.M.C.No.45/2024',    6, 'CTCR', 2024,
+(@chamber_ca, 'Crl.M.C.No.45/2024',    'MAGITN600', 'CTCR', 2024,
  'Anand',               'State of TN',         
  'Bail application – disposed',                                         'CSDI', NULL,         '2026-02-15', @user_caadmin),
 
-(@chamber_ca, 'F.C.No.56/2024',        5, 'CTFM', 2024,
+(@chamber_ca, 'F.C.No.56/2024',        'FCTN500', 'CTFM', 2024,
  'Priya',               'Rajesh',              
  'Custody matter – closed',                                             'CSCL', NULL,         '2026-01-30', @user_caadmin);
 
@@ -945,7 +818,59 @@ INSERT INTO activity_log (actor_chamber_id, actor_user_id, action, target, ip_ad
 (@chamber_ca, @user_karthik, 'DOCUMENT_UPLOAD','case:1', '49.204.123.88', JSON_OBJECT('case_id', 1, 'doc_type', 'affidavit'),           '2026-03-21 14:15:00'),
 (@chamber_ca, @user_caadmin,   'SETTINGS_UPDATE','chamber','117.192.45.12', JSON_OBJECT('setting', 'email_config'),                      '2026-03-20 11:30:00');
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 25.1  global_settings
+-- ─────────────────────────────────────────────────────────────────────────────
 
+INSERT INTO global_settings (
+    settings_id,
+    platform_name,
+    company_name,
+    support_email,
+    primary_color,
+
+    smtp_host,
+	smtp_user_name,
+	smtp_password,
+	smtp_use_tls,
+    smtp_port,
+
+    sms_provider,
+    sms_api_key,
+
+    maintenance_enabled,
+
+    allow_user_registration,
+    enable_case_collaboration,
+    enable_reports_module,
+    enable_api_rate_limit,
+
+    created_by
+) VALUES (
+    1,
+    'Nyadesk',
+    'Nyainfo Pvt Ltd',
+    'support@nyainfo.com',
+    '#0EA5E9',
+
+    'smtp.gmail.com',
+	'bG9rZXNoLnByb3RlY2hAZ21haWwuY29tLmjTR9ocT0y3',
+	'ZG1zdyBwZmVmIGFicWwgc3Nvci4cT3Jd38I4Zw==',
+	TRUE,
+    465,
+
+    NULL,
+    NULL, -- 🔐 keep null or encrypted value
+
+    FALSE,
+
+    TRUE,
+    TRUE,
+    TRUE,
+    TRUE,
+
+    NULL
+);
 
 -- =============================================================================
 -- 26. VERIFICATION QUERIES (Dashboard Data Check) — FIXED

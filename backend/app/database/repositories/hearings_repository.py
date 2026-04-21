@@ -97,7 +97,7 @@ class HearingsRepository(BaseRepository[Hearings]):
             Cases.case_number,
             Cases.petitioner,
             Cases.respondent,
-            Cases.court_id,
+            Cases.court_code,
         ).join(Cases, Hearings.case_id == Cases.case_id)
 
     async def get_calendar_events(

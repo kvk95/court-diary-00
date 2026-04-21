@@ -10,9 +10,9 @@ from sqlalchemy.orm import aliased
 from app.database.models.case_aors import CaseAors
 from app.database.models.cases import Cases
 from app.database.models.clients import Clients
+from app.database.models.courts import Courts
 from app.database.models.hearings import Hearings
 from app.database.models.refm_case_status import RefmCaseStatusConstants
-from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_roles import UserRoles
@@ -198,7 +198,7 @@ class DashboardRepository(BaseRepository[Cases]):
                 Cases.petitioner,
                 Cases.respondent,
                 Cases.status_code,
-                RefmCourts.court_name,
+                Courts.court_name,
                 Cases.next_hearing_date.label("case_next_hearing_date"),
                 last_hearing_sq.c.last_hearing_date,
                 next_hearing_sq.c.next_hearing_date,
@@ -207,7 +207,7 @@ class DashboardRepository(BaseRepository[Cases]):
                     last_hearing.purpose_code
                 ).label("purpose_code"),
             )
-            .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
+            .join(Courts, Cases.court_code == Courts.court_code)
             .outerjoin(last_hearing_sq, last_hearing_sq.c.case_id == Cases.case_id)
             .outerjoin(
                 last_hearing,
@@ -256,10 +256,10 @@ class DashboardRepository(BaseRepository[Cases]):
                 Cases.case_number,
                 Cases.petitioner,
                 Cases.respondent,
-                RefmCourts.court_name,
+                Courts.court_name,
             )
             .join(Cases, Hearings.case_id == Cases.case_id)
-            .join(RefmCourts, Cases.court_id == RefmCourts.court_id)
+            .join(Courts, Cases.court_code == Courts.court_code)
             .where(
                 Hearings.chamber_id == chamber_id,
                 Cases.chamber_id == chamber_id,

@@ -12,13 +12,13 @@ from app.database.models.case_clients import CaseClients
 from app.database.models.case_notes import CaseNotes
 from app.database.models.cases import Cases
 from app.database.models.clients import Clients
+from app.database.models.courts import Courts
 from app.database.models.hearings import Hearings
 from app.database.models.profile_images import ProfileImages
 from app.database.models.refm_aor_status import RefmAorStatus
 from app.database.models.refm_case_status import RefmCaseStatus
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
-from app.database.models.refm_courts import RefmCourts
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.refm_party_roles import RefmPartyRoles
@@ -27,6 +27,7 @@ from app.database.models.users import Users
 from app.database.repositories.case_clients_repository import CaseClientsRepository
 from app.database.repositories.case_notes_repository import CaseNotesRepository
 from app.database.repositories.cases_repository import CasesRepository
+from app.database.repositories.courts_repository import CourtsRepository
 from app.database.repositories.hearings_repository import HearingsRepository
 from app.dtos.aor_dto import AorOut
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
@@ -45,6 +46,7 @@ from app.dtos.cases_dto import (
     CaseNoteOut,
     CaseQuickHearingOut,
     CaseSummaryStats,
+    CourtItem,
     HearingCreate,
     HearingDelete,
     HearingEdit,
@@ -65,12 +67,15 @@ class CasesService(BaseSecuredService):
         hearings_repo: Optional[HearingsRepository] = None,
         case_notes_repo: Optional[CaseNotesRepository] = None,
         case_clients_repo: Optional[CaseClientsRepository] = None,
+        court_repo: Optional[CourtsRepository] = None,        
     ):
         super().__init__(session)
         self.cases_repo = cases_repo or CasesRepository()
         self.hearings_repo = hearings_repo or HearingsRepository()
         self.case_notes_repo = case_notes_repo or CaseNotesRepository()
         self.case_clients_repo = case_clients_repo or CaseClientsRepository()
+        self.court_repo = court_repo or CourtsRepository()
+        
 
     # ─────────────────────────────────────────────────────────────────────
     # HELPERS
@@ -143,10 +148,10 @@ class CasesService(BaseSecuredService):
     async def _load_common_maps(self, cases: List[Cases]):
         return {
             "court_map": await self._load_map(
-                (c.court_id for c in cases),
-                lambda ids: select(RefmCourts.court_id, RefmCourts.court_name)
-                .where(RefmCourts.court_id.in_(ids)),
-                lambda r: r.court_id,
+                (c.court_code for c in cases),
+                lambda codes: select(Courts.court_code, Courts.court_name)
+                .where(Courts.court_code.in_(codes)),
+                lambda r: r.court_code,
                 lambda r: r.court_name,
             ),
             "aor_map": await self._load_primary_aor_map(
@@ -377,8 +382,8 @@ class CasesService(BaseSecuredService):
             case_id=case.case_id,
             chamber_id=case.chamber_id,
             case_number=case.case_number,
-            court_id=case.court_id,
-            court_name=maps["court_map"].get(case.court_id),
+            court_code=case.court_code,
+            court_name=maps["court_map"].get(case.court_code),
             case_type_code=case.case_type_code,
             case_type_description=maps["case_type_map"].get(case.case_type_code),
             filing_year=case.filing_year,
@@ -406,6 +411,16 @@ class CasesService(BaseSecuredService):
                 (cc.party_role_description for cc in case_clients_out if cc.primary_ind),
                 case_clients_out[0].party_role_description if case_clients_out else '',
             ),
+        )
+    
+    def _to_court_details_out(self, row):
+        return CourtItem(
+            court_code=row.court_code,
+            court_name=row.court_name,
+            court_type_code=row.court_type_code,
+            court_type_name=row.court_type_name,
+            state_code=row.state_code,
+            state_name=row.state_name,
         )
 
     # ─────────────────────────────────────────────────────────────────────
@@ -446,18 +461,18 @@ class CasesService(BaseSecuredService):
             limit=limit,
         )
 
-        used_court_ids = {r.Cases.court_id for r in rows if r.Cases.court_id}
+        used_court_codes = {r.Cases.court_code for r in rows if r.Cases.court_code}
         used_statuses = {r.Cases.status_code for r in rows if r.Cases.status_code}
         used_case_types = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
         used_party_roles = {r.party_role_code for r in rows if r.party_role_code}
 
         court_map = {}
-        if used_court_ids:
+        if used_court_codes:
             q = await self.session.execute(
-                select(RefmCourts.court_id, RefmCourts.court_name)
-                .where(RefmCourts.court_id.in_(used_court_ids))
+                select(Courts.court_code, Courts.court_name)
+                .where(Courts.court_code.in_(used_court_codes))
             )
-            court_map = {r.court_id: r.court_name for r in q}
+            court_map = {r.court_code: r.court_name for r in q}
 
         status_map = {}
         if used_statuses:
@@ -488,8 +503,8 @@ class CasesService(BaseSecuredService):
                 case_id=r.Cases.case_id,
                 chamber_id=r.Cases.chamber_id,
                 case_number=r.Cases.case_number,
-                court_id=r.Cases.court_id,
-                court_name=court_map.get(r.Cases.court_id),
+                court_code=r.Cases.court_code,
+                court_name=court_map.get(r.Cases.court_code),
                 status_code=r.Cases.status_code,
                 status_description=status_map.get(r.Cases.status_code),
                 case_type_code=r.Cases.case_type_code,
@@ -515,7 +530,7 @@ class CasesService(BaseSecuredService):
         limit: int,
         search: Optional[str] = None,
         status_code: Optional[str] = None,
-        court_id: Optional[int] = None,
+        court_code: Optional[int] = None,
         sort_by: str = "updated_date",
     ) -> PagingData[CaseListOut]:
 
@@ -526,23 +541,23 @@ class CasesService(BaseSecuredService):
             chamber_id=self.chamber_id,
             search=search,
             status_code=status_code,
-            court_id=court_id,
+            court_code=court_code,
             sort_by=sort_by,
         )
 
-        used_court_ids = {r.Cases.court_id for r in rows if r.Cases.court_id}
+        used_court_codes = {r.Cases.court_code for r in rows if r.Cases.court_code}
         used_case_statuses = {r.Cases.status_code for r in rows if r.Cases.status_code}
         used_case_types = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
         used_hearing_status = {r.hearing_status_code for r in rows if r.hearing_status_code}
         used_party_roles = {r.party_role_code for r in rows if r.party_role_code}
 
         court_map = {}
-        if used_court_ids:
+        if used_court_codes:
             q = await self.session.execute(
-                select(RefmCourts.court_id, RefmCourts.court_name)
-                .where(RefmCourts.court_id.in_(used_court_ids))
+                select(Courts.court_code, Courts.court_name)
+                .where(Courts.court_code.in_(used_court_codes))
             )
-            court_map = {r.court_id: r.court_name for r in q}
+            court_map = {r.court_code: r.court_name for r in q}
 
         status_map = {}
         if used_case_statuses:
@@ -581,8 +596,8 @@ class CasesService(BaseSecuredService):
                 case_id=c.case_id,
                 chamber_id=c.chamber_id,
                 case_number=c.case_number,
-                court_id=c.court_id,
-                court_name=court_map.get(c.court_id),
+                court_code=c.court_code,
+                court_name=court_map.get(c.court_code),
                 status_code=c.status_code,
                 status_description=status_map.get(c.status_code),
                 case_type_code=c.case_type_code,
@@ -1052,7 +1067,7 @@ class CasesService(BaseSecuredService):
         used_party_roles = {r.CaseClients.party_role_code for r in rows if r.CaseClients.party_role_code}
         used_case_statuses = {r.Cases.status_code for r in rows if r.Cases.status_code}
         used_case_types = {r.Cases.case_type_code for r in rows if r.Cases.case_type_code}
-        used_court_ids = {r.Cases.court_id for r in rows if r.Cases.court_id}
+        used_court_codes = {r.Cases.court_code for r in rows if r.Cases.court_code}
         used_client_types = {r.Clients.client_type_code for r in rows if r.Clients.client_type_code}
         used_party_types = {r.Clients.party_type_code for r in rows if r.Clients.party_type_code}
 
@@ -1082,12 +1097,12 @@ class CasesService(BaseSecuredService):
             case_type_map = {r.code: r.description for r in ct_rows}
 
         court_map = {}
-        if used_court_ids:
+        if used_court_codes:
             co_rows = await self.session.execute(
-                select(RefmCourts.court_id, RefmCourts.court_name)
-                .where(RefmCourts.court_id.in_(used_court_ids))
+                select(Courts.court_code, Courts.court_name)
+                .where(Courts.court_code.in_(used_court_codes))
             )
-            court_map = {r.court_id: r.court_name for r in co_rows}
+            court_map = {r.court_code: r.court_name for r in co_rows}
 
         client_type_map = {}
         if used_client_types:
@@ -1117,8 +1132,8 @@ class CasesService(BaseSecuredService):
                 case_id=ca.case_id,
                 chamber_id=ca.chamber_id,
                 case_number=ca.case_number,
-                court_id=ca.court_id,
-                court_name=court_map.get(ca.court_id),
+                court_code=ca.court_code,
+                court_name=court_map.get(ca.court_code),
                 case_type_code=ca.case_type_code,
                 case_type_description=case_type_map.get(ca.case_type_code),
                 filing_year=ca.filing_year,
@@ -1304,3 +1319,28 @@ class CasesService(BaseSecuredService):
             )
             for r in activity_rows
         ]
+    
+    async def get_courts(
+        self,
+        limit: int,
+        search: str | None,
+        state_code: str | None,
+        court_type_code: str | None,
+    ) -> list[CourtItem]:
+
+        # ✅ validation (your rule)
+        if not state_code and not court_type_code and (not search or len(search) < 3):
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Provide state_code or court_type_code or min 3 chars search"
+            )
+
+        rows = await self.court_repo.list_courts(
+            session=self.session,
+            limit=limit,
+            search=search,
+            state_code=state_code,
+            court_type_code=court_type_code,
+        )
+
+        return [self._to_court_details_out(row) for row in rows]
