@@ -56,6 +56,7 @@ async def get_chamber_service(
 def get_image_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(get_current_user),
+    __: None = Depends(validate_csrf),
 ) -> ImageService:
     return ImageService(session=session)
 
@@ -65,18 +66,21 @@ def get_image_service(
 def get_cases_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.CASES, PType.READ)),
+    __: None = Depends(validate_csrf),
 ) -> CasesService:
     return CasesService(session=session)
 
 def get_aor_service(
     session: AsyncSession = Depends(get_session),
-    _=Depends(require_permission(RefmModulesEnum.CASES, PType.READ)),  # AOR lives under CASES
+    _=Depends(require_permission(RefmModulesEnum.CASES, PType.READ)),     
+    __: None = Depends(validate_csrf),
 ) -> AorService:
     return AorService(session=session)
 
 async def get_clients_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.CLIENTS, PType.READ)),
+    __: None = Depends(validate_csrf),
 ) -> ClientsService:
     return ClientsService(session=session, image_service=get_image_service())
 
@@ -89,6 +93,7 @@ async def get_clients_service(
 async def get_calendar_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.CALENDAR, PType.READ)),
+    __: None = Depends(validate_csrf),
 ) -> CalendarService:
     return CalendarService(session=session)
 
@@ -128,23 +133,27 @@ async def get_suad_service_dash(
 async def get_users_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),
+    __: None = Depends(validate_csrf),
 ) -> UsersService:
     return UsersService(session=session, image_service=get_image_service())
 
 async def get_roles_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),  # roles live under USER
+    __: None = Depends(validate_csrf),
 ) -> RolesService:
     return RolesService(session=session)
 
 async def get_role_permissions_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),  # same
+    __: None = Depends(validate_csrf),
 ) -> RolePermissionsService:
     return RolePermissionsService(session=session)
 
 async def get_support_ticket_service(
     session: AsyncSession = Depends(get_session),
-    _ = Depends(get_current_user)
+    _ = Depends(get_current_user),
+    __: None = Depends(validate_csrf),
 ) -> SupportTicketService:
     return SupportTicketService(session=session)

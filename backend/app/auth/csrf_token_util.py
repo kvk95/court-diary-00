@@ -13,6 +13,9 @@ async def validate_csrf(request: Request):
     cookie_token = request.cookies.get("csrf_token")
     header_token = request.headers.get("X-CSRF-Token")
 
+    if swaggger_cookie:
+        print(f"swaggger_cookie :: {swaggger_cookie}")
+
     if swaggger_cookie and swaggger_cookie == "nya_swagger":
         return
     

@@ -42,8 +42,16 @@ class BaseController(ABC):
         return decorator
 
     def _register_routes(self):
-        # ✅ Get methods in definition order, not alphabetical
         methods_with_order = self._get_methods_in_definition_order()
+        
+        # Sort: static/literal paths before parameterized ones
+        def path_priority(item):
+            _, method = item
+            rule, _ = method._route_info
+            # Count path params — more params = lower priority
+            return rule.count("{")
+        
+        methods_with_order.sort(key=path_priority)
         
         for name, method in methods_with_order:
             route_info = getattr(method, "_route_info", None)
@@ -51,13 +59,13 @@ class BaseController(ABC):
                 continue
 
             rule, options = route_info
+            options = dict(options)  # ← defensive copy so pop doesn't mutate stored dict
             methods = options.pop("methods", ["GET"])
 
             for http_method in [m.upper() for m in methods]:
                 decorator = getattr(self.router, http_method.lower(), None)
                 if decorator is None:
                     raise ValueError(f"Invalid HTTP method: {http_method} in {name}")
-
                 decorator(rule, **options)(method)
 
     def _get_methods_in_definition_order(self) -> List[Tuple[str, Callable[..., Any]]]:
