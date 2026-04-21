@@ -118,6 +118,13 @@ async def get_dashboard_service(
 ) -> DashboardService:
     return DashboardService(session=session)
 
+async def get_suad_service_dash(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(require_permission(RefmModulesEnum.DASHBOARD, PType.READ)),
+    __: None = Depends(validate_csrf),
+) -> SuadService:
+    return SuadService(session=session)
+
 async def get_users_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),

@@ -12,7 +12,6 @@ from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.suad_dto import GlobalSettingsBasic
 from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
 from app.services.anonymous_service import AnonymousService
-from app.startup.scheduler import send_tomorrow_hearings_job
 
 
 class AnonymousController(BaseController):
@@ -119,10 +118,3 @@ class AnonymousController(BaseController):
         service: AnonymousService = Depends(get_anonymous_service),
     )->BaseOutDto[GlobalSettingsBasic]:
         return self.success(result=await service.get_settings())
-    
-    # suad_controller.py (or any test controller)
-
-    @BaseController.post("/test-hearing-mail")
-    async def test_hearing_mail(self):
-        await send_tomorrow_hearings_job()
-        return {"status": "Triggered"}

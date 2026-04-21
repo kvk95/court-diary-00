@@ -12,7 +12,7 @@ from app.dependencies import get_suad_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import RecentActivityItem
-from app.dtos.suad_dto import ChamberItem, ChamberStatsOut, GlobalSettingsEdit, GlobalSettingsOut, SuperAdminDashboardStats, TopChamberItem, UserItem, UserStatsOut
+from app.dtos.suad_dto import AnnouncementBaseIn, AnnouncementCreate, AnnouncementOut, AnnouncementUpdate, ChamberItem, ChamberStatsOut, GlobalSettingsEdit, GlobalSettingsOut, SuperAdminDashboardStats, TopChamberItem, UserItem, UserStatsOut
 from app.services.suad_service import SuadService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
@@ -153,3 +153,104 @@ class SuadController(BaseController):
     ) -> BaseOutDto[PagingData[UserItem]]:
         result = await service.get_users(page, limit, search, status)
         return self.success(result=result)
+
+    # ---------------------------------------------------------------------
+    # announcements
+    # ---------------------------------------------------------------------
+    
+    @BaseController.post(
+        "/announcement",
+        summary="Create announcement",
+        response_model=BaseOutDto[AnnouncementOut],
+        dependencies=[Depends(require_permission(_SUAD, PType.WRITE))]
+    )
+    async def create_announcement(
+        self,
+        payload: AnnouncementCreate = Body(...),
+        service: SuadService = Depends(get_suad_service),
+    ):
+        return self.success(result=await service.create_announcement(payload))
+
+    # -----------------------------
+    # LIST
+    # -----------------------------
+    @BaseController.get(
+        "/announcement",
+        summary="List announcements",
+        response_model=BaseOutDto[PagingData[AnnouncementOut]],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))],
+    )
+    async def list_announcements(
+        self,
+        page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
+        limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
+
+        search: str | None = Query(None),
+        status: str | None = Query(None),
+        type: str | None = Query(None),
+        audience: str | None = Query(None),
+
+        service: SuadService = Depends(get_suad_service),
+    ) -> BaseOutDto[PagingData[AnnouncementOut]]:
+
+        result = await service.get_announcements(
+            page=page,
+            limit=limit,
+            search=search,
+            status=status,
+            type_code=type,
+            audience_code=audience,
+        )
+
+        return self.success(result=result)
+
+    # -----------------------------
+    # GET BY ID
+    # -----------------------------
+    @BaseController.get(
+        "/announcement/{announcement_id}",
+        summary="Get announcement",
+        response_model=BaseOutDto[AnnouncementOut],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))]
+    )
+    async def get_announcement(
+        self,
+        announcement_id: str,
+        service: SuadService = Depends(get_suad_service),
+    ):
+        return self.success(result=await service.get_announcement(announcement_id))
+
+    # -----------------------------
+    # UPDATE
+    # -----------------------------
+    @BaseController.put(
+        "/announcement",
+        summary="Update announcement",
+        response_model=BaseOutDto[AnnouncementOut],
+        dependencies=[Depends(require_permission(_SUAD, PType.WRITE))]
+    )
+    async def update_announcement(
+        self,
+        payload: AnnouncementUpdate = Body(...),
+        service: SuadService = Depends(get_suad_service),
+    ):
+        return self.success(
+            result=await service.update_announcement(payload)
+        )
+
+    # -----------------------------
+    # DELETE (soft)
+    # -----------------------------
+    @BaseController.delete(
+        "/announcement",
+        summary="Delete announcement",
+        response_model=BaseOutDto[bool],
+        dependencies=[Depends(require_permission(_SUAD, PType.DELETE))]
+    )
+    async def delete_announcement(
+        self,
+        payload: AnnouncementBaseIn = Body(...),
+        service: SuadService = Depends(get_suad_service),
+    ):
+        await service.delete_announcement(payload)
+        return self.success(result=True)

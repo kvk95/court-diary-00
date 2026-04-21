@@ -10,12 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.runtime_settings import set_runtime_settings
 from app.database.models.activity_log import ActivityLog
+from app.database.models.announcements import Announcements
+from app.database.models.refm_announcement_status import RefmAnnouncementStatusConstants
 from app.database.models.users import Users
+from app.database.repositories.announcements_repository import AnnouncementsRepository
 from app.database.repositories.global_settings_repository import GlobalSettingsRepository
 from app.database.repositories.suad_repository import SuadRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.cases_dto import RecentActivityItem
 from app.dtos.suad_dto import (
+    AnnouncementBaseIn,
+    AnnouncementCreate,
+    AnnouncementOut,
+    AnnouncementUpdate,
     ChamberItem,
     ChamberStatsOut,
     GlobalSettingsEdit,
@@ -44,10 +51,12 @@ class SuadService(BaseSecuredService):
         session: AsyncSession,
         suad_repo: Optional[SuadRepository] = None,
         global_settings_repo: Optional[GlobalSettingsRepository] = None,
+        announcement_repo: Optional[AnnouncementsRepository] = None,
     ):
         super().__init__(session)
         self.suad_repo = suad_repo or SuadRepository()
         self.global_settings_repo = global_settings_repo or GlobalSettingsRepository()
+        self.announcement_repo = announcement_repo or AnnouncementsRepository()
 
     # ---------------------------------------------------------------------
     # HELPERS
@@ -79,9 +88,9 @@ class SuadService(BaseSecuredService):
         if not row:
             raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Settings not Found")
 
-        return self._to_out(row)
+        return self._to_out_gset(row)
 
-    def _to_out(self, row):
+    def _to_out_gset(self, row):
         return GlobalSettingsOut(
             # branding
             platform_name=row.platform_name,
@@ -106,6 +115,44 @@ class SuadService(BaseSecuredService):
             enable_case_collaboration=row.enable_case_collaboration if row.enable_case_collaboration != None else False,
             enable_reports_module=row.enable_reports_module if row.enable_reports_module != None else False,
             enable_api_rate_limit=row.enable_api_rate_limit if row.enable_api_rate_limit != None else False,
+        )
+
+    def _to_out(self, row:Announcements):
+
+
+        
+        return AnnouncementOut(
+            announcement_id = row.announcement_id,
+            title = row.title,
+            content = row.content,
+            type_code = row.announcement_id,
+            audience_code = row.audience_code,
+            status_code = row.status_code,
+            scheduled_at = row.scheduled_at,
+            expires_at = row.expires_at,
+            created_date = row.created_date,
+        )
+    
+    def _resolve_status(self, payload, now: datetime) -> str:
+        # publish override
+        if getattr(payload, "publish_now", False):
+            return RefmAnnouncementStatusConstants.ACTIVE
+
+        scheduled_at = getattr(payload, "scheduled_at", None)
+        expires_at = getattr(payload, "expires_at", None)
+
+        if scheduled_at and scheduled_at > now:
+            return RefmAnnouncementStatusConstants.SCHEDULED
+
+        if expires_at and expires_at <= now:
+            return RefmAnnouncementStatusConstants.EXPIRED
+
+        return RefmAnnouncementStatusConstants.DRAFT
+    
+    def _err(self, msg: str):
+        return ValidationErrorDetail(
+            code=ErrorCodes.VALIDATION_ERROR,
+            message=msg
         )
 
     # -----------------------------
@@ -218,7 +265,7 @@ class SuadService(BaseSecuredService):
             "SMTP_USE_TLS": updated.smtp_use_tls,
         })
 
-        return self._to_out(updated)
+        return self._to_out_gset(updated)
 
     # ---------------------------------------------------------------------
     # DASHBOARD
@@ -379,3 +426,159 @@ class SuadService(BaseSecuredService):
         stats = await self.suad_repo.get_user_stats(self.session)
 
         return (UserStatsOut(**stats))
+
+    # ---------------------------------------------------------------------
+    # announcements
+    # ---------------------------------------------------------------------
+
+    async def get_announcements(
+        self,
+        page: int,
+        limit: int,
+        search: str | None,
+        status: str | None,
+        type_code: str | None,
+        audience_code: str | None,
+    ) -> PagingData[AnnouncementOut]:
+
+        items_raw, total = await self.announcement_repo.list_announcements(
+            session=self.session,
+            page=page,
+            limit=limit,
+            search=search,
+            status=status,
+            type_code=type_code,
+            audience_code=audience_code,
+        )
+
+        records = [AnnouncementOut(**i) for i in items_raw]
+
+        return PagingBuilder(
+            total_records=total,
+            page=page,
+            limit=limit,
+        ).build(records=records)
+    
+    async def get_announcement(self, announcement_id: str):
+        row = await self.announcement_repo.get_by_id(
+            session=self.session,
+            id_values=announcement_id
+        )
+
+        if not row:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Announcement not found"
+            )
+
+        return self._to_out(row)
+
+    async def create_announcement(self, payload: AnnouncementCreate) -> AnnouncementOut:
+
+        now = datetime.now(timezone.utc)
+        errors = []
+
+        # ---------------- VALIDATIONS ----------------
+        if not payload.title or not payload.title.strip():
+            errors.append(self._err("title is required"))
+
+        if payload.scheduled_at and payload.scheduled_at < now:
+            errors.append(self._err("scheduled_at cannot be in the past"))
+
+        if payload.scheduled_at and payload.expires_at:
+            if payload.scheduled_at >= payload.expires_at:
+                errors.append(self._err("scheduled_at must be before expires_at"))
+
+        if payload.expires_at and payload.expires_at <= now:
+            errors.append(self._err("expires_at must be in future"))
+
+        if errors:
+            aggregate_errors(errors)
+
+        # ---------------- STATUS ----------------
+        status = self._resolve_status(payload, now)
+
+        # ---------------- DATA ----------------
+        data = payload.model_dump(exclude_unset=True)
+
+        data["status_code"] = status
+        data["created_by"] = self.user_id
+        if getattr(payload, "publish_now", False):
+            data.pop("publish_now")
+
+        created = await self.announcement_repo.create(
+            session=self.session,
+            data=data
+        )
+
+        return self._to_out(created)
+    
+    async def update_announcement(
+        self,
+        payload: AnnouncementUpdate
+    ) -> AnnouncementOut:
+        
+        announcement_id = payload.announcement_id
+
+        now = datetime.now(timezone.utc)
+
+        row = await self.announcement_repo.get_by_id(
+            session=self.session,
+            id_values=announcement_id
+        )
+
+        if not row:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Announcement not found"
+            )
+
+        data = payload.model_dump(exclude_unset=True, exclude_none=True)
+
+        errors = []
+
+        # ---------------- VALIDATIONS ----------------
+
+        if "title" in data and not data["title"].strip():
+            errors.append(self._err("title cannot be empty"))
+
+        scheduled_at = data.get("scheduled_at", row.scheduled_at)
+        expires_at = data.get("expires_at", row.expires_at)
+
+        if scheduled_at and scheduled_at < now:
+            errors.append(self._err("scheduled_at cannot be in the past"))
+
+        if scheduled_at and expires_at:
+            if scheduled_at >= expires_at:
+                errors.append(self._err("scheduled_at must be before expires_at"))
+
+        if errors:
+            aggregate_errors(errors)
+
+        # ---------------- STATUS RECALC ----------------
+
+        status = self._resolve_status(
+            payload=payload,
+            now=now
+        )
+
+        data["status_code"] = status
+        data["updated_by"] = self.user_id
+        if getattr(payload, "publish_now", False):
+            data.pop("publish_now")
+
+        updated = await self.announcement_repo.update(
+            session=self.session,
+            data=data,
+            id_values=announcement_id
+        )
+
+        return self._to_out(updated)
+    
+    async def delete_announcement(self,  payload: AnnouncementBaseIn):
+        announcement_id = payload.announcement_id
+        await self.announcement_repo.delete(
+            session=self.session,
+            id_values=announcement_id,
+        )
+        return {"announcement_id": announcement_id, "deleted": True}

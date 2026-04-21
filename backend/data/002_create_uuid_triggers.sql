@@ -310,6 +310,19 @@ BEGIN
     END IF;
 END$$
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- announcements
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TRIGGER trg_announcements_before_insert
+BEFORE INSERT ON announcements
+FOR EACH ROW
+BEGIN
+    IF NEW.announcement_id IS NULL OR NEW.announcement_id = '' THEN
+        SET NEW.announcement_id = generate_uuid_v7();
+    END IF;
+END$$
+
 DELIMITER ;
 
 -- ─────────────────────────────────────────────────────────────────────────────

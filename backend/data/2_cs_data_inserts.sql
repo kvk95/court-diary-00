@@ -263,12 +263,62 @@ INSERT IGNORE INTO refm_aor_status (code, description, color_code, sort_order) V
 -- 16. SEED DATA — TIER 1  (REFM with FK to other REFM)
 -- =============================================================================
 
-INSERT IGNORE INTO refm_states (code, description, country_code, sort_order) VALUES
-('TN  ', 'Tamil Nadu',  'IN  ', 1),
-('KL  ', 'Kerala',      'IN  ', 2),
-('KA  ', 'Karnataka',   'IN  ', 3),
-('MH  ', 'Maharashtra', 'IN  ', 4),
-('DL  ', 'Delhi',       'IN  ', 5);
+INSERT INTO refm_states (code, description, country_code, sort_order) 
+SELECT code, description, country_code, sort_order FROM (
+  VALUES 
+    -- 28 STATES ─────────────────────────────────────────────
+    ROW('AP', 'Andhra Pradesh',              'IN', 1),
+    ROW('AR', 'Arunachal Pradesh',           'IN', 2),
+    ROW('AS', 'Assam',                       'IN', 3),
+    ROW('BR', 'Bihar',                       'IN', 4),
+    ROW('CG', 'Chhattisgarh',                'IN', 5),
+    ROW('GA', 'Goa',                         'IN', 6),
+    ROW('GJ', 'Gujarat',                     'IN', 7),
+    ROW('HR', 'Haryana',                     'IN', 8),
+    ROW('HP', 'Himachal Pradesh',            'IN', 9),
+    ROW('JH', 'Jharkhand',                   'IN', 10),
+    ROW('KA', 'Karnataka',                   'IN', 11),
+    ROW('KL', 'Kerala',                      'IN', 12),
+    ROW('MP', 'Madhya Pradesh',              'IN', 13),
+    ROW('MH', 'Maharashtra',                 'IN', 14),
+    ROW('MN', 'Manipur',                     'IN', 15),
+    ROW('ML', 'Meghalaya',                   'IN', 16),
+    ROW('MZ', 'Mizoram',                     'IN', 17),
+    ROW('NL', 'Nagaland',                    'IN', 18),
+    ROW('OD', 'Odisha',                      'IN', 19),
+    ROW('PB', 'Punjab',                      'IN', 20),
+    ROW('RJ', 'Rajasthan',                   'IN', 21),
+    ROW('SK', 'Sikkim',                      'IN', 22),
+    ROW('TN', 'Tamil Nadu',                  'IN', 23),
+    ROW('TS', 'Telangana',                   'IN', 24),
+    ROW('TR', 'Tripura',                     'IN', 25),
+    ROW('UP', 'Uttar Pradesh',               'IN', 26),
+    ROW('UK', 'Uttarakhand',                 'IN', 27),
+    ROW('WB', 'West Bengal',                 'IN', 28),
+    
+    -- 8 UNION TERRITORIES ───────────────────────────────────
+    ROW('AN', 'Andaman & Nicobar Islands',   'IN', 29),
+    ROW('CH', 'Chandigarh',                  'IN', 30),
+    ROW('DN', 'Dadra & Nagar Haveli and Daman & Diu', 'IN', 31),
+    ROW('DL', 'Delhi (NCT)',                 'IN', 32),
+    ROW('JK', 'Jammu & Kashmir',             'IN', 33),
+    ROW('LA', 'Ladakh',                      'IN', 34),
+    ROW('LD', 'Lakshadweep',                 'IN', 35),
+    ROW('PY', 'Puducherry',                  'IN', 36)
+) AS new_states(code, description, country_code, sort_order)
+WHERE NOT EXISTS (
+    SELECT 1 FROM refm_states r WHERE r.code = new_states.code
+);
+
+INSERT INTO refm_court_type (court_code, description) VALUES 
+('HIGH', 'High Court'),
+('TRIB', 'Tribunal'),
+('SPEC', 'Special Court'),
+('MAGI', 'Magistrate'),
+('CIVI', 'Civil Court'),
+('DIST', 'District Court'),
+('FAMI', 'Family Court'),
+('SUPR', 'Supreme Court');
 
 INSERT INTO refm_courts (court_name, state_code, court_type, sort_order) VALUES
 ('Madras High Court',                    'TN  ', 'High Court',     10),
@@ -278,6 +328,26 @@ INSERT INTO refm_courts (court_name, state_code, court_type, sort_order) VALUES
 ('Family Court, Chennai',                'TN  ', 'Family Court',   50),
 ('JM Court, Saidapet',                   'TN  ', 'Magistrate',     60);
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3.2  Courts  →  refm_announcement
+-- ─────────────────────────────────────────────────────────────────────────────
+
+INSERT INTO refm_announcement_type VALUES
+('MAINT', 'Maintenance'),
+('FEAT', 'Feature'),
+('INFO', 'Info'),
+('UPDT', 'Update');
+
+INSERT INTO refm_announcement_audience VALUES
+('ALL', 'All Chambers'),
+('PRO', 'Pro Only'),
+('FREE', 'Free Only');
+
+INSERT INTO refm_announcement_status VALUES
+('DRAFT', 'Draft'),
+('ACTIVE', 'Active'),
+('SCHEDULED', 'Scheduled'),
+('EXPIRED', 'Expired');
 
 -- =============================================================================
 -- 17. SEED DATA — TIER 2 (Core Entities: chamber + users)

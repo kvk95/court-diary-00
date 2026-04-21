@@ -303,6 +303,13 @@ CREATE TABLE refm_states (
 -- 3.2  Courts  →  refm_states (Keep INT AUTO_INCREMENT - small lookup table)
 -- ─────────────────────────────────────────────────────────────────────────────
 
+DROP TABLE IF EXISTS refm_court_type;
+CREATE TABLE refm_court_type (
+    court_code VARCHAR(4) PRIMARY KEY,
+    description VARCHAR(50)
+);
+
+
 DROP TABLE IF EXISTS refm_courts;
 CREATE TABLE refm_courts (
     court_id      INT          AUTO_INCREMENT PRIMARY KEY,
@@ -318,6 +325,26 @@ CREATE TABLE refm_courts (
         FOREIGN KEY (state_code) REFERENCES refm_states(code) ON DELETE RESTRICT
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Courts / benches';
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3.2  Courts  →  refm_announcement
+-- ─────────────────────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS refm_announcement_type;
+CREATE TABLE refm_announcement_type (
+    code VARCHAR(20) PRIMARY KEY,
+    name VARCHAR(50)
+);
+
+DROP TABLE IF EXISTS refm_announcement_audience;
+CREATE TABLE refm_announcement_audience (
+    code VARCHAR(20) PRIMARY KEY,
+    name VARCHAR(50)
+);
+
+DROP TABLE IF EXISTS refm_announcement_status;
+CREATE TABLE refm_announcement_status (
+    code VARCHAR(20) PRIMARY KEY,
+    name VARCHAR(50)
+);
 -- =============================================================================
 -- 4. CORE ENTITIES — TIER 2 (UUID v7 Primary Keys)
 --    chamber  →  REFM only   (user FKs deferred — Section 11)
@@ -1426,7 +1453,82 @@ CREATE TABLE contact_messages (
         FOREIGN KEY (status_code)
         REFERENCES refm_ticket_status(code)
         ON DELETE RESTRICT
-) ENGINE=InnoDB;
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='contact messages';
+
+DROP TABLE IF EXISTS announcements;
+
+CREATE TABLE announcements (
+    announcement_id CHAR(36) PRIMARY KEY,
+
+    title           VARCHAR(255) NOT NULL,
+    content         TEXT NOT NULL,
+
+    type_code       VARCHAR(20) NOT NULL,
+    audience_code   VARCHAR(20) NOT NULL,
+    status_code     VARCHAR(20) NOT NULL,
+
+    scheduled_at    TIMESTAMP NULL,
+    expires_at      TIMESTAMP NULL,
+
+    -- ✅ AUDIT
+    created_date    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by      CHAR(36) NULL,
+
+    updated_date    TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    updated_by      CHAR(36) NULL,
+	
+	deleted_ind BOOLEAN DEFAULT FALSE,
+	deleted_date TIMESTAMP NULL,
+	deleted_by CHAR(36) NULL,
+
+    -- 🔗 FK: USERS (audit)
+    CONSTRAINT fk_ann_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_ann_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    -- 🔗 FK: TYPE
+    CONSTRAINT fk_ann_type
+        FOREIGN KEY (type_code)
+        REFERENCES refm_announcement_type(code)
+        ON DELETE RESTRICT,
+
+    -- 🔗 FK: AUDIENCE
+    CONSTRAINT fk_ann_audience
+        FOREIGN KEY (audience_code)
+        REFERENCES refm_announcement_audience(code)
+        ON DELETE RESTRICT,
+
+    -- 🔗 FK: STATUS
+    CONSTRAINT fk_ann_status
+        FOREIGN KEY (status_code)
+        REFERENCES refm_announcement_status(code)
+        ON DELETE RESTRICT,
+		
+	CONSTRAINT fk_ann_deleted_by
+		FOREIGN KEY (deleted_by)
+		REFERENCES users(user_id)
+		ON DELETE SET NULL,
+
+    -- ✅ VALIDATION CHECKS
+    CONSTRAINT chk_schedule_dates
+        CHECK (
+            scheduled_at IS NULL 
+            OR expires_at IS NULL 
+            OR scheduled_at < expires_at
+        ),
+		
+	INDEX idx_ann_status (status_code),
+	INDEX idx_ann_schedule (scheduled_at),
+	INDEX idx_ann_expiry (expires_at)
+
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC 
+COMMENT='System announcements & notifications';
 
 
 -- =============================================================================

@@ -16,9 +16,6 @@ class TopChamberItem(BaseRecordData):
     cases_count: int
     plan: str
 
-
-
-
 class SuperAdminDashboardStats(BaseRecordData):
     total_chambers: int
     total_users: int
@@ -27,13 +24,11 @@ class SuperAdminDashboardStats(BaseRecordData):
     monthly_revenue: float
     system_health: float
 
-
 class ChamberStatsOut(BaseRecordData):
     total: int
     active: int
     trial: int
     suspended: int
-
 
 class ChamberItem(BaseRecordData):
     chamber_id: str
@@ -47,7 +42,6 @@ class ChamberItem(BaseRecordData):
     plan: str
     status: str
     joined_date: datetime
-
 
 class UserStatsOut(BaseRecordData):
     total: int
@@ -64,6 +58,8 @@ class UserItem(BaseRecordData):
 
     status: str
     last_login: Optional[datetime]
+    image_id: Optional[str]
+    image_data: Optional[str]
 
 class GlobalSettingsBasic(BaseRecordData):
     # branding
@@ -95,7 +91,6 @@ class GlobalSettingsOut(GlobalSettingsBasic):
     enable_reports_module: bool
     enable_api_rate_limit: bool
 
-
 class GlobalSettingsEdit(BaseInData):
     platform_name: Optional[str] = None
     company_name: Optional[str] = None
@@ -119,3 +114,48 @@ class GlobalSettingsEdit(BaseInData):
     enable_case_collaboration: Optional[bool] = None
     enable_reports_module: Optional[bool] = None
     enable_api_rate_limit: Optional[bool] = None
+
+class AnnouncementOut(BaseRecordData):
+    announcement_id: str
+
+    title: str
+    content: str
+
+    type_code: str
+    audience_code: str
+    status_code: str
+
+    scheduled_at: Optional[datetime]
+    expires_at: Optional[datetime]
+
+    created_date: datetime
+
+class AnnouncementCreate(BaseInData):
+    title: str
+    content: str
+
+    type_code: str
+    audience_code: str
+
+    scheduled_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+    publish_now: Optional[bool] = False
+
+
+class AnnouncementBaseIn(BaseRecordData):
+    announcement_id: str
+
+class AnnouncementUpdate(AnnouncementBaseIn):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+    type_code: Optional[str] = None
+    audience_code: Optional[str] = None
+
+    scheduled_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+
+    publish_now: Optional[bool] = None
+
+    

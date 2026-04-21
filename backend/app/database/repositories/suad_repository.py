@@ -3,12 +3,13 @@
 from datetime import date, datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from sqlalchemy import func, or_, select, case
+from sqlalchemy import and_, func, or_, select, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber import Chamber
 from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.login_audit import LoginAudit
+from app.database.models.profile_images import ProfileImages
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.models.cases import Cases
@@ -314,12 +315,20 @@ class SuadRepository(BaseRepository[Chamber]):
                 ChamberRoles.role_name,
 
                 last_login_subq.c.last_login,
+                ProfileImages.image_id,
+                ProfileImages.image_data,
             )
             .join(UserChamberLink, Users.user_id == UserChamberLink.user_id)
             .outerjoin(UserRoles, UserChamberLink.link_id == UserRoles.link_id)
             .outerjoin(ChamberRoles, UserRoles.role_id == ChamberRoles.role_id)
             .outerjoin(Chamber, UserChamberLink.chamber_id == Chamber.chamber_id)
             .outerjoin(last_login_subq, Users.user_id == last_login_subq.c.user_id)
+            .outerjoin(ProfileImages, 
+                       and_( Users.user_id == ProfileImages.user_id,
+                            ProfileImages.deleted_ind.is_(False),
+                            ProfileImages.deleted_date.is_(None)
+                            )
+                       )
             .where(Users.deleted_ind.is_(False))
         )
 
@@ -359,6 +368,8 @@ class SuadRepository(BaseRepository[Chamber]):
                 "role_name": r.role_name,
                 "status": "Active" if r.status_ind else "Inactive",
                 "last_login": r.last_login,
+                "image_id": r.image_id,
+                "image_data": r.image_data,
             })
 
         return result, total
