@@ -58,3 +58,12 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
         result = await self.execute(session=session,stmt=stmt)
         rows = result.all()
         return total,rows
+    
+    async def exists_in_chambers(self, session, role_id: int):
+        stmt = select(func.count()).where(
+            ChamberRoles.security_role_id == role_id,
+            ChamberRoles.deleted_ind.is_(False)
+        )
+
+        count = await self.execute_scalar(session=session, stmt=stmt)
+        return (count or 0) > 0

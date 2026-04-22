@@ -1,10 +1,12 @@
 # app\utils\utilities.py
 
 import base64
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import secrets
 import string
+from typing import Optional
 
 from app.core.config import settings
 from app.validators.password_policy_helper import PasswordPolicy
@@ -52,3 +54,12 @@ def decode_text(encoded_text: str) -> str:
         raise ValueError("Invalid signature")
 
     return text.decode()
+
+def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Convert naive datetime to UTC-aware. Leave aware datetimes as-is."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Assume naive input is in UTC
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)

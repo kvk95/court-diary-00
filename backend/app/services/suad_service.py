@@ -5,16 +5,19 @@ from datetime import datetime, timezone
 import re
 from typing import Any, Callable, Dict, Optional, List, TypeVar
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.runtime_settings import set_runtime_settings
 from app.database.models.activity_log import ActivityLog
 from app.database.models.announcements import Announcements
 from app.database.models.refm_announcement_status import RefmAnnouncementStatusConstants
+from app.database.models.security_roles import SecurityRoles
 from app.database.models.users import Users
 from app.database.repositories.announcements_repository import AnnouncementsRepository
+from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
 from app.database.repositories.global_settings_repository import GlobalSettingsRepository
+from app.database.repositories.security_roles_repository import SecurityRolesRepository
 from app.database.repositories.suad_repository import SuadRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.cases_dto import RecentActivityItem
@@ -27,6 +30,11 @@ from app.dtos.suad_dto import (
     ChamberStatsOut,
     GlobalSettingsEdit,
     GlobalSettingsOut,
+    SecurityRoleBaseIn,
+    SecurityRoleCreate,
+    SecurityRoleItem,
+    SecurityRoleStats,
+    SecurityRoleUpdate,
     SuperAdminDashboardStats,
     TopChamberItem,
     UserItem,
@@ -34,7 +42,7 @@ from app.dtos.suad_dto import (
 )
 from app.services.base.secured_base_service import BaseSecuredService
 from app.utils.activity_formatter import format_activity
-from app.utils.utilities import decode_text, encode_text
+from app.utils.utilities import decode_text, encode_text, ensure_utc
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
 from app.validators.field_validations import FieldValidator
@@ -52,11 +60,15 @@ class SuadService(BaseSecuredService):
         suad_repo: Optional[SuadRepository] = None,
         global_settings_repo: Optional[GlobalSettingsRepository] = None,
         announcement_repo: Optional[AnnouncementsRepository] = None,
+        security_roles_repo: Optional[SecurityRolesRepository] = None,
+        chamber_roles_repo: Optional[ChamberRolesRepository] = None,
     ):
         super().__init__(session)
         self.suad_repo = suad_repo or SuadRepository()
         self.global_settings_repo = global_settings_repo or GlobalSettingsRepository()
         self.announcement_repo = announcement_repo or AnnouncementsRepository()
+        self.security_roles_repo = security_roles_repo or SecurityRolesRepository()
+        self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
 
     # ---------------------------------------------------------------------
     # HELPERS
@@ -86,7 +98,7 @@ class SuadService(BaseSecuredService):
         row = await self.global_settings_repo.get_first(session=self.session)
 
         if not row:
-            raise ValidationErrorDetail(code=ErrorCodes.VALIDATION_ERROR, message="Settings not Found")
+            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Settings not Found")
 
         return self._to_out_gset(row)
 
@@ -117,7 +129,7 @@ class SuadService(BaseSecuredService):
             enable_api_rate_limit=row.enable_api_rate_limit if row.enable_api_rate_limit != None else False,
         )
 
-    def _to_out(self, row:Announcements):        
+    def _to_announcement_out(self, row:Announcements):        
         return AnnouncementOut(
             announcement_id = row.announcement_id,
             title = row.title,
@@ -129,6 +141,12 @@ class SuadService(BaseSecuredService):
             expires_at = row.expires_at,
             created_date = row.created_date,
         )
+    
+    def _to_roles_out(self, row: dict[str, Any] | None):
+        if not row:
+            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Role not Found")
+
+        return SecurityRoleItem(**row);
     
     def _resolve_status(self, payload, now: datetime) -> str:
         # publish override
@@ -450,7 +468,7 @@ class SuadService(BaseSecuredService):
             audience_code=audience_code,
         )
 
-        records = [self._to_out(row) for row in rows]
+        records = [self._to_announcement_out(row) for row in rows]
 
         return PagingBuilder(
             total_records=total,
@@ -470,25 +488,29 @@ class SuadService(BaseSecuredService):
                 message="Announcement not found"
             )
 
-        return self._to_out(row)
+        return self._to_announcement_out(row)
 
     async def create_announcement(self, payload: AnnouncementCreate) -> AnnouncementOut:
 
         now = datetime.now(timezone.utc)
         errors = []
 
+        # Normalize payload datetimes BEFORE comparison
+        scheduled_at = ensure_utc(payload.scheduled_at)
+        expires_at = ensure_utc(payload.expires_at)
+
         # ---------------- VALIDATIONS ----------------
         if not payload.title or not payload.title.strip():
             errors.append(self._err("title is required"))
 
-        if payload.scheduled_at and payload.scheduled_at < now:
+        if scheduled_at and scheduled_at < now:
             errors.append(self._err("scheduled_at cannot be in the past"))
 
-        if payload.scheduled_at and payload.expires_at:
-            if payload.scheduled_at >= payload.expires_at:
+        if scheduled_at and expires_at:
+            if scheduled_at >= expires_at:
                 errors.append(self._err("scheduled_at must be before expires_at"))
 
-        if payload.expires_at and payload.expires_at <= now:
+        if expires_at and expires_at <= now:
             errors.append(self._err("expires_at must be in future"))
 
         if errors:
@@ -510,7 +532,7 @@ class SuadService(BaseSecuredService):
             data=data
         )
 
-        return self._to_out(created)
+        return self._to_announcement_out(created)
     
     async def update_announcement(
         self,
@@ -542,7 +564,11 @@ class SuadService(BaseSecuredService):
             errors.append(self._err("title cannot be empty"))
 
         scheduled_at = data.get("scheduled_at", row.scheduled_at)
-        expires_at = data.get("expires_at", row.expires_at)
+        expires_at = data.get("expires_at", row.expires_at)       
+
+        # Normalize payload datetimes BEFORE comparison
+        scheduled_at = ensure_utc(scheduled_at)
+        expires_at = ensure_utc(expires_at)
 
         if scheduled_at and scheduled_at < now:
             errors.append(self._err("scheduled_at cannot be in the past"))
@@ -572,7 +598,7 @@ class SuadService(BaseSecuredService):
             id_values=announcement_id
         )
 
-        return self._to_out(updated)
+        return self._to_announcement_out(updated)
     
     async def delete_announcement(self,  payload: AnnouncementBaseIn):
         announcement_id = payload.announcement_id
@@ -581,3 +607,246 @@ class SuadService(BaseSecuredService):
             id_values=announcement_id,
         )
         return {"announcement_id": announcement_id, "deleted": True}
+
+    # ---------------------------------------------------------------------
+    # SECURITY ROLES
+    # ---------------------------------------------------------------------
+
+    async def get_security_role_stats(self) -> SecurityRoleStats:
+        
+        stats = await self.security_roles_repo.get_role_stats(session=self.session)
+
+        return SecurityRoleStats(**stats)
+    
+    async def get_security_roles(self, page, limit, search) -> PagingData[SecurityRoleItem]:
+
+        items_raw, total = await self.security_roles_repo.list_roles(
+            session=self.session,
+            page=page,
+            limit=limit,
+            search=search,
+        )
+        records = [self._to_roles_out(row) for row in items_raw]
+
+        return PagingBuilder(
+            total_records=total,
+            page=page,
+            limit=limit
+        ).build(records=records)
+    
+    async def create_security_role(self, payload: SecurityRoleCreate) -> SecurityRoleItem:
+
+        if not payload.role_code or not payload.role_code.strip():
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Role code is required"
+            )
+
+        if not payload.role_name or not payload.role_name.strip():
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Role name is required"
+            )
+
+        role_code = payload.role_code.strip()
+        role_name = payload.role_name.strip()
+
+        # ✅ Active duplicate check
+        existing = await self.security_roles_repo.get_first(
+            self.session,
+            where=[
+                SecurityRoles.deleted_ind.is_(False),
+                or_(
+                    SecurityRoles.role_code == role_code,
+                    SecurityRoles.role_name == role_name,
+                ),
+            ],
+        )
+
+        if existing:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message=f"Role code '{role_code}' or Role name '{role_name}' already exists",
+            )
+
+        # ✅ Check soft-deleted duplicate
+        stmt = select(SecurityRoles).where(
+            or_(
+                SecurityRoles.role_code == role_code,
+                SecurityRoles.role_name == role_name,
+            )
+        )
+
+        result = await self.session.execute(stmt)
+        soft_deleted = result.scalars().first()
+
+        if soft_deleted and soft_deleted.deleted_ind:
+            # 🔥 REVIVE
+            revived = await self.security_roles_repo.update(
+                session=self.session,
+                id_values=soft_deleted.role_id,
+                data={
+                    "deleted_ind": False,
+                    "role_name": role_name,
+                    "role_code": role_code,
+                    "description": payload.description,
+                    "status_ind": True,
+                }
+            )
+
+            row = await self.security_roles_repo.get_by_role_id(self.session, revived.role_id)
+            return self._to_roles_out(row)
+
+        # ✅ CREATE
+        role = await self.security_roles_repo.create(
+            session=self.session,
+            data={
+                "role_code": role_code,
+                "role_name": role_name,
+                "description": payload.description,
+                "admin_ind": payload.admin_ind or False,
+                "system_ind": payload.system_ind or False,
+                "status_ind": True,
+                "created_by": self.user_id,
+            }
+        )
+
+        row = await self.security_roles_repo.get_by_role_id(self.session, role.role_id)
+        return self._to_roles_out(row)
+    
+    async def update_security_role(self, payload: SecurityRoleUpdate) -> SecurityRoleItem:
+
+        role_id = payload.role_id
+
+        existing = await self.security_roles_repo.get_by_id(
+            session=self.session,
+            id_values=role_id,
+            include_chamber_id=False,
+        )
+
+        if not existing:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Role not found"
+            )
+
+        if existing.admin_ind:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Protected role cannot be modified"
+            )
+
+        update_data = {}
+
+        # 🔹 ROLE NAME UPDATE
+        if payload.role_name and payload.role_name.strip():
+            new_name = payload.role_name.strip()
+
+            # Active duplicate check
+            duplicate = await self.security_roles_repo.get_first(
+                self.session,
+                where=[
+                    SecurityRoles.role_name == new_name,
+                    SecurityRoles.role_id != role_id,
+                    SecurityRoles.deleted_ind.is_(False),
+                ],
+            )
+
+            if duplicate:
+                raise ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message=f"Role name '{new_name}' already exists"
+                )
+
+            # Soft-deleted duplicate
+            stmt = select(SecurityRoles).where(
+                SecurityRoles.role_name == new_name,
+                SecurityRoles.role_id != role_id,
+                SecurityRoles.deleted_ind.is_(True)
+            )
+
+            result = await self.session.execute(stmt)
+            soft_deleted = result.scalars().first()
+
+            if soft_deleted:
+                # 🔥 REVIVE INSTEAD
+                revived = await self.security_roles_repo.update(
+                    session=self.session,
+                    id_values=soft_deleted.role_id,
+                    data={
+                        "deleted_ind": False,
+                        "role_name": new_name,
+                        "description": payload.description,
+                        "status_ind": payload.status_ind if payload.status_ind is not None else True,
+                    }
+                )
+
+                row = await self.security_roles_repo.get_by_role_id(self.session, revived.role_id)
+                return self._to_roles_out(row)
+
+            update_data["role_name"] = new_name
+
+        # 🔹 OTHER FIELDS
+        if payload.description is not None:
+            update_data["description"] = payload.description
+
+        if payload.status_ind is not None:
+            update_data["status_ind"] = payload.status_ind
+
+        if not update_data:
+            row = await self.security_roles_repo.get_by_role_id(self.session, role_id)
+            return self._to_roles_out(row)
+
+        updated = await self.security_roles_repo.update(
+            session=self.session,
+            data=update_data,
+            id_values=role_id
+        )
+
+        row = await self.security_roles_repo.get_by_role_id(self.session, updated.role_id)
+        return self._to_roles_out(row)
+    
+    async def delete_security_role(self, payload: SecurityRoleBaseIn) -> dict:
+
+        role_id = payload.role_id
+
+        role = await self.security_roles_repo.get_by_id(
+            session=self.session,
+            id_values=role_id,
+            include_chamber_id=False,
+        )
+
+        if not role:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.NOT_FOUND,
+                message="Role not found"
+            )
+
+        if role.admin_ind:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Protected role cannot be deleted"
+            )
+
+        # 🔥 CHECK USAGE IN CHAMBERS
+        in_use = await self.chamber_roles_repo.exists_in_chambers(
+            session=self.session,
+            role_id=role_id
+        )
+
+        if in_use:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message="Role is used in chambers"
+            )
+
+        await self.security_roles_repo.delete(
+            session=self.session,
+            id_values=role_id,
+            soft=True
+        )
+
+        return {
+            "role_id": role_id,
+            "deleted": True
+        }

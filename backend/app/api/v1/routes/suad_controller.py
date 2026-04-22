@@ -12,7 +12,7 @@ from app.dependencies import get_suad_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import RecentActivityItem
-from app.dtos.suad_dto import AnnouncementBaseIn, AnnouncementCreate, AnnouncementOut, AnnouncementUpdate, ChamberItem, ChamberStatsOut, GlobalSettingsEdit, GlobalSettingsOut, SuperAdminDashboardStats, TopChamberItem, UserItem, UserStatsOut
+from app.dtos.suad_dto import AnnouncementBaseIn, AnnouncementCreate, AnnouncementOut, AnnouncementUpdate, ChamberItem, ChamberStatsOut, GlobalSettingsEdit, GlobalSettingsOut, SecurityRoleBaseIn, SecurityRoleCreate, SecurityRoleItem, SecurityRoleStats, SecurityRoleUpdate, SuperAdminDashboardStats, TopChamberItem, UserItem, UserStatsOut
 from app.services.suad_service import SuadService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
@@ -253,4 +253,69 @@ class SuadController(BaseController):
         service: SuadService = Depends(get_suad_service),
     ):
         await service.delete_announcement(payload)
+        return self.success(result=True)
+
+    # ---------------------------------------------------------------------
+    # SECURITY ROLES
+    # ---------------------------------------------------------------------
+
+    @BaseController.get(
+        "/roles/stats",
+        summary="Global role stats",
+        response_model=BaseOutDto[SecurityRoleStats],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))]
+    )
+    async def get_role_stats(
+        self,
+        service: SuadService = Depends(get_suad_service),
+    ):
+        return self.success(result=await service.get_security_role_stats())
+    
+    @BaseController.get(
+        "/roles",
+        summary="List global roles",
+        response_model=BaseOutDto[PagingData[SecurityRoleItem]],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))]
+    )
+    async def get_roles(
+        self,
+        page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
+        limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
+        search: str | None = Query(None),
+        service: SuadService = Depends(get_suad_service),
+    ):
+        result = await service.get_security_roles(page, limit, search)
+        return self.success(result=result)
+    
+    @BaseController.post(
+        "/roles",
+        response_model=BaseOutDto[bool],
+        dependencies=[Depends(require_permission(_SUAD, PType.WRITE))]
+    )
+    async def create_role(self, payload: SecurityRoleCreate, service: SuadService = Depends(get_suad_service)):
+        await service.create_security_role(payload)
+        return self.success(result=True)
+
+
+    @BaseController.put(
+        "/roles",
+        response_model=BaseOutDto[bool],
+        dependencies=[Depends(require_permission(_SUAD, PType.WRITE))]
+    )
+    async def update_role(self, 
+                          payload: SecurityRoleUpdate, 
+                          service: SuadService = Depends(get_suad_service)):
+        await service.update_security_role(payload)
+        return self.success(result=True)
+
+
+    @BaseController.delete(
+        "/roles",
+        response_model=BaseOutDto[bool],
+        dependencies=[Depends(require_permission(_SUAD, PType.DELETE))]
+    )
+    async def delete_role(self,                           
+                          payload: SecurityRoleBaseIn,
+                          service: SuadService = Depends(get_suad_service)):
+        await service.delete_security_role(payload)
         return self.success(result=True)

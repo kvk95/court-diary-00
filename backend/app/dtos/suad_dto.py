@@ -142,7 +142,6 @@ class AnnouncementCreate(BaseInData):
 
     publish_now: Optional[bool] = False
 
-
 class AnnouncementBaseIn(BaseRecordData):
     announcement_id: str
 
@@ -158,4 +157,32 @@ class AnnouncementUpdate(AnnouncementBaseIn):
 
     publish_now: Optional[bool] = None
 
-    
+class SecurityRoleItem(BaseRecordData):
+    role_id: int
+    role_code: str
+    role_name: str
+    description: Optional[str]
+    system_ind: bool
+    admin_ind: bool
+    status_ind: bool
+    chambers_count: int
+
+class SecurityRoleStats(BaseRecordData):
+    total_roles: int
+    default_roles: int
+    protected_roles: int
+
+class SecurityRoleCreate(BaseInData):
+    role_code: str
+    role_name: str
+    description: Optional[str]
+    admin_ind: Optional[bool] = False
+    system_ind: Optional[bool] = False
+
+class SecurityRoleBaseIn(BaseRecordData):
+    role_id: int
+
+class SecurityRoleUpdate(SecurityRoleBaseIn):
+    role_name: Optional[str]
+    description: Optional[str]
+    status_ind: Optional[bool]
