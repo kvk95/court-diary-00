@@ -250,8 +250,9 @@ CREATE TABLE refm_states (
 
 DROP TABLE IF EXISTS refm_court_type;
 CREATE TABLE refm_court_type (
-    court_code VARCHAR(4) PRIMARY KEY,
-    description VARCHAR(50)
+    code VARCHAR(4) PRIMARY KEY,
+    description VARCHAR(50),
+    status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -260,19 +261,22 @@ CREATE TABLE refm_court_type (
 DROP TABLE IF EXISTS refm_announcement_type;
 CREATE TABLE refm_announcement_type (
     code VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(50)
+    description VARCHAR(50),
+    status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
 DROP TABLE IF EXISTS refm_announcement_audience;
 CREATE TABLE refm_announcement_audience (
     code VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(50)
+    description VARCHAR(50),
+    status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
 DROP TABLE IF EXISTS refm_announcement_status;
 CREATE TABLE refm_announcement_status (
     code VARCHAR(20) PRIMARY KEY,
-    name VARCHAR(50)
+    description VARCHAR(50),
+    status_ind    BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -291,7 +295,7 @@ CREATE TABLE courts (
     CONSTRAINT fk_courts_state
         FOREIGN KEY (state_code)   REFERENCES refm_states(code)      ON DELETE RESTRICT,
     CONSTRAINT fk_courts_type_code
-		FOREIGN KEY (court_type_code) REFERENCES refm_court_type(court_code),
+		FOREIGN KEY (court_type_code) REFERENCES refm_court_type(code),
     CONSTRAINT code
 		FOREIGN KEY (parent_court_code) REFERENCES courts(court_code)
 );

@@ -1,6 +1,6 @@
 """refm_announcement_audience"""
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, String
 from enum import Enum as PyEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
@@ -14,8 +14,11 @@ class RefmAnnouncementAudience(BaseModel):
     # code : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
     code: Mapped[str] = mapped_column(String(20), primary_key=True, nullable=False)
 
-    # name : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
-    name: Mapped[Optional[str]] = mapped_column(String(50))
+    # description : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
+    description: Mapped[Optional[str]] = mapped_column(String(50))
+
+    # status_ind : TINYINT
+    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

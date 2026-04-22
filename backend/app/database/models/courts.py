@@ -18,11 +18,11 @@ class Courts(BaseModel):
     # court_name : VARCHAR(255) COLLATE "utf8mb4_unicode_ci"
     court_name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # state_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    state_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_states.code", ondelete="RESTRICT"))
+    # state_code : CHAR(2) COLLATE "utf8mb4_unicode_ci"
+    state_code: Mapped[Optional[str]] = mapped_column(CHAR(2), ForeignKey("refm_states.code", ondelete="RESTRICT"))
 
     # court_type_code : VARCHAR(4) COLLATE "utf8mb4_unicode_ci"
-    court_type_code: Mapped[str] = mapped_column(String(4), ForeignKey("refm_court_type.court_code"), nullable=False)
+    court_type_code: Mapped[str] = mapped_column(String(4), ForeignKey("refm_court_type.code"), nullable=False)
 
     # parent_court_code : VARCHAR(12) COLLATE "utf8mb4_unicode_ci"
     parent_court_code: Mapped[Optional[str]] = mapped_column(String(12), ForeignKey("courts.court_code"))
@@ -40,7 +40,7 @@ class Courts(BaseModel):
         backref=backref("courts_state_code_refm_statess", cascade="all, delete-orphan")
     )
 
-    # courts.court_type_code -> refm_court_type.court_code
+    # courts.court_type_code -> refm_court_type.code
     courts_court_type_code_refm_court_type = relationship(
         "RefmCourtType",
         foreign_keys=[court_type_code], 

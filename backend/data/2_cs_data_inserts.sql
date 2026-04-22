@@ -205,22 +205,22 @@ INSERT IGNORE INTO refm_aor_status (code, description, color_code, sort_order) V
 -- 3.2  Courts  →  refm_announcement
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT INTO refm_announcement_type VALUES
-('MAINT', 'Maintenance'),
-('FEAT', 'Feature'),
-('INFO', 'Info'),
-('UPDT', 'Update');
+INSERT INTO refm_announcement_type (code, description) VALUES
+('MAINT', 	'Maintenance'),
+('FEAT', 	'Feature'),
+('INFO', 	'Info'),
+('UPDT', 	'Update');
 
-INSERT INTO refm_announcement_audience VALUES
-('ALL', 'All Chambers'),
-('PRO', 'Pro Only'),
+INSERT INTO refm_announcement_audience (code, description) VALUES
+('ALL',  'All Chambers'),
+('PRO',  'Pro Only'),
 ('FREE', 'Free Only');
 
-INSERT INTO refm_announcement_status VALUES
-('DRAFT', 'Draft'),
-('ACTIVE', 'Active'),
-('SCHEDULED', 'Scheduled'),
-('EXPIRED', 'Expired');
+INSERT INTO refm_announcement_status (code, description) VALUES
+('DRAFT', 		'Draft'),
+('ACTIVE', 		'Active'),
+('SCHEDULED', 	'Scheduled'),
+('EXPIRED', 	'Expired');
 
 -- =============================================================================
 -- 17. SEED DATA — TIER 2 (Core Entities: chamber + users)

@@ -56,7 +56,7 @@ WHERE NOT EXISTS (
     SELECT 1 FROM refm_states r WHERE r.code = new_states.code
 );
 
-INSERT INTO refm_court_type (court_code, description) VALUES 
+INSERT INTO refm_court_type (code, description) VALUES 
 ('HIGH', 'High Court'),
 ('TRIB', 'Tribunal'),
 ('SPEC', 'Special Court'),

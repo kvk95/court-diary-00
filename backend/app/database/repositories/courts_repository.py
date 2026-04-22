@@ -38,7 +38,7 @@ class CourtsRepository(BaseRepository[Courts]):
             )
             .select_from(Courts)
             .outerjoin(s, Courts.state_code == s.code)
-            .outerjoin(t, Courts.court_type_code == t.court_code)
+            .outerjoin(t, Courts.court_type_code == t.code)
         )
 
         # 🔍 search
