@@ -118,3 +118,9 @@ class AnonymousController(BaseController):
         service: AnonymousService = Depends(get_anonymous_service),
     )->BaseOutDto[GlobalSettingsBasic]:
         return self.success(result=await service.get_settings())
+    
+
+    # @BaseController.post("/test-hearing-mail")
+    # async def test_hearing_mail(self):
+    #     await send_tomorrow_hearings_job()
+    #     return {"status": "Triggered"}
