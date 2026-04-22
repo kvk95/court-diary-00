@@ -647,7 +647,7 @@ class CasesService(BaseSecuredService):
         )
         
         # Build metadata with optional case client info
-        metadata = case.model_dump(exclude_unset=True, exclude_none=True)
+        metadata = case.to_dict(exclude_none=True)
         case_clients = await self.case_clients_repo.get_by_id(
             session=self.session,
             filters={CaseClients.case_id: case.case_id},

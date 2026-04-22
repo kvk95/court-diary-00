@@ -25,11 +25,27 @@ class BaseModel(Base):
     @classmethod
     def get_table_name(cls):
         return cls.__tablename__
+    
+    def to_dict(
+        self,
+        *,
+        exclude_none: bool = False,
+        exclude: set[str] | None = None,
+    ) -> Dict[str, Any]:
+        exclude = exclude or set()
+        out: Dict[str, Any] = {}
 
-    @classmethod
-    def to_dict(cls, self) -> Dict[str, Any]:
-        out = {}
-        for col in cls.__table__.columns:
-            val = getattr(self, col.name)
-            out[col.name] = val.isoformat() if hasattr(val, "isoformat") else val
-        return out
+        for col in self.__table__.columns:
+            key = col.name
+
+            if key in exclude:
+                continue
+
+            val = getattr(self, key)
+
+            if exclude_none and val is None:
+                continue
+
+            out[key] = val.isoformat() if hasattr(val, "isoformat") else val
+
+        return out 
