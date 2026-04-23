@@ -52,3 +52,18 @@ class FieldValidator:
                 message="Invalid phone number format"
             )
         return None
+    
+    @classmethod
+    def validate_enum(cls, enum_class, value, field_name, errors):
+        if value is None:
+            return None
+        try:
+            return enum_class(value)
+        except ValueError:
+            errors.append(
+                ValidationErrorDetail(
+                    code=ErrorCodes.VALIDATION_ERROR,
+                    message=f"Invalid {field_name}"
+                )
+            )
+            return None

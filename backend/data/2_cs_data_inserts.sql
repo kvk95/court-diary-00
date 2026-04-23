@@ -111,11 +111,10 @@ INSERT IGNORE INTO refm_party_type (code, description, sort_order) VALUES
 -- 15.4  Email & Communication
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT IGNORE INTO refm_email_encryption (code, description, sort_order) VALUES
-('EENN', 'None', 10),
-('EETL', 'TLS',  20),
-('EESS', 'SSL',  30),
-('EEBT', 'Both', 40);
+INSERT IGNORE INTO refm_email_summary_frequency (code, description, sort_order) VALUES
+('SFNN', 'None', 10),
+('SFDL', 'Daily',  20),
+('SFWK', 'Weekly',  30);
 
 INSERT IGNORE INTO refm_email_templates (code, subject, content, category, description, sort_order, status_ind) VALUES
 ('LTUA',
@@ -767,9 +766,15 @@ INSERT INTO case_aors (case_id, user_id, chamber_id, primary_ind, appointment_da
 -- 23. SEED DATA — TIER 9  (Config: Email Settings & Templates)
 -- =============================================================================
 
-INSERT INTO email_settings (chamber_id, from_email, smtp_host, smtp_port, smtp_user, smtp_password, encryption_code, default_ind, status_ind, created_by) VALUES
-(@chamber_ca, 'no-reply@vkchamber.in', 'smtp.gmail.com', 587, 'no-reply@vkchamber.in', 'app-password-placeholder', 'EETL', TRUE,  TRUE, @user_caadmin),
-(@chamber_ca, 'office@vkchamber.in',   'smtp.zoho.com',  587, 'office@vkchamber.in',   'zoho-password-placeholder', 'EETL', FALSE, TRUE, @user_caadmin);
+INSERT INTO notification_settings (user_id, created_by) VALUES
+(@user_caadmin, @user_caadmin),
+(@user_priya, @user_caadmin),
+(@user_karthik, @user_caadmin),
+(@user_jerem, @user_caadmin),
+(@user_suresh, @user_caadmin),
+
+(@user_suad_vijay, @user_suad_vijay),
+(@user_suad_lokesh, @user_suad_lokesh);
 -- =============================================================================
 -- 24. SEED DATA — TIER 10  (User Avatar)
 -- =============================================================================

@@ -5,6 +5,7 @@ from fastapi import Body, Depends, Path, Query
 from app.auth.permissions import PType, require_permission
 from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusEnum
+from app.dtos.notification_settings_dto import NotificationSettingsEdit, NotificationSettingsOut
 from app.dtos.users_dto import (
     UserOut, 
     UserCreate, 
@@ -17,8 +18,9 @@ from app.dtos.users_dto import (
 )
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
+from app.services.notification_settings_service import NotificationSettingsService
 from app.services.users_service import UsersService
-from app.dependencies import get_current_user, get_users_service
+from app.dependencies import get_current_user, get_notification_settings_service, get_users_service
 from app.api.v1.routes.base.base_controller import BaseController
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
@@ -262,3 +264,34 @@ class UsersController(BaseController):
     ) -> BaseOutDto[dict]:
         result = await service.users_remove_from_chamber(user_id=user_id)
         return self.success(result=result)
+
+    # -------------------------------------------------------
+    # NOTIFICATIONS
+    # -------------------------------------------------------
+
+    # ── GET ────────────────────────────
+
+    @BaseController.get(
+        "/notification",
+        summary="Get user notification settings",
+        response_model=BaseOutDto[NotificationSettingsOut],
+    )
+    async def get_notification_settings(
+        self,
+        service: NotificationSettingsService = Depends(get_notification_settings_service),
+    ):
+        return self.success(result=await service.get_settings())
+
+    # ── Update ────────────────────────────
+    
+    @BaseController.put(
+        "/notification",
+        summary="Update user notification settings",
+        response_model=BaseOutDto[NotificationSettingsOut],
+    )
+    async def update_notification_settings(
+        self,
+        payload: NotificationSettingsEdit = Body(...),
+        service: NotificationSettingsService = Depends(get_notification_settings_service),
+    ):
+        return self.success(result=await service.update_settings(payload))

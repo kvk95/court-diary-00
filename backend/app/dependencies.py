@@ -17,6 +17,7 @@ from app.services.image_service import ImageService
 from app.services.calendar_service import CalendarService
 from app.services.cases_service import CasesService
 from app.services.clients_service import ClientsService
+from app.services.notification_settings_service import NotificationSettingsService
 from app.services.role_permissions_service import RolePermissionsService
 from app.services.roles_service import RolesService
 from app.services.suad_service import SuadService
@@ -136,6 +137,13 @@ async def get_users_service(
     __: None = Depends(validate_csrf),
 ) -> UsersService:
     return UsersService(session=session, image_service=get_image_service())
+    
+async def get_notification_settings_service(
+    session: AsyncSession = Depends(get_session),
+    _ = Depends(get_current_user),
+    __: None = Depends(validate_csrf),
+) -> NotificationSettingsService:
+    return NotificationSettingsService(session=session)
 
 async def get_roles_service(
     session: AsyncSession = Depends(get_session),

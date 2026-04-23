@@ -128,13 +128,13 @@ CREATE TABLE refm_party_type (
 -- 2.4  Email & Communication
 -- ─────────────────────────────────────────────────────────────────────────────
 
-DROP TABLE IF EXISTS refm_email_encryption;
-CREATE TABLE refm_email_encryption (
+DROP TABLE IF EXISTS refm_email_summary_frequency;
+CREATE TABLE refm_email_summary_frequency (
     code          CHAR(4)     PRIMARY KEY,
     description   VARCHAR(50) NOT NULL,
     sort_order    INT         NOT NULL,
     status_ind    BOOLEAN     NOT NULL DEFAULT TRUE
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Email encryption methods';
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Email summary frequency';
 
 DROP TABLE IF EXISTS refm_email_templates;
 CREATE TABLE refm_email_templates (
@@ -1138,37 +1138,77 @@ CREATE TABLE profile_images (
 -- =============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 9.1  Email Settings  →  chamber, refm_email_encryption, users
+-- 9.1  notification Settings  →  users
 -- ─────────────────────────────────────────────────────────────────────────────
 
-DROP TABLE IF EXISTS email_settings;
-CREATE TABLE email_settings (
-    id                INT       AUTO_INCREMENT PRIMARY KEY,
-    chamber_id        CHAR(36)  NOT NULL,  
-    from_email        VARCHAR(150) NOT NULL,
-    smtp_host         VARCHAR(100) NOT NULL,
-    smtp_port         SMALLINT UNSIGNED NOT NULL DEFAULT 587,
-    smtp_user         VARCHAR(150) NOT NULL,
-    smtp_password     VARCHAR(255) NOT NULL,
-    encryption_code   CHAR(4)   NOT NULL DEFAULT 'EETL',
-    auth_required_ind BOOLEAN   DEFAULT TRUE,
-    default_ind        BOOLEAN   DEFAULT FALSE,
-    status_ind        BOOLEAN   NOT NULL DEFAULT TRUE,
-    created_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by        CHAR(36)  NULL,  
-    updated_date      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by        CHAR(36)  NULL,  
-    CONSTRAINT uk_chamber_default
-        UNIQUE KEY (chamber_id, default_ind),
-    CONSTRAINT fk_email_settings_chamber
-        FOREIGN KEY (chamber_id)      REFERENCES chamber(chamber_id)           ON DELETE CASCADE,
-    CONSTRAINT fk_email_settings_encryption
-        FOREIGN KEY (encryption_code) REFERENCES refm_email_encryption(code)  ON DELETE RESTRICT,
-    CONSTRAINT fk_email_settings_created_by
-        FOREIGN KEY (created_by)      REFERENCES users(user_id)               ON DELETE SET NULL,
-    CONSTRAINT fk_email_settings_updated_by
-        FOREIGN KEY (updated_by)      REFERENCES users(user_id)               ON DELETE SET NULL
-) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='SMTP settings per chamber';
+DROP TABLE IF EXISTS notification_settings;
+
+CREATE TABLE notification_settings (
+    notification_id                 INT AUTO_INCREMENT PRIMARY KEY,
+
+    user_id                         CHAR(36) NOT NULL,
+
+    -- 🔔 CHANNEL ENABLEMENT
+    email_enabled_ind               BOOLEAN NOT NULL DEFAULT TRUE,
+    sms_enabled_ind                 BOOLEAN NOT NULL DEFAULT TRUE,
+    whatsapp_enabled_ind            BOOLEAN NOT NULL DEFAULT TRUE,
+
+    -- 📊 SUMMARY (per channel)
+    email_summary_frequency_code    CHAR(4) NOT NULL DEFAULT 'SFDL',
+    sms_summary_frequency_code      CHAR(4) NOT NULL DEFAULT 'SFDL',
+    whatsapp_summary_frequency_code CHAR(4) NOT NULL DEFAULT 'SFDL',
+
+    -- ⏰ REMINDERS (minutes before)
+    email_remind_before             INT NULL DEFAULT 30,
+    sms_remind_before               INT NULL DEFAULT 30,
+    whatsapp_remind_before          INT NULL DEFAULT 30,
+
+    -- ✅ STATUS
+    status_ind                      BOOLEAN NOT NULL DEFAULT TRUE,
+
+    -- 🧾 AUDIT
+    created_date                    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by                      CHAR(36) NULL,
+
+    updated_date                    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by                      CHAR(36) NULL,
+
+    -- 🔐 ONE ROW PER USER
+    CONSTRAINT uk_notification_user UNIQUE (user_id),
+
+    -- 🔗 FKs
+    CONSTRAINT fk_notification_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_notification_email_summary
+        FOREIGN KEY (email_summary_frequency_code)
+        REFERENCES refm_email_summary_frequency(code)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_notification_sms_summary
+        FOREIGN KEY (sms_summary_frequency_code)
+        REFERENCES refm_email_summary_frequency(code)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_notification_whatsapp_summary
+        FOREIGN KEY (whatsapp_summary_frequency_code)
+        REFERENCES refm_email_summary_frequency(code)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_notification_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_notification_updated_by
+        FOREIGN KEY (updated_by)
+        REFERENCES users(user_id)
+        ON DELETE SET NULL
+
+) ENGINE=InnoDB ROW_FORMAT=DYNAMIC
+COMMENT='Notification settings per user';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 9.3  Delete Account Requests  →  chamber, users, refm_user_deletion_status

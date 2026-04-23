@@ -1,4 +1,4 @@
-"""refm_email_encryption"""
+"""refm_email_summary_frequency"""
 
 from sqlalchemy import Boolean, CHAR, Integer, String
 from enum import Enum as PyEnum
@@ -8,8 +8,8 @@ from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 
-class RefmEmailEncryption(BaseModel):
-    __tablename__ = 'refm_email_encryption'
+class RefmEmailSummaryFrequency(BaseModel):
+    __tablename__ = 'refm_email_summary_frequency'
 
     # code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     code: Mapped[str] = mapped_column(CHAR(4), primary_key=True, nullable=False)
@@ -31,14 +31,12 @@ class RefmEmailEncryption(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 
 
-class RefmEmailEncryptionConstants:
-    NONE = 'EENN'
-    TLS = 'EETL'
-    SSL = 'EESS'
-    BOTH = 'EEBT'
+class RefmEmailSummaryFrequencyConstants:
+    NONE = 'SFNN'
+    DAILY = 'SFDL'
+    WEEKLY = 'SFWK'
 
-class RefmEmailEncryptionEnum(str, PyEnum):
-    NONE = RefmEmailEncryptionConstants.NONE
-    TLS = RefmEmailEncryptionConstants.TLS
-    SSL = RefmEmailEncryptionConstants.SSL
-    BOTH = RefmEmailEncryptionConstants.BOTH
+class RefmEmailSummaryFrequencyEnum(str, PyEnum):
+    NONE = RefmEmailSummaryFrequencyConstants.NONE
+    DAILY = RefmEmailSummaryFrequencyConstants.DAILY
+    WEEKLY = RefmEmailSummaryFrequencyConstants.WEEKLY

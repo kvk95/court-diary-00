@@ -7,6 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import func, select, union_all
 
+from app.core.config import settings
 from app.database.models.base.session import get_session
 from app.database.models.case_aors import CaseAors
 from app.database.models.case_notes import CaseNotes
@@ -313,95 +314,6 @@ def build_table(
     for i, h in enumerate(hearings, start=1):
         case_link = f"{ui_url}cases/{h.case_id}"
 
-        case_number = h.case_number
-        parties = f"{h.petitioner} vs {h.respondent}"
-        court_name = h.court_name or "—"
-        hearing_date = format_date(h.hearing_date)
-
-        purpose_label = purpose_map.get(h.purpose_code, h.purpose_code or "—")
-        status_label = status_map.get(h.status_code, h.status_code or "—")
-
-        next_date = format_date(h.next_hearing_date)
-
-        note_text = getattr(h, "note_text", None)
-        if note_text:
-            note_text = (note_text[:120] + "...") if len(note_text) > 120 else note_text
-        else:
-            note_text = "—"
-
-        row_bg = "#ffffff" if i % 2 == 0 else "#f8fafc"
-
-        badge_bg, badge_fg = _STATUS_BADGE.get(
-            (h.status_code or "").upper(),
-            ("#f1f5f9", "#64748b")
-        )
-
-        rows_html += f"""
-        <tr style="background:{row_bg};">
-
-            <td style="padding:10px;">{i}</td>
-
-            <td style="padding:10px;">
-                <a href="{case_link}" style="color:#0ea5e9; text-decoration:none;">
-                    {case_number}
-                </a>
-            </td>
-
-            <td style="padding:10px;">{parties}</td>
-            <td style="padding:10px;">{court_name}</td>
-            <td style="padding:10px;">{hearing_date}</td>
-            <td style="padding:10px;">{purpose_label}</td>
-
-            <td style="padding:10px;">
-                <span style="color:{badge_fg}; background:{badge_bg};
-                             padding:3px 8px; border-radius:6px;">
-                    {status_label}
-                </span>
-            </td>
-
-            <td style="padding:10px;">{next_date}</td>
-        """
-
-        if include_notes:
-            rows_html += f"""
-            <td style="padding:10px; max-width:220px;">
-                {note_text}
-            </td>
-            """
-
-        rows_html += "</tr>"
-
-    notes_header = "<th>Notes</th>" if include_notes else ""
-
-    return f"""
-    <table width="100%" style="border-collapse:collapse; margin-top:10px;">
-        <tr style="background:#0f172a; color:#fff;">
-            <th>#</th>
-            <th>Case</th>
-            <th>Parties</th>
-            <th>Court</th>
-            <th>Date</th>
-            <th>Purpose</th>
-            <th>Status</th>
-            <th>Next</th>
-            {notes_header}
-        </tr>
-        {rows_html}
-    </table>
-    """
-
-def build_table(
-    hearings,
-    purpose_map,
-    status_map,
-    ui_url,
-    include_notes=False
-):
-    rows_html = ""
-
-    for i, h in enumerate(hearings, start=1):
-        case_link = f"{ui_url}cases/{h.case_id}"
-
         parties = f"{h.petitioner} vs {h.respondent}"
         court_name = h.court_name or "—"
 
@@ -497,4 +409,68 @@ def build_table(
         {rows_html}
 
     </table>
+    """
+
+def build_body(
+    today_hearings,
+    tomorrow_hearings,
+    purpose_map,
+    status_map
+):
+    ui_url = settings.UI_URL
+
+    # ---- TODAY SUMMARY ----
+    today_total, today_status = build_summary(today_hearings)
+
+    today_summary_html = f"""
+    <h3>?? Today's Summary</h3>
+    <p>Total Hearings: <b>{today_total}</b></p>
+    <ul>
+        {''.join([f"<li>{k}: {v}</li>" for k, v in today_status.items()])}
+    </ul>
+    """
+
+    # ---- TABLES ----
+    today_table = build_table(
+        today_hearings,
+        purpose_map,
+        status_map,
+        ui_url,
+        include_notes=True
+    )
+
+    tomorrow_table = build_table(
+        tomorrow_hearings,
+        purpose_map,
+        status_map,
+        ui_url,
+        include_notes=False
+    )
+
+    return f"""
+    <div style="font-family:Arial; padding:20px;">
+
+        <h2>?? Court Diary Update</h2>
+
+        {today_summary_html}
+
+        <h3>?? Today's Hearings</h3>
+        {today_table}
+
+        <h3 style="margin-top:30px;">? Tomorrow's Hearings</h3>
+        {tomorrow_table}
+
+        <div style="margin-top:30px;">
+            <a href="{ui_url}calendar"
+               style="background:#0ea5e9; color:#fff; padding:10px 20px;
+                      text-decoration:none; border-radius:6px;">
+               View Full Calendar
+            </a>
+        </div>
+
+        <p style="margin-top:20px; font-size:12px; color:#888;">
+            Automated email from NyaDesk
+        </p>
+
+    </div>
     """
