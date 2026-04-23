@@ -36,6 +36,7 @@ class RefmModules(BaseModel):
 
 class RefmModulesConstants:
     ADMIN = 'ADMN'
+    BILLING = 'BILL'
     CALENDAR = 'CALD'
     CASES = 'CASE'
     CLIENTS = 'CLNT'
@@ -47,6 +48,7 @@ class RefmModulesConstants:
 
 class RefmModulesEnum(str, PyEnum):
     ADMIN = RefmModulesConstants.ADMIN
+    BILLING = RefmModulesConstants.BILLING
     CALENDAR = RefmModulesConstants.CALENDAR
     CASES = RefmModulesConstants.CASES
     CLIENTS = RefmModulesConstants.CLIENTS

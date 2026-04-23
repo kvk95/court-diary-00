@@ -17,6 +17,18 @@ class RefmPlanTypes(BaseModel):
     # description : VARCHAR(60) COLLATE "utf8mb4_unicode_ci"
     description: Mapped[str] = mapped_column(String(60), nullable=False)
 
+    # status_ind : TINYINT
+    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # email_ind : TINYINT
+    email_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # sms_ind : TINYINT
+    sms_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    # whatsapp_ind : TINYINT
+    whatsapp_ind: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # max_users : INTEGER
     max_users: Mapped[Optional[int]] = mapped_column(Integer)
 
@@ -34,9 +46,6 @@ class RefmPlanTypes(BaseModel):
 
     # sort_order : INTEGER
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
-
-    # status_ind : TINYINT
-    status_ind: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.

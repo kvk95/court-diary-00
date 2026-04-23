@@ -41,13 +41,16 @@ DROP TABLE IF EXISTS refm_plan_types;
 CREATE TABLE refm_plan_types (
     code              CHAR(4)        PRIMARY KEY,
     description       VARCHAR(60)    NOT NULL,
+    status_ind        BOOLEAN        NOT NULL DEFAULT TRUE,
+	email_ind         BOOLEAN        NOT NULL DEFAULT TRUE,
+	sms_ind           BOOLEAN        NOT NULL DEFAULT FALSE,
+	whatsapp_ind      BOOLEAN        NOT NULL DEFAULT FALSE,
     max_users         INT            NULL,
     max_cases         INT            NULL,
     price_monthly_amt DECIMAL(12,2)  DEFAULT 0,
     price_annual_amt  DECIMAL(12,2)  DEFAULT 0,
     currency_code     CHAR(3)        DEFAULT 'INR',
-    sort_order        INT            NOT NULL,
-    status_ind        BOOLEAN        NOT NULL DEFAULT TRUE
+    sort_order        INT            NOT NULL
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Subscription plans';
 
 DROP TABLE IF EXISTS refm_modules;

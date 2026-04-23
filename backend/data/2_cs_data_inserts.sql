@@ -19,14 +19,14 @@ USE courtdiary;
 -- 15.2  Plans & Modules
 -- ─────────────────────────────────────────────────────────────────────────────
 
-INSERT IGNORE INTO refm_plan_types (code, description, max_users, max_cases, price_monthly_amt, price_annual_amt, sort_order) VALUES
-('PTFR', 'Free',       3,    75,    0.00,     0.00,    10),
-('PTPR', 'Pro',        10,   300,   999.00,   9999.00, 20),
-('PTEN', 'Enterprise', NULL, NULL,  2999.00, 29999.00, 30);
+INSERT IGNORE INTO refm_plan_types (code, description, email_ind, sms_ind, whatsapp_ind, max_users, max_cases, price_monthly_amt, price_annual_amt, sort_order) VALUES
+('PTFR', 'Free',       TRUE, FALSE, FALSE,    3,   75,    0.00,     0.00, 10),
+('PTPR', 'Pro',        TRUE, TRUE,  TRUE,    10,  300,  999.00,  9999.00, 20),
+('PTEN', 'Enterprise', TRUE, TRUE,  TRUE,  NULL, NULL, 2999.00, 29999.00, 30);
 
 INSERT IGNORE INTO refm_modules (code, name, description, sort_order) VALUES
 ('ADMN', 'Admin',           'System administration & control',     10),
--- ('BILL', 'Billing',         'Invoices, payments & accounts',       20),
+('BILL', 'Billing',         'Invoices, payments & accounts',       20),
 ('CALD', 'Calendar',        'Court & personal calendar',           30),
 ('CASE', 'Cases',           'Case register & details',             40),
 ('CLNT', 'Clients',         'Client management & details',         50),
