@@ -5,10 +5,11 @@ import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import select, union_all
+from sqlalchemy import func, select, union_all
 
 from app.database.models.base.session import get_session
 from app.database.models.case_aors import CaseAors
+from app.database.models.case_notes import CaseNotes
 from app.database.models.cases import Cases
 from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.courts import Courts
@@ -37,7 +38,7 @@ def start_scheduler(job_fn):
         replace_existing=True,
     )
     scheduler.start()
-    _logger.info("✅ Scheduler started (8 PM IST job registered)")
+    _logger.info("? Scheduler started (8 PM IST job registered)")
 
 
 # -----------------------------------------------------------------------------
@@ -65,17 +66,29 @@ async def send_tomorrow_hearings_job():
         async for session in get_session():
             email_util: EmailUtil = EmailUtil(session=session)
 
-            rows = await get_tomorrow_hearings(session)
-            if not rows:
+            rows_tomorrow  = await get_tomorrow_hearings(session)
+            rows_today = await get_today_hearings_with_notes(session)
+            
+            if not rows_tomorrow :
                 _logger.info("No hearings tomorrow — skipping email job.")
                 return
+            
+            print(len(rows_tomorrow ))
 
             purpose_map, status_map = await get_refm_maps(session)
-            grouped = group_hearings_by_user(rows)
+            grouped_tomorrow = group_hearings_by_user(rows_tomorrow)
+            grouped_today = group_hearings_by_user(rows_today)
 
             tasks = [
-                safe_send(email_util, email, hearings, purpose_map, status_map)
-                for email, hearings in grouped.items()
+                safe_send(
+                    email_util,
+                    email,
+                    grouped_today.get(email, []),
+                    grouped_tomorrow.get(email, []),
+                    purpose_map,
+                    status_map
+                )
+                for email in grouped_tomorrow.keys() | grouped_today.keys()
             ]
 
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -109,17 +122,17 @@ _HEARING_COLS = [
 async def get_tomorrow_hearings(session):
     tomorrow = get_tomorrow()
 
-    # ── AOR ──────────────────────────────────────────────────────────────────
+    # -- AOR ------------------------------------------------------------------
     aor_stmt = (
         select(*_HEARING_COLS)
         .join(Hearings, Hearings.case_id == Cases.case_id)
         .join(Courts, Courts.court_code == Cases.court_code)
         .join(CaseAors, CaseAors.case_id == Cases.case_id)
         .join(Users, Users.user_id == CaseAors.user_id)
-        # .where(Hearings.hearing_date == tomorrow)
+        .where(Hearings.hearing_date == tomorrow)
     )
 
-    # ── ADMIN / ASSO / CNSL ──────────────────────────────────────────────────
+    # -- ADMIN / ASSO / CNSL --------------------------------------------------
     admin_stmt = (
         select(*_HEARING_COLS)
         .join(Hearings, Hearings.case_id == Cases.case_id)
@@ -129,17 +142,61 @@ async def get_tomorrow_hearings(session):
         .join(ChamberRoles, ChamberRoles.role_id == UserRoles.role_id)
         .join(Users, Users.user_id == UserChamberLink.user_id)
         .where(
-            # Hearings.hearing_date == tomorrow,
+            Hearings.hearing_date == tomorrow,
             ChamberRoles.role_code.in_(["ADMIN", "ASSO", "CNSL"]),
         )
     )
 
-    result = await session.execute(union_all(aor_stmt, admin_stmt))
+    combined = union_all(aor_stmt, admin_stmt).subquery()
+
+    stmt = select(*combined.c).distinct(
+        combined.c.hearing_id,
+        combined.c.email
+    ).order_by(combined.c.hearing_date)
+
+    result = await session.execute(stmt)
+    return result.mappings().all()
+
+async def get_today_hearings_with_notes(session):
+    today = date.today()
+
+    latest_note_subq = (
+        select(
+            CaseNotes.case_id,
+            func.max(CaseNotes.created_date).label("max_date")
+        )
+        .where(
+            CaseNotes.deleted_ind == False,
+            CaseNotes.private_ind == False
+        )
+        .group_by(CaseNotes.case_id)
+        .subquery()
+    )
+
+    notes_join = (
+        select(CaseNotes.case_id, CaseNotes.note_text)
+        .join(
+            latest_note_subq,
+            (CaseNotes.case_id == latest_note_subq.c.case_id) &
+            (CaseNotes.created_date == latest_note_subq.c.max_date)
+        )
+        .subquery()
+    )
+
+    stmt = (
+        select(*_HEARING_COLS, notes_join.c.note_text)
+        .join(Hearings, Hearings.case_id == Cases.case_id)
+        .join(Courts, Courts.court_code == Cases.court_code)
+        .outerjoin(notes_join, notes_join.c.case_id == Cases.case_id)
+        .where(Hearings.hearing_date == today)
+    )
+
+    result = await session.execute(stmt)
     return result.mappings().all()
 
 
 # -----------------------------------------------------------------------------
-# REFERENCE MAP  (purpose & status code → description)
+# REFERENCE MAP  (purpose & status code ? description)
 # -----------------------------------------------------------------------------
 async def get_refm_maps(session) -> tuple[dict, dict]:
     purpose_rows = await session.execute(
@@ -178,21 +235,47 @@ def group_hearings_by_user(rows) -> dict[str, list]:
 semaphore = asyncio.Semaphore(10)
 
 
-async def safe_send(email_util: EmailUtil, email: str, hearings: list,
-                    purpose_map: dict, status_map: dict):
+async def safe_send(
+    email_util: EmailUtil,
+    email: str,
+    today_hearings: list,
+    tomorrow_hearings: list,
+    purpose_map: dict,
+    status_map: dict
+):
     async with semaphore:
-        await send_hearing_email(email_util, email, hearings, purpose_map, status_map)
+        await send_hearing_email(
+            email_util,
+            email,
+            today_hearings,
+            tomorrow_hearings,
+            purpose_map,
+            status_map
+        )
 
 
-async def send_hearing_email(email_util: EmailUtil, email: str, hearings: list,
-                              purpose_map: dict, status_map: dict):
+async def send_hearing_email(
+    email_util,
+    email,
+    today_hearings,
+    tomorrow_hearings,
+    purpose_map,
+    status_map
+):
     try:
+        # ? REMOVE this (bug)
         email = "kvk9540@gmail.com"
+
         await asyncio.to_thread(
             email_util.send_email,
             [email],
-            "Tomorrow's Hearings — NyaDesk",
-            build_body(hearings, purpose_map, status_map),
+            "Today's Summary & Tomorrow's Hearings — NyaDesk",
+            build_body(
+                today_hearings,
+                tomorrow_hearings,
+                purpose_map,
+                status_map
+            ),
         )
     except Exception as e:
         _logger.error(f"Failed to send email to {email}: {e}")
@@ -209,121 +292,209 @@ _STATUS_BADGE = {
     "DISMISSED": ("#fef2f2", "#ef4444"),
 }
 
+def build_summary(hearings):
+    total = len(hearings)
+    status_count = defaultdict(int)
 
-def build_body(hearings, purpose_map: dict , status_map: dict) -> str:
-    purpose_map = purpose_map or {}
-    status_map  = status_map  or {}
+    for h in hearings:
+        status_count[h.status_code] += 1
 
+    return total, status_count
+
+def build_table(
+    hearings,
+    purpose_map,
+    status_map,
+    ui_url,
+    include_notes=False
+):
     rows_html = ""
+
     for i, h in enumerate(hearings, start=1):
-        case_number    = h.case_number
-        parties        = f"{h.petitioner} vs {h.respondent}"
-        court_name     = h.court_name or "—"
-        hearing_date   = format_date(h.hearing_date)
-        purpose_label  = purpose_map.get(h.purpose_code, h.purpose_code or "—")
-        status_label   = status_map.get(h.status_code,  h.status_code  or "—")
-        next_date      = format_date(h.next_hearing_date)
-        row_bg         = "#ffffff" if i % 2 == 0 else "#f8fafc"
+        case_link = f"{ui_url}cases/{h.case_id}"
+
+        case_number = h.case_number
+        parties = f"{h.petitioner} vs {h.respondent}"
+        court_name = h.court_name or "—"
+        hearing_date = format_date(h.hearing_date)
+
+        purpose_label = purpose_map.get(h.purpose_code, h.purpose_code or "—")
+        status_label = status_map.get(h.status_code, h.status_code or "—")
+
+        next_date = format_date(h.next_hearing_date)
+
+        note_text = getattr(h, "note_text", None)
+        if note_text:
+            note_text = (note_text[:120] + "...") if len(note_text) > 120 else note_text
+        else:
+            note_text = "—"
+
+        row_bg = "#ffffff" if i % 2 == 0 else "#f8fafc"
 
         badge_bg, badge_fg = _STATUS_BADGE.get(
-            (h.status_code or "").upper(), ("#f1f5f9", "#64748b")
+            (h.status_code or "").upper(),
+            ("#f1f5f9", "#64748b")
         )
 
         rows_html += f"""
-            <tr style="background:{row_bg};">
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;
-                            color:#94a3b8; font-size:13px; text-align:center;
-                            font-weight:500; width:36px;">{i}</td>
+        <tr style="background:{row_bg};">
 
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;">
-                    <span style="display:inline-block; font-size:12px; font-weight:600;
-                                 color:#0ea5e9; background:#eff6ff;
-                                 padding:3px 10px; border-radius:20px; white-space:nowrap;">
-                        {case_number}
-                    </span>
-                </td>
+            <td style="padding:10px;">{i}</td>
 
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;
-                            color:#1e293b; font-size:13px; font-weight:500;">{parties}</td>
+            <td style="padding:10px;">
+                <a href="{case_link}" style="color:#0ea5e9; text-decoration:none;">
+                    {case_number}
+                </a>
+            </td>
 
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;
-                            color:#475569; font-size:13px;">{court_name}</td>
+            <td style="padding:10px;">{parties}</td>
+            <td style="padding:10px;">{court_name}</td>
+            <td style="padding:10px;">{hearing_date}</td>
+            <td style="padding:10px;">{purpose_label}</td>
 
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;
-                            color:#475569; font-size:13px; white-space:nowrap;">{hearing_date}</td>
+            <td style="padding:10px;">
+                <span style="color:{badge_fg}; background:{badge_bg};
+                             padding:3px 8px; border-radius:6px;">
+                    {status_label}
+                </span>
+            </td>
 
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;
-                            color:#475569; font-size:13px;">{purpose_label}</td>
-
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;">
-                    <span style="display:inline-block; font-size:11px; font-weight:600;
-                                 color:{badge_fg}; background:{badge_bg};
-                                 padding:3px 10px; border-radius:20px; white-space:nowrap;
-                                 text-transform:uppercase; letter-spacing:0.3px;">
-                        {status_label}
-                    </span>
-                </td>
-
-                <td style="padding:12px 16px; border-bottom:1px solid #e2e8f0;
-                            color:#64748b; font-size:13px; white-space:nowrap;">{next_date}</td>
-            </tr>
+            <td style="padding:10px;">{next_date}</td>
         """
 
+        if include_notes:
+            rows_html += f"""
+            <td style="padding:10px; max-width:220px;">
+                {note_text}
+            </td>
+            """
+
+        rows_html += "</tr>"
+
+    notes_header = "<th>Notes</th>" if include_notes else ""
+
     return f"""
-        <div style="font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#1e293b;">
+    <table width="100%" style="border-collapse:collapse; margin-top:10px;">
+        <tr style="background:#0f172a; color:#fff;">
+            <th>#</th>
+            <th>Case</th>
+            <th>Parties</th>
+            <th>Court</th>
+            <th>Date</th>
+            <th>Purpose</th>
+            <th>Status</th>
+            <th>Next</th>
+            {notes_header}
+        </tr>
+        {rows_html}
+    </table>
+    """
 
-            <div style="margin-bottom:24px;">
-                <div style="display:inline-block; width:44px; height:44px;
-                             background:linear-gradient(135deg,#e0f2fe,#bae6fd);
-                             border-radius:10px; margin-bottom:14px;
-                             text-align:center; line-height:44px; font-size:20px;">⚖️</div>
-                <h2 style="margin:0 0 6px; font-size:20px; font-weight:700;
-                            color:#0f172a; letter-spacing:-0.3px;">Tomorrow's Hearings</h2>
-                <p style="margin:0; font-size:14px; color:#64748b;">
-                    Here's a full summary of your scheduled hearings. Please review and prepare accordingly.
-                </p>
-            </div>
+def build_table(
+    hearings,
+    purpose_map,
+    status_map,
+    ui_url,
+    include_notes=False
+):
+    rows_html = ""
 
-            <div style="overflow-x:auto;">
-                <table width="100%" cellpadding="0" cellspacing="0"
-                    style="border-collapse:collapse; border:1px solid #e2e8f0;
-                           border-radius:10px; overflow:hidden; font-size:14px; min-width:640px;">
+    for i, h in enumerate(hearings, start=1):
+        case_link = f"{ui_url}cases/{h.case_id}"
 
-                    <tr style="background:#0f172a;">
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:center; width:36px;">#</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Case No.</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Parties</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Court</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Date</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Purpose</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Status</th>
-                        <th style="padding:11px 16px; color:#94a3b8; font-size:10px; font-weight:600;
-                                   text-transform:uppercase; letter-spacing:0.6px; text-align:left;">Next Date</th>
-                    </tr>
+        parties = f"{h.petitioner} vs {h.respondent}"
+        court_name = h.court_name or "—"
 
-                    {rows_html}
-                </table>
-            </div>
+        purpose_label = purpose_map.get(h.purpose_code, h.purpose_code or "—")
+        status_label = status_map.get(h.status_code, h.status_code or "—")
 
-            <div style="text-align:center; margin:28px 0 8px;">
-                <a href="https://court-diary.nyainfo.com/calendar"
-                    style="display:inline-block; background:#0ea5e9; color:#ffffff;
-                           font-size:14px; font-weight:600; padding:13px 28px;
-                           border-radius:10px; text-decoration:none; letter-spacing:0.1px;">
-                    View Full Calendar →
+        note_text = getattr(h, "note_text", None) or "—"
+        if note_text != "—":
+            note_text = note_text[:100] + "..." if len(note_text) > 100 else note_text
+
+        badge_bg, badge_fg = _STATUS_BADGE.get(
+            (h.status_code or "").upper(),
+            ("#eef2f7", "#475569")
+        )
+
+        rows_html += f"""
+        <tr>
+            <td align="center" style="padding:10px; vertical-align:top;">{i}</td>
+
+            <td style="padding:10px; vertical-align:top; white-space:nowrap;">
+                <a href="{case_link}" style="color:#0ea5e9; text-decoration:none; font-weight:500;">
+                    {h.case_number}
                 </a>
-            </div>
+            </td>
 
-            <p style="margin-top:20px; font-size:12px; color:#94a3b8; text-align:center;
-                       border-top:1px solid #f1f5f9; padding-top:16px;">
-                This is an automated notification from NyaDesk. Please do not reply to this email.
-            </p>
-        </div>
+            <td style="padding:10px; vertical-align:top; line-height:1.4;">
+                {parties}
+            </td>
+
+            <td style="padding:10px; vertical-align:top; line-height:1.4;">
+                {court_name}
+            </td>
+
+            <td style="padding:10px; vertical-align:top; white-space:nowrap;">
+                {format_date(h.hearing_date)}
+            </td>
+
+            <td style="padding:10px; vertical-align:top;">
+                {purpose_label}
+            </td>
+
+            <td style="padding:10px; vertical-align:top;">
+                <span style="
+                    display:inline-block;
+                    padding:4px 8px;
+                    border-radius:6px;
+                    font-size:11px;
+                    font-weight:600;
+                    background:{badge_bg};
+                    color:{badge_fg};
+                    white-space:nowrap;">
+                    {status_label}
+                </span>
+            </td>
+
+            <td style="padding:10px; vertical-align:top; white-space:nowrap;">
+                {format_date(h.next_hearing_date)}
+            </td>
+        """
+
+        if include_notes:
+            rows_html += f"""
+            <td style="padding:10px; vertical-align:top; line-height:1.4; max-width:220px;">
+                {note_text}
+            </td>
+            """
+
+        rows_html += "</tr>"
+    
+    notes_header = "<th align='left'>Notes</th>" if include_notes else ""
+
+    return f"""
+    <table width="100%" cellpadding="0" cellspacing="0"
+        style="
+            border-collapse:collapse;
+            width:100%;
+            font-size:13px;
+            table-layout:fixed;
+        ">
+
+        <tr style="background:#0f172a; color:#ffffff;">
+            <th width="40">#</th>
+            <th width="140" align="left">Case</th>
+            <th align="left">Parties</th>
+            <th width="160" align="left">Court</th>
+            <th width="110" align="left">Date</th>
+            <th width="120" align="left">Purpose</th>
+            <th width="110" align="left">Status</th>
+            <th width="110" align="left">Next</th>
+            {notes_header}
+        </tr>
+
+        {rows_html}
+
+    </table>
     """
