@@ -9,7 +9,7 @@ class CodeDescription:
 class ErrorCodes():
     SUCCESS: Final[CodeDescription] = CodeDescription(Code = "S", Description="Success")
     FAILURE: Final[CodeDescription] = CodeDescription(Code = "F", Description="Failure")
-    NOT_FOUND: Final[CodeDescription] = CodeDescription(Code = "S", Description="No matching Record")
+    NOT_FOUND: Final[CodeDescription] = CodeDescription(Code = "E001", Description="No matching Record")
     VALIDATION_ERROR: Final[CodeDescription] = CodeDescription(Code = "E001", Description="Validation Failed")
     PERMISSION_DENIED: Final[CodeDescription] = CodeDescription(Code = "401", Description="Unauthorized")
     INTEGRITY_ERROR: Final[CodeDescription] = CodeDescription(Code = "E007", Description="Record being modified by another user")
