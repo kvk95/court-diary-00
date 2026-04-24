@@ -21,7 +21,6 @@ from app.database.repositories.user_chamber_link_repository import UserChamberLi
 from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
-from app.dtos.chamber_subscriptions_dto import UsageStats
 from app.dtos.users_dto import (
     DeletionRejectPayload,
     DeletionRequestOut,
@@ -36,7 +35,6 @@ from app.dtos.users_dto import (
 )
 from app.dtos.roles_dto import RoleOut
 from app.dtos.role_permissions_dto import RolePermissionModuleOut
-from app.services.chamber_subscriptions_service import ChamberSubscriptionService
 from app.services.email_link_service import EmailLinkService
 from app.services.image_service import ImageService
 from app.utils.security import hash_password
@@ -64,7 +62,6 @@ class UsersService(BaseSecuredService):
         profile_images_repo: Optional[ProfileImagesRepository] = None,
         image_service: Optional[ImageService] = None,
         email_link_service: Optional[EmailLinkService] = None,
-        chamber_subscriptions_service: Optional[ChamberSubscriptionService] = None,
     ):
         super().__init__(session)
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
@@ -76,7 +73,6 @@ class UsersService(BaseSecuredService):
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
         self.image_service = image_service or ImageService(session)
         self.email_link_service = email_link_service or EmailLinkService(session=self.session)
-        self.chamber_subscriptions_service = chamber_subscriptions_service or ChamberSubscriptionService(session=self.session)
 
     # ─────────────────────────────────────────────────────────────────────────
     # HELPERS (Now Just Call Repository Methods - No Query Logic)
@@ -338,11 +334,11 @@ class UsersService(BaseSecuredService):
  
     async def users_add(self, payload: UserCreate) -> UserOut:
 
-        usage_stats:UsageStats = await self.chamber_subscriptions_service.get_usage()
-        if usage_stats.users_allowed and usage_stats.users_used>= usage_stats.users_allowed:
+        user_stats:UserStatsOut = await self.get_user_stats()
+        if user_stats.users_allowed and user_stats.total_users>= user_stats.users_allowed:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
-                message=f"Update Subscription current, users in chamber is {usage_stats.users_used} allowed is {usage_stats.users_allowed}"
+                message=f"Update Subscription current, users in chamber is {user_stats.total_users} allowed is {user_stats.users_allowed}"
             )
 
 
@@ -820,6 +816,14 @@ class UsersService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────────
 
     async def users_add_to_chamber(self, user_id: str) -> dict:
+
+        user_stats:UserStatsOut = await self.get_user_stats()
+        if user_stats.users_allowed and user_stats.total_users>= user_stats.users_allowed:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message=f"Update Subscription current, users in chamber is {user_stats.total_users} allowed is {user_stats.users_allowed}"
+            )
+        
         user = await self.users_repo.get_by_id(
             session=self.session,
             id_values=user_id

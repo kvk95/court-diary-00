@@ -814,7 +814,7 @@ CREATE TABLE cases (
     respondent        TEXT         NOT NULL,
     case_summary      TEXT         NULL,
 
-    status_code       CHAR(4)      DEFAULT 'AC',
+    status_code       CHAR(4)      DEFAULT 'CSAC',
 
     next_hearing_date DATE         NULL,
     last_hearing_date DATE         NULL,

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import field_validator
 
+from app.database.models.refm_case_status import RefmCaseStatusConstants
 from app.dtos.aor_dto import AorOut
 from app.dtos.base.base_data import BaseInData, BaseRecordData
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ class CaseCreate(BaseInData):
     petitioner: str
     respondent: str
     case_summary: Optional[str] = None
-    status_code: str = "AC"
+    status_code: str = RefmCaseStatusConstants.ACTIVE
     next_hearing_date: Optional[date] = None
 
     @field_validator("case_number")

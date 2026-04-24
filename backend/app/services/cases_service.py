@@ -53,10 +53,8 @@ from app.dtos.cases_dto import (
     HearingOut,
     RecentActivityItem,
 )
-from app.dtos.chamber_subscriptions_dto import UsageStats
 from app.dtos.clients_dto import ClientDetailsOut
 from app.services.base.secured_base_service import BaseSecuredService
-from app.services.chamber_subscriptions_service import ChamberSubscriptionService
 from app.utils.activity_formatter import format_activity
 from app.validators import ErrorCodes, ValidationErrorDetail
 
@@ -70,7 +68,6 @@ class CasesService(BaseSecuredService):
         case_notes_repo: Optional[CaseNotesRepository] = None,
         case_clients_repo: Optional[CaseClientsRepository] = None,
         court_repo: Optional[CourtsRepository] = None,
-        chamber_subscriptions_service: Optional[ChamberSubscriptionService] = None,
     ):
         super().__init__(session)
         self.cases_repo = cases_repo or CasesRepository()
@@ -78,7 +75,6 @@ class CasesService(BaseSecuredService):
         self.case_notes_repo = case_notes_repo or CaseNotesRepository()
         self.case_clients_repo = case_clients_repo or CaseClientsRepository()
         self.court_repo = court_repo or CourtsRepository()        
-        self.chamber_subscriptions_service = chamber_subscriptions_service or ChamberSubscriptionService(session=self.session)
         
 
     # ─────────────────────────────────────────────────────────────────────
@@ -636,12 +632,12 @@ class CasesService(BaseSecuredService):
 
     async def cases_add(self, payload: CaseCreate) -> CaseDetailOut:
 
-        usage_stats:UsageStats = await self.chamber_subscriptions_service.get_usage()
+        usage_stats:CaseSummaryStats = await self.cases_get_stats()
 
-        if usage_stats.cases_allowed and usage_stats.cases_used>= usage_stats.cases_allowed:
+        if usage_stats.total_allowed and usage_stats.total>= usage_stats.total_allowed:
             raise ValidationErrorDetail(
                 code=ErrorCodes.VALIDATION_ERROR,
-                message=f"Update Subscription, current cases in chamber is {usage_stats.cases_used} allowed is {usage_stats.cases_allowed}"
+                message=f"Update Subscription, current cases in chamber is {usage_stats.total} allowed is {usage_stats.total_allowed}"
             )
                 
         existing = await self.cases_repo.get_first(
@@ -655,6 +651,7 @@ class CasesService(BaseSecuredService):
             )
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data["chamber_id"] = self.chamber_id
+        print(f"CASE CREATE ******************************* : {data}")
         case = await self.cases_repo.create(
             session=self.session,
             data=self.cases_repo.map_fields_to_db_column(data),
