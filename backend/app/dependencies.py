@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.csrf_token_util import validate_csrf
 from app.auth.deps import get_current_user
 from app.auth.permissions import PType, require_permission
+from app.auth.webhook_auth import get_current_user_webhook
 from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.base.session import get_session
 
@@ -173,3 +174,19 @@ async def get_support_ticket_service(
     __: None = Depends(validate_csrf),
 ) -> SupportTicketService:
     return SupportTicketService(session=session)
+
+# -------------------------------------
+# WHATSAPP
+# -------------------------------------
+
+def get_cases_service_webhook(
+    session: AsyncSession = Depends(get_session),
+    _ = Depends(get_current_user_webhook),
+) -> CasesService:
+    return CasesService(session=session)
+
+async def get_calendar_service_webhook(
+    session: AsyncSession = Depends(get_session),
+    _ = Depends(get_current_user_webhook),
+) -> CalendarService:
+    return CalendarService(session=session)
