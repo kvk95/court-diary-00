@@ -20,6 +20,7 @@ from app.database.repositories.user_roles_repository import UserRolesRepository
 from app.database.repositories.users_repository import UsersRepository
 from app.dtos.chamber_dto import ChamberAddAdditional, ChamberEdit, ChamberIdInput, ChamberOut, ChamberStatus
 from app.services.base.secured_base_service import BaseSecuredService
+from app.services.chamber_subscriptions_service import ChamberSubscriptionService
 from app.utils.constants import SUPERADMIN_ROLE_CODE
 from app.validators import aggregate_errors
 from app.validators.error_codes import ErrorCodes
@@ -41,6 +42,7 @@ class ChamberService(BaseSecuredService):
             user_role_repo: Optional[UserRolesRepository] = None,
             role_permission_master_repo: Optional[RolePermissionMasterRepository] = None,
             role_permission_repo: Optional[RolePermissionsRepository] = None,
+            chamber_subscriptions_service: Optional[ChamberSubscriptionService] = None,
         ) -> None:
         super().__init__(session=session)
         self.chamber_repo = chamber_repo or ChamberRepository()
@@ -52,6 +54,7 @@ class ChamberService(BaseSecuredService):
         self.user_role_repo: UserRolesRepository = user_role_repo or UserRolesRepository()
         self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
+        self.chamber_subscriptions_service = chamber_subscriptions_service or ChamberSubscriptionService(session=session)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -323,6 +326,10 @@ class ChamberService(BaseSecuredService):
                 "plan_code": RefmPlanTypesConstants.FREE,
                 "created_by": user_id,
             },
+        )
+
+        await self.chamber_subscriptions_service.create_free_subscription(
+            chamber_id=chamber.chamber_id,
         )
 
         # ── 5. CREATE CHAMBER LINK ────────────────────────────────────────────

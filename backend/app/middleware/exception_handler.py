@@ -207,7 +207,7 @@ async def starlette_http_exception_handler(request: Request, exc: Exception):
 
     if http_exc.status_code == 404:
         code = ErrorCodes.NOT_FOUND
-        description = ErrorCodes.NOT_FOUND.description
+        description = http_exc.detail
     elif http_exc.status_code == 401:
         code = ErrorCodes.PERMISSION_DENIED
         description = ErrorCodes.PERMISSION_DENIED.description

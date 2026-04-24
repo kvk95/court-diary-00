@@ -53,8 +53,10 @@ from app.dtos.cases_dto import (
     HearingOut,
     RecentActivityItem,
 )
+from app.dtos.chamber_subscriptions_dto import UsageStats
 from app.dtos.clients_dto import ClientDetailsOut
 from app.services.base.secured_base_service import BaseSecuredService
+from app.services.chamber_subscriptions_service import ChamberSubscriptionService
 from app.utils.activity_formatter import format_activity
 from app.validators import ErrorCodes, ValidationErrorDetail
 
@@ -67,14 +69,16 @@ class CasesService(BaseSecuredService):
         hearings_repo: Optional[HearingsRepository] = None,
         case_notes_repo: Optional[CaseNotesRepository] = None,
         case_clients_repo: Optional[CaseClientsRepository] = None,
-        court_repo: Optional[CourtsRepository] = None,        
+        court_repo: Optional[CourtsRepository] = None,
+        chamber_subscriptions_service: Optional[ChamberSubscriptionService] = None,
     ):
         super().__init__(session)
         self.cases_repo = cases_repo or CasesRepository()
         self.hearings_repo = hearings_repo or HearingsRepository()
         self.case_notes_repo = case_notes_repo or CaseNotesRepository()
         self.case_clients_repo = case_clients_repo or CaseClientsRepository()
-        self.court_repo = court_repo or CourtsRepository()
+        self.court_repo = court_repo or CourtsRepository()        
+        self.chamber_subscriptions_service = chamber_subscriptions_service or ChamberSubscriptionService(session=self.session)
         
 
     # ─────────────────────────────────────────────────────────────────────
@@ -432,16 +436,17 @@ class CasesService(BaseSecuredService):
         # aggregation using conditional COUNT (CASE WHEN ... END).  One
         # round-trip instead of four.
         today = date.today()
-        r = await self.cases_repo.get_case_summary(
+        stats = await self.cases_repo.get_case_summary(
                 session=self.session,
                 chamber_id=self.chamber_id,
                 today=today
             )
         return CaseSummaryStats(
-            total=r.total or 0,
-            active=r.active or 0,
-            adjourned=r.adjourned or 0,
-            overdue=r.overdue or 0,
+            total=stats.total or 0,
+            active=stats.active or 0,
+            adjourned=stats.adjourned or 0,
+            overdue=stats.overdue or 0,
+            total_allowed=stats.max_cases
         )
 
     # ─────────────────────────────────────────────────────────────────────
@@ -630,6 +635,15 @@ class CasesService(BaseSecuredService):
         return await self._enrich_case_detail(row)
 
     async def cases_add(self, payload: CaseCreate) -> CaseDetailOut:
+
+        usage_stats:UsageStats = await self.chamber_subscriptions_service.get_usage()
+
+        if usage_stats.cases_allowed and usage_stats.cases_used>= usage_stats.cases_allowed:
+            raise ValidationErrorDetail(
+                code=ErrorCodes.VALIDATION_ERROR,
+                message=f"Update Subscription, current cases in chamber is {usage_stats.cases_used} allowed is {usage_stats.cases_allowed}"
+            )
+                
         existing = await self.cases_repo.get_first(
             session=self.session,
             filters={Cases.chamber_id: self.chamber_id, Cases.case_number: payload.case_number},

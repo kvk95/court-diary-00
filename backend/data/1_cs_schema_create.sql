@@ -36,22 +36,61 @@ CREATE TABLE refm_countries (
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2.2  Subscription & Modules
 -- ─────────────────────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS refm_currency;
+CREATE TABLE refm_currency (
+    code        CHAR(3) PRIMARY KEY,
+    description VARCHAR(20) NOT NULL,
+    symbol      VARCHAR(5),
+    status_ind  BOOLEAN DEFAULT TRUE
+);
 
 DROP TABLE IF EXISTS refm_plan_types;
 CREATE TABLE refm_plan_types (
     code              CHAR(4)        PRIMARY KEY,
     description       VARCHAR(60)    NOT NULL,
     status_ind        BOOLEAN        NOT NULL DEFAULT TRUE,
-	email_ind         BOOLEAN        NOT NULL DEFAULT TRUE,
-	sms_ind           BOOLEAN        NOT NULL DEFAULT FALSE,
-	whatsapp_ind      BOOLEAN        NOT NULL DEFAULT FALSE,
+    email_ind         BOOLEAN        NOT NULL DEFAULT TRUE,
+    sms_ind           BOOLEAN        NOT NULL DEFAULT FALSE,
+    whatsapp_ind      BOOLEAN        NOT NULL DEFAULT FALSE,
     max_users         INT            NULL,
     max_cases         INT            NULL,
-    price_monthly_amt DECIMAL(12,2)  DEFAULT 0,
-    price_annual_amt  DECIMAL(12,2)  DEFAULT 0,
-    currency_code     CHAR(3)        DEFAULT 'INR',
-    sort_order        INT            NOT NULL
+    price_monthly_amt DECIMAL(12,2)  NOT NULL DEFAULT 0,
+    price_annual_amt  DECIMAL(12,2)  NOT NULL DEFAULT 0,
+    currency_code     CHAR(3)        NOT NULL DEFAULT 'INR',
+    sort_order        INT            NOT NULL,
+    
+    CONSTRAINT fk_refm_plan_currency
+        FOREIGN KEY (currency_code)
+        REFERENCES refm_currency(code)
+        ON DELETE RESTRICT
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Subscription plans';
+
+DROP TABLE IF EXISTS refm_billing_cycle;
+
+CREATE TABLE refm_billing_cycle (
+    code        CHAR(4) PRIMARY KEY,
+    description VARCHAR(20) NOT NULL,
+    sort_order  INT NOT NULL,
+    status_ind  BOOLEAN DEFAULT TRUE
+);
+
+DROP TABLE IF EXISTS refm_subscription_status;
+
+CREATE TABLE refm_subscription_status (
+    code        CHAR(4) PRIMARY KEY,
+    description VARCHAR(30) NOT NULL,
+    sort_order  INT NOT NULL,
+    status_ind  BOOLEAN DEFAULT TRUE
+);
+
+DROP TABLE IF EXISTS refm_invoice_status;
+
+CREATE TABLE refm_invoice_status (
+    code        CHAR(4) PRIMARY KEY,
+    description VARCHAR(30) NOT NULL,
+    sort_order  INT NOT NULL,
+    status_ind  BOOLEAN DEFAULT TRUE
+);
 
 DROP TABLE IF EXISTS refm_modules;
 CREATE TABLE refm_modules (
@@ -345,6 +384,101 @@ CREATE TABLE chamber (
     INDEX idx_chamber_email (email),
     INDEX idx_chamber_status (status_ind, deleted_ind)
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Law chamber / firm';
+
+DROP TABLE IF EXISTS chamber_subscriptions;
+
+CREATE TABLE chamber_subscriptions (
+    subscription_id     CHAR(36) PRIMARY KEY,
+
+    chamber_id          CHAR(36) NOT NULL,
+    plan_code           CHAR(4)  NOT NULL,
+
+    billing_cycle       CHAR(4) NOT NULL,
+
+    start_date          DATE NOT NULL,
+    end_date            DATE NULL,
+
+    next_renewal_date   DATE NULL,
+
+    status_code         CHAR(4) NOT NULL, -- ACTIVE / EXPIRED / CANCELLED
+
+    -- 💰 pricing snapshot (important)
+    price_amt           DECIMAL(12,2) NOT NULL,
+    currency_code       CHAR(3) DEFAULT 'INR',
+
+    -- 🧾 audit
+    created_date        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by          CHAR(36),
+    updated_date        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by          CHAR(36),
+
+    -- 🔗 FKs
+    CONSTRAINT fk_cs_chamber
+        FOREIGN KEY (chamber_id)
+        REFERENCES chamber(chamber_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_cs_plan
+        FOREIGN KEY (plan_code)
+        REFERENCES refm_plan_types(code)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_cs_cycle
+        FOREIGN KEY (billing_cycle)
+        REFERENCES refm_billing_cycle(code)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_cs_status
+        FOREIGN KEY (status_code)
+        REFERENCES refm_subscription_status(code)
+        ON DELETE RESTRICT,
+		
+    CONSTRAINT fk_cs_currency
+        FOREIGN KEY (currency_code)   REFERENCES refm_currency(code)      ON DELETE RESTRICT
+
+) ENGINE=InnoDB COMMENT='Chamber subscription state';
+
+DROP TABLE IF EXISTS billing_invoices;
+
+CREATE TABLE billing_invoices (
+    invoice_id         CHAR(36) PRIMARY KEY,
+
+    chamber_id         CHAR(36) NOT NULL,
+    subscription_id    CHAR(36) NOT NULL,
+
+    invoice_number     VARCHAR(50) NOT NULL,
+
+    period_start       DATE NOT NULL,
+    period_end         DATE NOT NULL,
+
+    amount             DECIMAL(12,2) NOT NULL,
+    currency_code      CHAR(3) DEFAULT 'INR',
+
+    status_code        CHAR(4) NOT NULL, -- PAID / PENDING / FAILED
+
+    paid_date          DATE NULL,
+
+    created_date       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_invoice_chamber
+        FOREIGN KEY (chamber_id)
+        REFERENCES chamber(chamber_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_invoice_sub
+        FOREIGN KEY (subscription_id)
+        REFERENCES chamber_subscriptions(subscription_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_invoice_status
+        FOREIGN KEY (status_code )
+        REFERENCES refm_invoice_status(code)
+        ON DELETE CASCADE,
+		
+    CONSTRAINT fk_invoice_currency
+        FOREIGN KEY (currency_code)   REFERENCES refm_currency(code)      ON DELETE RESTRICT
+
+) ENGINE=InnoDB COMMENT='Billing invoices';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4.2  Users (Chamber-agnostic)

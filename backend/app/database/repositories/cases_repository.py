@@ -9,10 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.case_aors import CaseAors
 from app.database.models.case_clients import CaseClients
 from app.database.models.cases import Cases
+from app.database.models.chamber_subscriptions import ChamberSubscriptions
 from app.database.models.courts import Courts
 from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.hearings import Hearings
+from app.database.models.refm_plan_types import RefmPlanTypes
+from app.database.models.refm_subscription_status import RefmSubscriptionStatusConstants
 from app.database.models.users import Users
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -56,8 +59,24 @@ class CasesRepository(BaseRepository[Cases]):
         today: date,
     ):
         """
-        Returns basic case summary counts for the dashboard.
+        Returns case summary + plan limits (single query, optimized).
         """
+
+        # 🔹 subquery for max_cases
+        max_cases_subq = (
+            select(RefmPlanTypes.max_cases)
+            .join(
+                ChamberSubscriptions,
+                ChamberSubscriptions.plan_code == RefmPlanTypes.code
+            )
+            .where(
+                ChamberSubscriptions.chamber_id == chamber_id,
+                ChamberSubscriptions.status_code == RefmSubscriptionStatusConstants.ACTIVE
+            )
+            .limit(1)
+            .scalar_subquery()
+        )
+
         stmt = select(
             func.count(Cases.case_id).label("total"),
 
@@ -67,7 +86,7 @@ class CasesRepository(BaseRepository[Cases]):
                         Cases.status_code == RefmCaseStatusConstants.ACTIVE,
                         Cases.deleted_ind.is_(False)
                     ), 1),
-                    else_=0
+                    else_=None
                 )
             ).label("active"),
 
@@ -77,7 +96,7 @@ class CasesRepository(BaseRepository[Cases]):
                         Cases.status_code == RefmCaseStatusConstants.ADJOURNED,
                         Cases.deleted_ind.is_(False)
                     ), 1),
-                    else_=0
+                    else_=None
                 )
             ).label("adjourned"),
 
@@ -88,17 +107,20 @@ class CasesRepository(BaseRepository[Cases]):
                         Cases.next_hearing_date < today,
                         Cases.deleted_ind.is_(False)
                     ), 1),
-                    else_=0
+                    else_=None
                 )
             ).label("overdue"),
+
+            # 🔥 add limit here
+            max_cases_subq.label("max_cases")
+
         ).where(
             Cases.chamber_id == chamber_id,
-            Cases.deleted_ind.is_(False)          # Global safety filter
+            Cases.deleted_ind.is_(False)
         )
 
         result = await self.execute(session=session, stmt=stmt)
-        r = result.one()
-        return r
+        return result.one()
 
     async def get_cases_by_status(
         self, session: AsyncSession

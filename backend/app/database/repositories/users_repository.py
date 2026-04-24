@@ -1,13 +1,16 @@
 # app/database/repositories/users_repository.py
 
 from typing import List, Optional, Tuple, Dict, Any
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
+from app.database.models.chamber_subscriptions import ChamberSubscriptions
 from app.database.models.login_audit import LoginAudit
 from app.database.models.profile_images import ProfileImages
 from app.database.models.refm_login_status import RefmLoginStatusConstants
+from app.database.models.refm_plan_types import RefmPlanTypes
+from app.database.models.refm_subscription_status import RefmSubscriptionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
@@ -422,62 +425,71 @@ class UsersRepository(BaseRepository[Users]):
         self,
         session: AsyncSession,
         chamber_id: str,
-    ) -> Dict[str, int]:
-        """
-        Get user management statistics for a chamber.
-        Returns dict with total_users, active_users, total_roles.
-        """
-        # 1. Total users linked to this chamber (including historical)
-        total_users_stmt = select(
-            func.count(func.distinct(UserChamberLink.user_id))
-        ).where(
-            UserChamberLink.chamber_id == chamber_id
-        )
+    ):
 
-        total_users = await self.execute_scalar(
-            session=session, stmt=total_users_stmt, default=0
-        )
-
-        # 2. Active users (currently linked and active)
-        active_users_stmt = select(
-            func.count(func.distinct(UserChamberLink.user_id))
-        ).where(
-            and_(
-                UserChamberLink.chamber_id == chamber_id,
-                UserChamberLink.left_date.is_(None),
-                UserChamberLink.status_ind.is_(True),
-                # Optional: exclude deleted users
-                # Users.status_ind.is_(True),   # if you join with Users
-            )
-        )
-
-        active_users = await self.execute_scalar(
-            session=session, stmt=active_users_stmt, default=0
-        )
-
-        # 3. Total unique roles currently assigned in this chamber
-        total_roles_stmt = (
-            select(func.count(func.distinct(UserRoles.role_id)))
+        # 🔹 subquery for max_users
+        max_users_subq = (
+            select(RefmPlanTypes.max_users)
             .join(
-                UserChamberLink,
-                UserChamberLink.link_id == UserRoles.link_id
+                ChamberSubscriptions,
+                ChamberSubscriptions.plan_code == RefmPlanTypes.code
             )
             .where(
-                and_(
-                    UserChamberLink.chamber_id == chamber_id,
-                    UserChamberLink.left_date.is_(None),
-                    UserChamberLink.status_ind.is_(True),
-                    UserRoles.end_date.is_(None),
-                )
+                ChamberSubscriptions.chamber_id == chamber_id,
+                ChamberSubscriptions.status_code == RefmSubscriptionStatusConstants.ACTIVE
             )
+            .limit(1)
+            .scalar_subquery()
         )
 
-        total_roles = await self.execute_scalar(
-            session=session, stmt=total_roles_stmt, default=0
-        )
+        stmt = select(
+            # 🔹 total users (all time)
+            func.count(func.distinct(UserChamberLink.user_id)).label("total_users"),
 
-        return {
-            "total_users": total_users,
-            "active_users": active_users,
-            "total_roles": total_roles,        # or "roles_count" to match other methods
-        }
+            # 🔹 active users
+            func.count(
+                func.distinct(
+                    case(
+                        (
+                            and_(
+                                UserChamberLink.left_date.is_(None),
+                                UserChamberLink.status_ind.is_(True),
+                            ),
+                            UserChamberLink.user_id
+                        ),
+                        else_=None
+                    )
+                )
+            ).label("active_users"),
+
+            # 🔹 roles count
+            func.count(
+                func.distinct(
+                    case(
+                        (
+                            and_(
+                                UserChamberLink.left_date.is_(None),
+                                UserChamberLink.status_ind.is_(True),
+                                UserRoles.end_date.is_(None),
+                            ),
+                            UserRoles.role_id
+                        ),
+                        else_=None
+                    )
+                )
+            ).label("total_roles"),
+
+            # 🔥 plan limit
+            max_users_subq.label("max_users"),
+
+        ).select_from(UserChamberLink) \
+        .outerjoin(UserRoles, UserRoles.link_id == UserChamberLink.link_id) \
+        .where(UserChamberLink.chamber_id == chamber_id)
+
+        result = await self.execute(session=session, stmt=stmt)
+        return result.one()
+    
+    async def get_by_phone(self, session, phone: str):
+        stmt = select(Users).where(Users.phone == phone)
+        result = await session.execute(stmt)
+        return result.scalars().first()

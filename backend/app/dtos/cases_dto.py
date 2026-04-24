@@ -49,6 +49,7 @@ class CaseSummaryStats(BaseRecordData):
     active: int = 0
     adjourned: int = 0
     overdue: int = 0
+    total_allowed: Optional[int] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

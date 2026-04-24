@@ -1,7 +1,8 @@
 """refm_plan_types"""
 
-from sqlalchemy import Boolean, CHAR, Integer, Numeric, String
+from sqlalchemy import ForeignKey, Boolean, CHAR, Integer, Numeric, String
 from enum import Enum as PyEnum
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func, text
 from typing import Any, Optional
@@ -36,13 +37,13 @@ class RefmPlanTypes(BaseModel):
     max_cases: Mapped[Optional[int]] = mapped_column(Integer)
 
     # price_monthly_amt : DECIMAL(12, 2)
-    price_monthly_amt: Mapped[Optional[float]] = mapped_column(Numeric, default='0.00')
+    price_monthly_amt: Mapped[float] = mapped_column(Numeric, default='0.00', nullable=False)
 
     # price_annual_amt : DECIMAL(12, 2)
-    price_annual_amt: Mapped[Optional[float]] = mapped_column(Numeric, default='0.00')
+    price_annual_amt: Mapped[float] = mapped_column(Numeric, default='0.00', nullable=False)
 
     # currency_code : CHAR(3) COLLATE "utf8mb4_unicode_ci"
-    currency_code: Mapped[Optional[str]] = mapped_column(CHAR(3), default='INR')
+    currency_code: Mapped[str] = mapped_column(CHAR(3), ForeignKey("refm_currency.code", ondelete="RESTRICT"), default='INR', nullable=False)
 
     # sort_order : INTEGER
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -50,7 +51,12 @@ class RefmPlanTypes(BaseModel):
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
-    #    -- No relationships defined. --
+    # refm_plan_types.currency_code -> refm_currency.code
+    refm_plan_types_currency_code_refm_currency = relationship(
+        "RefmCurrency",
+        foreign_keys=[currency_code], 
+        backref=backref("refm_plan_types_currency_code_refm_currencys", cascade="all, delete-orphan")
+    )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
 

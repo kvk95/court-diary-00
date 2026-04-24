@@ -25,6 +25,32 @@ BEGIN
 END$$
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Chamber Subscriptions
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TRIGGER trg_chamber_subscriptions_before_insert
+BEFORE INSERT ON chamber_subscriptions
+FOR EACH ROW
+BEGIN
+    IF NEW.subscription_id IS NULL OR NEW.subscription_id = '' THEN
+        SET NEW.subscription_id = generate_uuid_v7();
+    END IF;
+END$$
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Billing Invoices
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TRIGGER trg_billing_invoices_before_insert
+BEFORE INSERT ON billing_invoices
+FOR EACH ROW
+BEGIN
+    IF NEW.invoice_id IS NULL OR NEW.invoice_id = '' THEN
+        SET NEW.invoice_id = generate_uuid_v7();
+    END IF;
+END$$
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Users
 -- ─────────────────────────────────────────────────────────────────────────────
 

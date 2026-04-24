@@ -12,6 +12,7 @@ from app.database.models.base.session import get_session
 from app.services.anonymous_service import AnonymousService
 from app.services.auth_service import AuthService
 from app.services.chamber_service import ChamberService
+from app.services.chamber_subscriptions_service import ChamberSubscriptionService
 from app.services.contact_messages_service import ContactMessagesService
 from app.services.image_service import ImageService
 from app.services.calendar_service import CalendarService
@@ -71,6 +72,7 @@ def get_cases_service(
 ) -> CasesService:
     return CasesService(session=session)
 
+
 def get_aor_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.CASES, PType.READ)),     
@@ -90,6 +92,12 @@ async def get_clients_service(
 #     _=Depends(require_permission(RefmModulesEnum.BILLING, PType.READ)),
 # ) -> BillingService:
 #     return BillingService(session=session)
+
+async def get_chamber_subscription_service(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(require_permission(RefmModulesEnum.BILLING, PType.READ)),
+) -> ChamberSubscriptionService:
+    return ChamberSubscriptionService(session=session)
 
 async def get_calendar_service(
     session: AsyncSession = Depends(get_session),

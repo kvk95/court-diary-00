@@ -18,11 +18,28 @@ USE courtdiary;
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.2  Plans & Modules
 -- ─────────────────────────────────────────────────────────────────────────────
+INSERT INTO refm_currency (code, description, symbol) VALUES
+('INR', 'Indian Rupee', '₹'),
+('USD', 'US Dollar', '$');
 
 INSERT IGNORE INTO refm_plan_types (code, description, email_ind, sms_ind, whatsapp_ind, max_users, max_cases, price_monthly_amt, price_annual_amt, sort_order) VALUES
-('PTFR', 'Free',       TRUE, FALSE, FALSE,    3,   75,    0.00,     0.00, 10),
+('PTFR', 'Free',       TRUE, FALSE, FALSE,    3,   50,    0.00,     0.00, 10),
 ('PTPR', 'Pro',        TRUE, TRUE,  TRUE,    10,  300,  999.00,  9999.00, 20),
 ('PTEN', 'Enterprise', TRUE, TRUE,  TRUE,  NULL, NULL, 2999.00, 29999.00, 30);
+
+INSERT INTO refm_billing_cycle (code, description, sort_order) VALUES
+('MNTH', 'Monthly', 10),
+('ANUL', 'Annual', 20);
+
+INSERT INTO refm_subscription_status (code, description, sort_order) VALUES
+('ACTV', 'Active', 10),
+('EXPD', 'Expired', 20),
+('CNCL', 'Cancelled', 30);
+
+INSERT INTO refm_invoice_status (code, description, sort_order) VALUES
+('PEND', 'Pending', 10),
+('PAID', 'Paid', 20),
+('FAIL', 'Failed', 30);
 
 INSERT IGNORE INTO refm_modules (code, name, description, sort_order) VALUES
 ('ADMN', 'Admin',           'System administration & control',     10),
@@ -266,6 +283,62 @@ INSERT INTO chamber (chamber_name, email, city, state_code, plan_code, created_b
 VALUES ('SYSTEM', 'system@internal', 'NA', 'TN', 'PTEN', @user_suad_vijay);
 
 SET @chamber_system = (SELECT chamber_id FROM chamber WHERE chamber_name = 'SYSTEM');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 17.3 Chambers subscription
+-- ─────────────────────────────────────────────────────────────────────────────
+
+SET @sub_ca = generate_uuid_v7();
+INSERT INTO chamber_subscriptions (
+    subscription_id,
+    chamber_id,
+    plan_code,
+    billing_cycle,
+    start_date,
+    next_renewal_date,
+    status_code,
+    price_amt,
+    currency_code,
+    created_by
+)
+SELECT
+    @sub_ca,
+    c.chamber_id,
+    'PTFR',                     -- FREE
+    'MNTH',
+    CURDATE(),
+    NULL,
+    'ACTV',
+    0.00,
+    'INR',
+    c.created_by
+FROM chamber c
+WHERE c.chamber_name != 'SYSTEM';
+
+SET @sub_system  = generate_uuid_v7();
+INSERT INTO chamber_subscriptions (
+    subscription_id,
+    chamber_id,
+    plan_code,
+    billing_cycle,
+    start_date,
+    next_renewal_date,
+    status_code,
+    price_amt,
+    currency_code,
+    created_by
+) VALUES (
+    @sub_system,
+    @chamber_system,
+    'PTEN',
+    'ANUL',
+    CURDATE(),
+    NULL,               -- ❗ no end
+    'ACTV',
+    0.00,               -- internal
+    'INR',
+    @user_suad_vijay
+);
 
 -- =============================================================================
 -- 18. SEED DATA — TIER 3 (Bridge Tables)
