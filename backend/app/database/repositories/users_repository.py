@@ -5,12 +5,10 @@ from sqlalchemy import and_, func, or_, select, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
-from app.database.models.chamber_subscriptions import ChamberSubscriptions
 from app.database.models.login_audit import LoginAudit
 from app.database.models.profile_images import ProfileImages
 from app.database.models.refm_login_status import RefmLoginStatusConstants
 from app.database.models.refm_plan_types import RefmPlanTypes
-from app.database.models.refm_subscription_status import RefmSubscriptionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.user_profiles import UserProfiles
 from app.database.models.user_roles import UserRoles
@@ -427,17 +425,11 @@ class UsersRepository(BaseRepository[Users]):
         chamber_id: str,
     ):
 
-        # 🔹 subquery for max_users
+        # 🔹 subquery using chamber snapshot (NO subscription table)
         max_users_subq = (
             select(RefmPlanTypes.max_users)
-            .join(
-                ChamberSubscriptions,
-                ChamberSubscriptions.plan_code == RefmPlanTypes.code
-            )
-            .where(
-                ChamberSubscriptions.chamber_id == chamber_id,
-                ChamberSubscriptions.status_code == RefmSubscriptionStatusConstants.ACTIVE
-            )
+            .join(Chamber, Chamber.plan_code == RefmPlanTypes.code)
+            .where(Chamber.chamber_id == chamber_id)
             .limit(1)
             .scalar_subquery()
         )
@@ -479,7 +471,7 @@ class UsersRepository(BaseRepository[Users]):
                 )
             ).label("total_roles"),
 
-            # 🔥 plan limit
+            # 🔥 plan limit (from chamber snapshot)
             max_users_subq.label("max_users"),
 
         ).select_from(UserChamberLink) \

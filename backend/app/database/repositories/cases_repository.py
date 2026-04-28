@@ -9,13 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.case_aors import CaseAors
 from app.database.models.case_clients import CaseClients
 from app.database.models.cases import Cases
-from app.database.models.chamber_subscriptions import ChamberSubscriptions
+from app.database.models.chamber import Chamber
 from app.database.models.courts import Courts
 from app.database.models.refm_case_status import RefmCaseStatus, RefmCaseStatusConstants
 from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.hearings import Hearings
 from app.database.models.refm_plan_types import RefmPlanTypes
-from app.database.models.refm_subscription_status import RefmSubscriptionStatusConstants
 from app.database.models.users import Users
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
@@ -59,20 +58,14 @@ class CasesRepository(BaseRepository[Cases]):
         today: date,
     ):
         """
-        Returns case summary + plan limits (single query, optimized).
+        Returns case summary + plan limits (no subscription join).
         """
 
-        # 🔹 subquery for max_cases
+        # 🔹 subquery using chamber snapshot
         max_cases_subq = (
             select(RefmPlanTypes.max_cases)
-            .join(
-                ChamberSubscriptions,
-                ChamberSubscriptions.plan_code == RefmPlanTypes.code
-            )
-            .where(
-                ChamberSubscriptions.chamber_id == chamber_id,
-                ChamberSubscriptions.status_code == RefmSubscriptionStatusConstants.ACTIVE
-            )
+            .join(Chamber, Chamber.plan_code == RefmPlanTypes.code)
+            .where(Chamber.chamber_id == chamber_id)
             .limit(1)
             .scalar_subquery()
         )
@@ -111,7 +104,7 @@ class CasesRepository(BaseRepository[Cases]):
                 )
             ).label("overdue"),
 
-            # 🔥 add limit here
+            # 🔥 plan limit (from chamber snapshot)
             max_cases_subq.label("max_cases")
 
         ).where(

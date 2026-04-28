@@ -2,7 +2,6 @@ from typing import Any, List, Optional, Tuple, Dict
 
 from sqlalchemy import select, func
 
-from app.database.models.refm_invoice_status import RefmInvoiceStatus
 from app.database.repositories.base.repo_context import apply_repo_context
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.models.billing_invoices import BillingInvoices
@@ -29,10 +28,8 @@ class BillingInvoicesRepository(BaseRepository[BillingInvoices]):
                 BillingInvoices.period_end,
                 BillingInvoices.amount,
                 BillingInvoices.status_code,
-                RefmInvoiceStatus.description.label("status_label"),
                 BillingInvoices.created_date.label("invoice_date"),
             )
-            .join(RefmInvoiceStatus, RefmInvoiceStatus.code == BillingInvoices.status_code)
             .where(BillingInvoices.chamber_id == chamber_id)
             .order_by(BillingInvoices.created_date.desc())
         )
@@ -62,7 +59,6 @@ class BillingInvoicesRepository(BaseRepository[BillingInvoices]):
                 "period_end": r.period_end,
                 "amount": r.amount,
                 "status_code": r.status_code,
-                "status_label": r.status_label,
                 "invoice_date": r.invoice_date,
             })
 

@@ -7,11 +7,12 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.billing_invoices import BillingInvoices
 from app.database.models.chamber_subscriptions import ChamberSubscriptions
-from app.database.models.refm_billing_cycle import RefmBillingCycleConstants
+from app.database.models.refm_billing_cycle import RefmBillingCycle, RefmBillingCycleConstants
 from app.database.models.refm_currency import RefmCurrencyConstants
-from app.database.models.refm_invoice_status import RefmInvoiceStatusConstants
-from app.database.models.refm_subscription_status import RefmSubscriptionStatusConstants
+from app.database.models.refm_invoice_status import RefmInvoiceStatus, RefmInvoiceStatusConstants
+from app.database.models.refm_subscription_status import RefmSubscriptionStatus, RefmSubscriptionStatusConstants
 from app.database.repositories.billing_invoices_repository import BillingInvoicesRepository
 from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.chamber_subscriptions_repository import ChamberSubscriptionsRepository
@@ -36,18 +37,45 @@ class ChamberSubscriptionService(BaseSecuredService):
         super().__init__(session)
         self.chamber_repo = chamber_repo or ChamberRepository()
         self.chamber_subscription_repo = chamber_subscription_repo or ChamberSubscriptionsRepository()
-        self.billing_invoice_repo = billing_invoice_repo or BillingInvoicesRepository()        
+        self.billing_invoice_repo = billing_invoice_repo or BillingInvoicesRepository()
+        self.maps = None
 
-    def _to_out(self, sub, plan_name, max_users, max_cases):
+    async def _load_maps(self):
+        if self.maps:
+            return self.maps
+        
+        self.maps =  (await self.refm_resolver.get_refm_map(
+                column_attr=ChamberSubscriptions.plan_code,
+            ),
+            await self.refm_resolver.get_desc_map(
+                column_attr=ChamberSubscriptions.status_code,
+                value_column=RefmSubscriptionStatus.description,
+            ),
+            await self.refm_resolver.get_desc_map(
+                column_attr=ChamberSubscriptions.billing_cycle,
+                value_column=RefmBillingCycle.description,
+            ),
+            await self.refm_resolver.get_desc_map(
+                column_attr=BillingInvoices.status_code,
+                value_column=RefmInvoiceStatus.description,
+            )
+        )
+        return self.maps
+
+    async def _to_out(self, sub:ChamberSubscriptions):
+        plan_map,status_map, cycle_maps,_ = await self._load_maps()
+        plan = plan_map.get(sub.plan_code) or {}
         return ChamberSubscriptionOut(
             plan_code=sub.plan_code,
-            plan_name=plan_name,
+            plan_name=plan.get("description"),
             billing_cycle=sub.billing_cycle,
+            billing_cycle_desc=cycle_maps.get(sub.billing_cycle),
             status_code=sub.status_code,
+            status_description=status_map.get(sub.status_code,""),
             next_renewal_date=sub.next_renewal_date,
             next_amount=sub.price_amt,
-            max_users=max_users,
-            max_cases=max_cases,
+            max_users=plan.get("max_users"),
+            max_cases=plan.get("max_cases"),
         )
 
     def _generate_invoice_number(self) -> str:
@@ -142,7 +170,7 @@ class ChamberSubscriptionService(BaseSecuredService):
 
     async def get_current_subscription(self) -> ChamberSubscriptionOut:
 
-        row = await self.chamber_subscription_repo.get_active_subscription(
+        row:Optional[ChamberSubscriptions] = await self.chamber_subscription_repo.get_active_subscription(
             session=self.session,
             chamber_id=self.chamber_id
         )        
@@ -153,9 +181,7 @@ class ChamberSubscriptionService(BaseSecuredService):
                 message="No Subscription"
             )
 
-        sub, plan_name, max_users, max_cases = row
-
-        return self._to_out(sub, plan_name, max_users, max_cases)
+        return await self._to_out(row)
 
     # -------------------------------------------------------
     # GET ALL PLANS
@@ -219,7 +245,8 @@ class ChamberSubscriptionService(BaseSecuredService):
         for r in rows:
             # 🧠 period label (UI friendly)
             period_label = r["period_start"].strftime("%b %Y")
-            print(f"*************************** Invoide date :: {r["invoice_date"]}")
+
+            _,_,_,inv_status_map = await self._load_maps()
 
             records.append(
                 BillingInvoiceItem(
@@ -228,7 +255,7 @@ class ChamberSubscriptionService(BaseSecuredService):
                     period_label=period_label,
                     amount=r["amount"],
                     status_code=r["status_code"],
-                    status_label=r["status_label"],
+                    status_description=inv_status_map.get(r["status_code"],""),
                     invoice_date=r["invoice_date"],
                 )
             )

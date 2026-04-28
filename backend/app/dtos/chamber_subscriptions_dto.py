@@ -39,7 +39,10 @@ class ChamberSubscriptionOut(BaseRecordData):
     plan_name: Optional[str]
 
     billing_cycle: Optional[str]
+    billing_cycle_desc: Optional[str]
+
     status_code: Optional[str]
+    status_description: Optional[str]
 
     next_renewal_date: Optional[date]
     next_amount: Optional[float]
@@ -69,6 +72,6 @@ class BillingInvoiceItem(BaseRecordData):
     amount: float
 
     status_code: str
-    status_label: str
+    status_description: str
 
     invoice_date: datetime

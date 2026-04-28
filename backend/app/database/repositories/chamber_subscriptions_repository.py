@@ -1,5 +1,7 @@
 
 
+from typing import Optional
+
 from sqlalchemy import func, select
 
 from app.database.models.cases import Cases
@@ -58,13 +60,10 @@ class ChamberSubscriptionsRepository(BaseRepository[ChamberSubscriptions]):
         result = await self.execute(session=session,stmt=stmt)
         return result.first()
 
-    async def get_active_subscription(self, session, chamber_id: str):
+    async def get_active_subscription(self, session, chamber_id: str) -> Optional[ChamberSubscriptions]:
         stmt = (
             select(
-                ChamberSubscriptions,
-                RefmPlanTypes.description.label("plan_name"),
-                RefmPlanTypes.max_users,
-                RefmPlanTypes.max_cases,
+                ChamberSubscriptions
             )
             .join(RefmPlanTypes, RefmPlanTypes.code == ChamberSubscriptions.plan_code)
             .where(
@@ -74,7 +73,7 @@ class ChamberSubscriptionsRepository(BaseRepository[ChamberSubscriptions]):
         )
 
         result = await self.execute(session=session,stmt=stmt)
-        return result.first()
+        return result.scalars().first()
 
     async def list_plans(self, session):
         stmt = select(RefmPlanTypes).where(
