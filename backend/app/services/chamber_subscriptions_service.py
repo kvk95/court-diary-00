@@ -13,6 +13,7 @@ from app.database.models.refm_currency import RefmCurrencyConstants
 from app.database.models.refm_invoice_status import RefmInvoiceStatusConstants
 from app.database.models.refm_subscription_status import RefmSubscriptionStatusConstants
 from app.database.repositories.billing_invoices_repository import BillingInvoicesRepository
+from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.chamber_subscriptions_repository import ChamberSubscriptionsRepository
 from app.dtos.base.paginated_out import PagingBuilder
 from app.dtos.chamber_subscriptions_dto import BillingInvoiceItem, ChamberSubscriptionOut, ChangePlanIn, SubscriptionPlanItem, SubscriptionStats, UsageStats
@@ -28,10 +29,12 @@ class ChamberSubscriptionService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        chamber_repo: Optional[ChamberRepository] = None,
         chamber_subscription_repo: Optional[ChamberSubscriptionsRepository] = None,
         billing_invoice_repo: Optional[BillingInvoicesRepository] = None,
     ):
         super().__init__(session)
+        self.chamber_repo = chamber_repo or ChamberRepository()
         self.chamber_subscription_repo = chamber_subscription_repo or ChamberSubscriptionsRepository()
         self.billing_invoice_repo = billing_invoice_repo or BillingInvoicesRepository()        
 
@@ -95,6 +98,17 @@ class ChamberSubscriptionService(BaseSecuredService):
                 "amount": price,
                 "currency_code": subscription.currency_code,
                 "status_code": RefmInvoiceStatusConstants.PENDING,
+            }
+        )
+
+    async def _update_chamber_subscription_snapshot(self, sub):
+        await self.chamber_repo.update(
+            session=self.session,
+            id_values=self.chamber_id,
+            data={
+                "plan_code": sub.plan_code,
+                "subscription_start": sub.start_date,
+                "subscription_end": sub.next_renewal_date,
             }
         )
 
@@ -334,6 +348,9 @@ class ChamberSubscriptionService(BaseSecuredService):
             }
         )
 
+        # 🔥 UPDATE CHAMBER SNAPSHOT
+        await self._update_chamber_subscription_snapshot(new_sub)
+
         if payload.plan_code != RefmPlanTypesConstants.FREE:
             await self._create_invoice_for_subscription(
                 subscription=new_sub,
@@ -394,5 +411,8 @@ class ChamberSubscriptionService(BaseSecuredService):
                 "currency_code": RefmCurrencyConstants.INDIAN_RUPEE,
             }
         )
+
+        # 🔥 UPDATE CHAMBER SNAPSHOT
+        await self._update_chamber_subscription_snapshot(new_sub)
 
         return await self.get_current_subscription()
