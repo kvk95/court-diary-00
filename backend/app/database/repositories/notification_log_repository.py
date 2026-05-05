@@ -89,7 +89,7 @@ class NotificationRepository(BaseRepository):
         stmt = (
             self.__hearings_select_stmt()
             .where(
-                # Hearings.hearing_date.between(start, end),
+                Hearings.hearing_date.between(start, end),
             )
         )
         result = await self.execute(session=session, stmt=stmt)
@@ -99,7 +99,7 @@ class NotificationRepository(BaseRepository):
         stmt = (
             self.__hearings_select_stmt()
             .where(
-                # Hearings.hearing_date == target_time.date(),
+                Hearings.hearing_date == target_time.date(),
             )
         )
         result = await self.execute(session=session, stmt=stmt)
