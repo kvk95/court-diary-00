@@ -3,8 +3,9 @@
 from sqlalchemy import ForeignKey, Boolean, CHAR, Date, DateTime, Integer, String, Text
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func, text
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
 from app.database.models.base.timestampmixin import TimestampMixin
@@ -40,7 +41,7 @@ class Cases(BaseModel, TimestampMixin):
     case_summary: Mapped[Optional[str]] = mapped_column(Text)
 
     # status_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_case_status.code", ondelete="RESTRICT"), default='CSAC')
+    status_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_case_status.code", ondelete="RESTRICT"), default='AC')
 
     # next_hearing_date : DATE
     next_hearing_date: Mapped[Optional[date]] = mapped_column(Date)

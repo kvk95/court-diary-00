@@ -15,9 +15,10 @@ from app.startup.load_settings import load_global_settings
 from app.database.models.base.session import async_engine
 from app.middleware.request_context_middleware import RequestContextMiddleware
 from app.middleware.exception_handler import add_exception_handlers
-from app.startup.scheduler import send_tomorrow_hearings_job, start_scheduler
+from app.startup.scheduler import start_scheduler
 from app.utils.logging_framework.queue_manager import get_queue_manager
 from app.utils.logging_framework.sqlalchemy_listeners import attach_listeners
+from app.whatsapp.wrefm_cache import wrefm_cache_instance
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -38,13 +39,14 @@ async def lifespan(app: FastAPI):
 
     # 3) startup 
     
-    start_scheduler(send_tomorrow_hearings_job)
+    start_scheduler()
 
     # Run blocking I/O in a thread during startup
     # ✅ Just await the async startup job
     # 🔑 Create DB session manually (no user, no Depends)
     async with async_sessionmaker(bind=async_engine)() as session:
         await load_global_settings(session)
+        await wrefm_cache_instance.load(session)
 
     # FastAPI lifecycle enters running state
     # App is now ready to serve requests

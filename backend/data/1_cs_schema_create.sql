@@ -1347,6 +1347,35 @@ CREATE TABLE notification_settings (
 ) ENGINE=InnoDB ROW_FORMAT=DYNAMIC
 COMMENT='Notification settings per user';
 
+DROP TABLE IF EXISTS notification_log;
+
+CREATE TABLE notification_log (
+    notification_log_id CHAR(36) PRIMARY KEY,
+
+    user_id        CHAR(36) NOT NULL,
+    hearing_id     CHAR(36) NULL,   -- ✅ allow NULL for summary
+
+    channel_code   CHAR(10) NOT NULL,
+    type_code      CHAR(10) NOT NULL,
+
+    ref_date       DATE NULL,       -- ✅ REQUIRED for summary dedup
+
+    scheduled_at   TIMESTAMP NOT NULL,
+    sent_at        TIMESTAMP NULL,
+
+    status_code    CHAR(10) DEFAULT 'PENDING',
+
+    created_date   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uk_notification_dedup (
+        user_id,
+        hearing_id,
+        channel_code,
+        type_code,
+        ref_date
+    )
+);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 9.3  Delete Account Requests  →  chamber, users, refm_user_deletion_status
 -- ─────────────────────────────────────────────────────────────────────────────

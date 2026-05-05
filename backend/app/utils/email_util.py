@@ -55,7 +55,7 @@ class EmailUtil (BaseService):
         subject, body = await self.get_email_content(template_code, dynamic_values)
         self.send_email(to_emails=to_emails, subject=subject, body=body)
 
-    def send_email(self, to_emails, subject, body, attachments=None):
+    def send_email(self, to_emails, subject, body, attachments=None, attach_body = True):
         try:            
 
             # If partially configured → fail
@@ -86,9 +86,12 @@ class EmailUtil (BaseService):
             with open(template_path, "r", encoding="utf-8") as tfile:
                 template_content = tfile.read()
 
-            msg_body = template_content.replace("{body}", body).replace(
-                "{tomail}", ", ".join(to_emails)
-            )  # Replace placeholder
+            if attach_body:
+                msg_body = template_content.replace("{body}", body).replace(
+                    "{tomail}", ", ".join(to_emails)
+                )  # Replace placeholder
+            else:
+                msg_body = body
 
             part1 = MIMEText(msg_body, "html", "utf-8")
             message.attach(part1)

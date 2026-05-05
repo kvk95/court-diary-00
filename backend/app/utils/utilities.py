@@ -63,3 +63,11 @@ def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
         # Assume naive input is in UTC
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+def parse_date(value: str):
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Invalid date format: {value}")
