@@ -1,48 +1,43 @@
 # app/whatsapp/webhook.py
 
-from fastapi import HTTPException,  Depends, Request
+from fastapi import HTTPException, Depends, Request
 from fastapi.responses import PlainTextResponse
 
 from app.api.v1.routes.base.base_controller import BaseController
-from app.services.calendar_service import CalendarService
-from app.services.cases_service import CasesService
-from app.whatsapp.handler import handle_message
-from app.dependencies import get_calendar_service_webhook, get_cases_service_webhook
+from app.dependencies import (
+    get_whatsapp_service_webhook,
+)
+from app.whatsapp.handler import WhatsAppService
+
 
 class WhatsAppController(BaseController):
     CONTROLLER_NAME = "webhook"
 
-    @BaseController.get(
-        "/hi",
-        summary="Get case detail",
-    )
-    async def cases_get_by_id(
-        self,
-    ):
+    @BaseController.get("/hi", summary="Health check")
+    async def hi(self):
         return self.success(result="hi")
 
-    @BaseController.post(
-            "/whatsapp",
-            summary="Add a new case",
-            # response_model=PlainTextResponse[Response],
-        )
+    @BaseController.post("/whatsapp", summary="WhatsApp webhook (Twilio)")
     async def whatsapp_webhook(
         self,
         request: Request,
-        cases_service:CasesService = Depends(get_cases_service_webhook),
-        calendar_service:CalendarService = Depends(get_calendar_service_webhook),
+        whatsapp_service: WhatsAppService = Depends(get_whatsapp_service_webhook),
     ):
         data = await request.form()
 
         phone = data.get("From")
         message = data.get("Body")
-        
-        # Validate & narrow types
+
         if not isinstance(phone, str) or not phone:
             raise HTTPException(400, "Missing or invalid 'From'")
         if not isinstance(message, str):
-            message = str(message) if message else ""
+            message = message.strip() if isinstance(message, str) else ""
 
-        reply = await handle_message(phone, message, cases_service, calendar_service)
+        phone = phone.replace("whatsapp:", "").strip()
+
+        reply = await whatsapp_service.handle_message(
+            phone=phone,
+            message=message,
+        )
 
         return PlainTextResponse(reply)
