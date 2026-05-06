@@ -59,7 +59,7 @@ class SecurityRolesRepository(BaseRepository[SecurityRoles]):
     async def get_by_role_id(self, session, role_id:int):
         stmt = self.roles_select_stmt()
         stmt = stmt.where(SecurityRoles.role_id == role_id)
-        row = (await self.execute(session=session, stmt=stmt)).scalars().first()
+        row = (await self.execute(session=session, stmt=stmt)).first()
 
         if not row:
             return None
@@ -102,3 +102,10 @@ class SecurityRolesRepository(BaseRepository[SecurityRoles]):
             })
 
         return result, total
+    
+    async def count(self, session):
+        stmt = select(func.count(SecurityRoles.role_id)).where(
+            SecurityRoles.deleted_ind.is_(False)
+        )
+
+        return await self.execute_scalar(session=session,stmt=stmt)

@@ -736,7 +736,7 @@ DROP TABLE IF EXISTS role_permission_master;
 CREATE TABLE role_permission_master (
     id INT AUTO_INCREMENT PRIMARY KEY,
 
-    security_role_id INT NOT NULL,   -- ✅ FIXED
+    security_role_id INT NOT NULL,
 
     module_code CHAR(8) NOT NULL,
 
@@ -748,6 +748,11 @@ CREATE TABLE role_permission_master (
     import_ind BOOLEAN DEFAULT FALSE,
     export_ind BOOLEAN DEFAULT FALSE,
 
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+
     CONSTRAINT fk_rpm_role
         FOREIGN KEY (security_role_id)
         REFERENCES security_roles(role_id)
@@ -757,6 +762,9 @@ CREATE TABLE role_permission_master (
         FOREIGN KEY (module_code)
         REFERENCES refm_modules(code)
         ON DELETE RESTRICT,
+		
+	CONSTRAINT fk_rpm_created_by FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_rpm_updated_by FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
 
     UNIQUE KEY uk_rpm (security_role_id, module_code)
 

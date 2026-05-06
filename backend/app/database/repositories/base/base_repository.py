@@ -952,6 +952,46 @@ class BaseRepository(Generic[ModelType]):
         stmt_select = select(self.model).where(*filters_exprs)
         result = await self.execute(stmt_select, session)
         return result.scalars().all()
+    
+    async def bulk_upsert(
+        self,
+        session: AsyncSession,
+        *,
+        rows: List[Dict[str, Any]],
+        unique_columns: List[str],
+        update_columns: Optional[List[str]] = None,
+    ):
+
+        if not rows:
+            return
+
+        # 🔹 apply audit fields
+        processed_rows = [
+            self._set_audit_fields(r, is_update=False)
+            for r in rows
+        ]
+
+        stmt = insert(self.model).values(processed_rows)
+
+        # 🔹 determine update columns
+        if not update_columns:
+
+            update_columns = [
+                c.name
+                for c in self.model.__table__.columns
+                if c.name not in unique_columns
+            ]
+
+        update_dict = {
+            col: getattr(stmt.inserted, col)
+            for col in update_columns
+        }
+
+        stmt = stmt.on_duplicate_key_update(**update_dict)
+
+        self._log_stmt(stmt, session)
+
+        await self.execute(stmt=stmt, session=session)
 
     async def delete(
         self,

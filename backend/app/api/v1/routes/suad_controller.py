@@ -12,7 +12,31 @@ from app.dependencies import get_suad_service
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import RecentActivityItem
-from app.dtos.suad_dto import AnnouncementBaseIn, AnnouncementCreate, AnnouncementOut, AnnouncementUpdate, ChamberItem, ChamberStatsOut, GlobalSettingsEdit, GlobalSettingsOut, SecurityRoleBaseIn, SecurityRoleCreate, SecurityRoleItem, SecurityRoleStats, SecurityRoleUpdate, SuperAdminDashboardStats, TopChamberItem, UserItem, UserStatsOut
+from app.dtos.suad_dto import (
+    AnnouncementBaseIn, 
+    AnnouncementCreate, 
+    AnnouncementOut, 
+    AnnouncementUpdate, 
+    ChamberItem, 
+    ChamberStatsOut, 
+    GlobalSettingsEdit, 
+    GlobalSettingsOut, 
+    PermissionCloneIn, 
+    PermissionCloneOut, 
+    PermissionPushIn, 
+    MasterRolePermissionDetail, 
+    MasterRolePermissionStats, 
+    PermissionUpdateIn, 
+    SecurityRoleBaseIn, 
+    SecurityRoleCreate, 
+    SecurityRoleItem, 
+    SecurityRoleStats, 
+    SecurityRoleUpdate, 
+    SuperAdminDashboardStats, 
+    TopChamberItem, 
+    UserItem, 
+    UserStatsOut
+)
 from app.services.suad_service import SuadService
 from app.utils.constants import PAGINATION_DEFAULT_LIMIT, PAGINATION_DEFAULT_PAGE
 
@@ -168,7 +192,7 @@ class SuadController(BaseController):
         self,
         payload: AnnouncementCreate = Body(...),
         service: SuadService = Depends(get_suad_service),
-    ):
+    ) -> BaseOutDto[AnnouncementOut]:
         return self.success(result=await service.create_announcement(payload))
 
     # -----------------------------
@@ -217,7 +241,7 @@ class SuadController(BaseController):
         self,
         announcement_id: str,
         service: SuadService = Depends(get_suad_service),
-    ):
+    ) -> BaseOutDto[AnnouncementOut]:
         return self.success(result=await service.get_announcement(announcement_id))
 
     # -----------------------------
@@ -233,7 +257,7 @@ class SuadController(BaseController):
         self,
         payload: AnnouncementUpdate = Body(...),
         service: SuadService = Depends(get_suad_service),
-    ):
+    ) -> BaseOutDto[AnnouncementOut]:
         return self.success(
             result=await service.update_announcement(payload)
         )
@@ -251,7 +275,7 @@ class SuadController(BaseController):
         self,
         payload: AnnouncementBaseIn = Body(...),
         service: SuadService = Depends(get_suad_service),
-    ):
+    ) -> BaseOutDto[bool]:
         await service.delete_announcement(payload)
         return self.success(result=True)
 
@@ -268,7 +292,7 @@ class SuadController(BaseController):
     async def get_role_stats(
         self,
         service: SuadService = Depends(get_suad_service),
-    ):
+    ) -> BaseOutDto[SecurityRoleStats]:
         return self.success(result=await service.get_security_role_stats())
     
     @BaseController.get(
@@ -283,7 +307,7 @@ class SuadController(BaseController):
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
         search: str | None = Query(None),
         service: SuadService = Depends(get_suad_service),
-    ):
+    ) -> BaseOutDto[PagingData[SecurityRoleItem]]:
         result = await service.get_security_roles(page, limit, search)
         return self.success(result=result)
     
@@ -292,7 +316,11 @@ class SuadController(BaseController):
         response_model=BaseOutDto[bool],
         dependencies=[Depends(require_permission(_SUAD, PType.WRITE))]
     )
-    async def create_role(self, payload: SecurityRoleCreate, service: SuadService = Depends(get_suad_service)):
+    async def create_role(
+        self, 
+        payload: SecurityRoleCreate, 
+        service: SuadService = Depends(get_suad_service)
+    ) -> BaseOutDto[bool]:
         await service.create_security_role(payload)
         return self.success(result=True)
 
@@ -304,7 +332,8 @@ class SuadController(BaseController):
     )
     async def update_role(self, 
                           payload: SecurityRoleUpdate, 
-                          service: SuadService = Depends(get_suad_service)):
+                          service: SuadService = Depends(get_suad_service)
+        ) -> BaseOutDto[bool]:
         await service.update_security_role(payload)
         return self.success(result=True)
 
@@ -316,6 +345,72 @@ class SuadController(BaseController):
     )
     async def delete_role(self,                           
                           payload: SecurityRoleBaseIn,
-                          service: SuadService = Depends(get_suad_service)):
+                          service: SuadService = Depends(get_suad_service)
+        ) -> BaseOutDto[bool]:
         await service.delete_security_role(payload)
         return self.success(result=True)
+
+    # ---------------------------------------------------------------------
+    # ROLES PERMISSION MASTER
+    # ---------------------------------------------------------------------
+
+    @BaseController.get("/permissions/stats",
+        summary="Global Permission stats",
+        response_model=BaseOutDto[MasterRolePermissionStats],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))])
+    async def get_permission_stats(
+        self,
+        service: SuadService = Depends(get_suad_service),
+    ) -> BaseOutDto[MasterRolePermissionStats]:
+        return self.success(
+            result=await service.get_permission_stats()
+        )
+    
+    @BaseController.get("/permissions/{role_id}",
+        summary="Get Permissions by Role ID",
+        response_model=BaseOutDto[List[MasterRolePermissionDetail]],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))])
+    async def get_permission_detail(
+        self,
+        role_id: int,
+        service: SuadService = Depends(get_suad_service),
+    ) -> BaseOutDto[List[MasterRolePermissionDetail]]:
+        return self.success(
+            result=await service.get_permission_detail(role_id)
+        )
+    
+    @BaseController.post("/permissions/clone",
+        response_model=BaseOutDto[PermissionCloneOut],
+        dependencies=[Depends(require_permission(_SUAD, PType.WRITE))]
+        )
+    async def clone_permission(
+        self,
+        payload: PermissionCloneIn,
+        service: SuadService = Depends(get_suad_service),
+    ) -> BaseOutDto[PermissionCloneOut]:
+        return self.success(
+            result=await service.clone_permission(payload)
+        )
+    
+    @BaseController.put("/permissions",
+        summary="Update global permissions",
+        response_model=BaseOutDto[PermissionCloneOut],
+        dependencies=[Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.WRITE))])
+    async def update_permission(
+        self,
+        payload: PermissionUpdateIn,
+        service: SuadService = Depends(get_suad_service),
+    )->BaseOutDto[PermissionCloneOut]:
+        return self.success(
+            result=await service.update_permission(payload)
+        )
+    
+    @BaseController.post("/permissions/push")
+    async def push_permission(
+        self,
+        payload: PermissionPushIn,
+        service: SuadService = Depends(get_suad_service),
+    ):
+        return self.success(
+            result=await service.push_permission(payload)
+        )

@@ -7,8 +7,9 @@ from sqlalchemy.sql import func, text
 from typing import Any, Optional
 
 from app.database.models.base.base_model import BaseModel
+from app.database.models.base.timestampmixin import TimestampMixin
 
-class RolePermissionMaster(BaseModel):
+class RolePermissionMaster(BaseModel, TimestampMixin):
     __tablename__ = 'role_permission_master'
 
     # id : INTEGER
@@ -41,6 +42,12 @@ class RolePermissionMaster(BaseModel):
     # export_ind : TINYINT
     export_ind: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
 
+    # created_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    created_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
+
+    # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
+    updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36), ForeignKey("users.user_id", ondelete="SET NULL"))
+
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
@@ -56,6 +63,20 @@ class RolePermissionMaster(BaseModel):
         "RefmModules",
         foreign_keys=[module_code], 
         backref=backref("role_permission_master_module_code_refm_moduless", cascade="all, delete-orphan")
+    )
+
+    # role_permission_master.created_by -> users.user_id
+    role_permission_master_created_by_users = relationship(
+        "Users",
+        foreign_keys=[created_by], 
+        backref=backref("role_permission_master_created_by_userss", cascade="all, delete-orphan")
+    )
+
+    # role_permission_master.updated_by -> users.user_id
+    role_permission_master_updated_by_users = relationship(
+        "Users",
+        foreign_keys=[updated_by], 
+        backref=backref("role_permission_master_updated_by_userss", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

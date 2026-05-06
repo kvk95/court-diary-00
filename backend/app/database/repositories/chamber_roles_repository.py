@@ -67,3 +67,14 @@ class ChamberRolesRepository(BaseRepository[ChamberRoles]):
 
         count = await self.execute_scalar(session=session, stmt=stmt)
         return (count or 0) > 0
+    
+    async def get_by_security_role(self, session, security_role_id: int):
+
+        stmt = select(ChamberRoles).where(
+            ChamberRoles.security_role_id == security_role_id,
+            ChamberRoles.status_ind.is_(True),
+        )
+
+        result = await self.execute(session=session, stmt=stmt)
+
+        return result.scalars().all()

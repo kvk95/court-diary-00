@@ -186,3 +186,43 @@ class SecurityRoleUpdate(SecurityRoleBaseIn):
     role_name: Optional[str]
     description: Optional[str]
     status_ind: Optional[bool]
+
+class MasterRolePermissionStats(BaseRecordData):
+    total_templates: int
+    modules_covered: int
+    last_pushed: Optional[datetime]
+
+class MasterRolePermissionDetail(BaseRecordData):
+
+    module_code: str
+    module_name: Optional[str]
+
+    permission_id: int
+
+    allow_all_ind: bool = False
+
+    read_ind: bool = False
+    write_ind: bool = False
+    create_ind: bool = False
+    delete_ind: bool = False
+
+    import_ind: bool = False
+    export_ind: bool = False
+
+class PermissionCloneBase(SecurityRoleCreate):
+    permissions: list[MasterRolePermissionDetail]
+
+class PermissionCloneIn(PermissionCloneBase):
+    pass
+
+class PermissionCloneOut(PermissionCloneBase):
+    role_id: int
+
+class PermissionUpdateIn(BaseInData):
+
+    role_id: int
+
+    permissions: list[MasterRolePermissionDetail]
+
+class PermissionPushIn(BaseInData):
+    role_id: int
