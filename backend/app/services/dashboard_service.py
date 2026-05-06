@@ -6,13 +6,14 @@ from typing import List, Optional, Any, Callable, Dict, Iterable, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.database.models.activity_log import ActivityLog
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.hearings import Hearings
 from app.database.models.refm_modules import RefmModulesConstants
 from app.database.models.users import Users
+from app.database.repositories.activity_log_repository import ActivityLogRepository
 from app.database.repositories.dashboard_repository import DashboardRepository
+from app.dtos.base.paginated_out import PagingBuilder, PagingData
 from app.dtos.dashboard_dto import (
     AdminDashboardOut,
     AdminStatCards,
@@ -35,9 +36,11 @@ class DashboardService(BaseSecuredService):
         self,
         session: AsyncSession,
         dashboard_repo: Optional[DashboardRepository] = None,
+        activity_log_repo: Optional[ActivityLogRepository] = None,
     ):
         super().__init__(session)
-        self.repo = dashboard_repo or DashboardRepository()
+        self.dashboard_repo = dashboard_repo or DashboardRepository()
+        self.activity_log_repo = activity_log_repo or ActivityLogRepository()
 
     # ===================================================================
     # HELPERS
@@ -127,19 +130,19 @@ class DashboardService(BaseSecuredService):
         hour = datetime.now().hour
 
         # Fetch all data from repository
-        overview = await self.repo.get_practice_overview(
+        overview = await self.dashboard_repo.get_practice_overview(
             session=self.session, chamber_id=cid, today=today
         )
-        chamber_stats = await self.repo.get_chamber_management_stats(
+        chamber_stats = await self.dashboard_repo.get_chamber_management_stats(
             session=self.session, chamber_id=cid, today=today
         )
-        overdue_rows = await self.repo.get_overdue_cases(
+        overdue_rows = await self.dashboard_repo.get_overdue_cases(
             session=self.session, chamber_id=cid, today=today
         )
-        today_rows = await self.repo.get_hearings_for_date(
+        today_rows = await self.dashboard_repo.get_hearings_for_date(
             session=self.session, chamber_id=cid, hearing_date=today
         )
-        tomorrow_rows = await self.repo.get_hearings_for_date(
+        tomorrow_rows = await self.dashboard_repo.get_hearings_for_date(
             session=self.session, chamber_id=cid, hearing_date=tomorrow
         )
 
@@ -231,7 +234,7 @@ class DashboardService(BaseSecuredService):
         cid = self.chamber_id
 
         # All stats + trends in ONE repository call
-        chamber_stats = await self.repo.get_chamber_management_stats(
+        chamber_stats = await self.dashboard_repo.get_chamber_management_stats(
             session=self.session, chamber_id=cid, today=today
         )
         
@@ -271,7 +274,7 @@ class DashboardService(BaseSecuredService):
 
         total_cases = 0
         if has_case_access or is_admin:
-            total_cases = await self.repo.get_case_count(
+            total_cases = await self.dashboard_repo.get_case_count(
                 session=self.session,
                 chamber_id=chamber_id,
                 user_id=user_id,
@@ -280,7 +283,7 @@ class DashboardService(BaseSecuredService):
 
         total_clients = 0
         if has_client_access or is_admin:
-            total_clients = await self.repo.get_client_count(
+            total_clients = await self.dashboard_repo.get_client_count(
                 session=self.session,
                 chamber_id=chamber_id,
                 user_id=user_id,
@@ -297,25 +300,11 @@ class DashboardService(BaseSecuredService):
     # ─────────────────────────────────────────────────────────────────────
 
     async def get_recent_activity(
-        self, limit: int = 10
+        self, 
+        limit: int = 10
     ) -> List[RecentActivityItem]:
-        try:
-            rows = await self.session.execute(
-                select(
-                    ActivityLog.action,
-                    ActivityLog.actor_user_id,
-                    ActivityLog.created_date,
-                    ActivityLog.metadata_json,
-                )
-                .where(
-                    ActivityLog.actor_chamber_id == self.chamber_id,
-                )
-                .order_by(ActivityLog.created_date.desc())
-                .limit(limit)
-            )
-            activity_rows = rows.fetchall()
-        except Exception:
-            return []
+        activity_rows = await self.activity_log_repo.get_recent_activity(session=self.session,
+                                                              limit=limit)
         
         # Load actor names efficiently
         actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
@@ -336,4 +325,41 @@ class DashboardService(BaseSecuredService):
                 actor_name=actor_map.get(r.actor_user_id) if r.actor_user_id else "System",
             )
             for r in activity_rows
+        ]    
+    
+
+    async def get_recent_activity_paged(
+        self, 
+        page: int,
+        limit: int,
+    ) -> PagingData[RecentActivityItem]:
+        activity_rows, total = await self.activity_log_repo.get_recent_activity_paged(
+            session=self.session,
+            page=page,
+            limit=limit)        
+        # Load actor names efficiently
+        actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
+        actor_map = await self._load_map(
+            actor_ids,
+            lambda ids: select(
+                Users.user_id,
+                Users.first_name,
+                Users.last_name,
+            ).where(Users.user_id.in_(ids)),
+            lambda r: r.user_id,
+            lambda r: self.full_name(r.first_name, r.last_name),
+        )
+
+        recent_activities = [
+            format_activity(
+                log=r,
+                actor_name=actor_map.get(r.actor_user_id) if r.actor_user_id else "System",
+            )
+            for r in activity_rows
         ]
+
+        return PagingBuilder(
+            total_records=total,
+            page=page,
+            limit=limit,
+        ).build(records=recent_activities)

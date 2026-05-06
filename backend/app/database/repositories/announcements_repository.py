@@ -56,12 +56,12 @@ class AnnouncementsRepository(BaseRepository[Announcements]):
 
         # 🧮 count
         count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await session.execute(count_stmt)).scalar()
+        total = await self.execute_scalar(session=session, stmt=count_stmt, default=0)
 
         # 📄 pagination
         stmt = stmt.order_by(Announcements.created_date.desc())
         stmt = stmt.offset((page - 1) * limit).limit(limit)
 
-        rows = (await session.execute(stmt)).all()
+        rows = (await self.execute(session=session, stmt=stmt)).all()
 
         return rows, total

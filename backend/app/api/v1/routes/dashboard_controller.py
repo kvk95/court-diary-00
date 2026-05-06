@@ -1,6 +1,7 @@
 """dashboard_controller.py — HTTP routes for Main Dashboard and Admin Dashboard"""
 
 
+
 from fastapi import Depends, Query
 
 from app.api.v1.routes.base.base_controller import BaseController
@@ -9,6 +10,7 @@ from app.database.models.refm_modules import RefmModulesEnum
 from app.dependencies import get_current_user, get_dashboard_service, get_suad_service_dash
 from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
+from app.dtos.cases_dto import RecentActivityItem
 from app.dtos.dashboard_dto import AdminDashboardOut, MainDashboardOut, SummaryCountsOut
 from app.dtos.oauth_dtos import CurrentUserContext
 from app.dtos.suad_dto import AnnouncementOut
@@ -35,6 +37,21 @@ class DashboardController(BaseController):
     ) -> BaseOutDto[MainDashboardOut]:
         first_name = current_user.first_name or "there"
         return self.success(result=await service.get_main_dashboard(user_first_name=first_name))
+    
+    @BaseController.get(
+        "/audit-log",
+        summary="",
+        response_model=BaseOutDto[PagingData[RecentActivityItem]],
+        dependencies=[Depends(require_permission(_ADMN, PType.READ))],
+    )
+    async def get_recent_activity_paged(
+        self,
+        page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
+        limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
+        search: str | None = Query(None),
+        service: DashboardService = Depends(get_dashboard_service),
+    ) -> BaseOutDto[PagingData[RecentActivityItem]]:
+        return self.success(result=await service.get_recent_activity_paged(page=page, limit=limit))
 
     @BaseController.get(
         "/admin",

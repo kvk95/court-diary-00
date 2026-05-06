@@ -12,7 +12,7 @@ from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.suad_dto import GlobalSettingsBasic
 from app.dtos.users_dto import UserCreateBasic, UserEmailIn, UserPasswordIn
 from app.services.anonymous_service import AnonymousService
-from app.startup.scheduler import send_tomorrow_hearings_job
+from app.startup.scheduler import enqueue_reminder_job
 
 
 class AnonymousController(BaseController):
@@ -123,5 +123,6 @@ class AnonymousController(BaseController):
 
     @BaseController.post("/test-hearing-mail")
     async def test_hearing_mail(self):
-        await send_tomorrow_hearings_job()
+        # await enqueue_summary_job()
+        await enqueue_reminder_job()
         return {"status": "Triggered"}

@@ -15,6 +15,7 @@ from app.services.auth_service import AuthService
 from app.services.chamber_service import ChamberService
 from app.services.chamber_subscriptions_service import ChamberSubscriptionService
 from app.services.contact_messages_service import ContactMessagesService
+from app.services.home_service import HomeService
 from app.services.image_service import ImageService
 from app.services.calendar_service import CalendarService
 from app.services.cases_service import CasesService
@@ -27,6 +28,7 @@ from app.services.support_ticket_service import SupportTicketService
 from app.services.users_service import UsersService
 from app.services.dashboard_service import DashboardService
 from app.services.aor_service import AorService
+from app.whatsapp.handler import WhatsAppService
 
 
 # ── No-auth services ──────────────────────────────────────────────────────────
@@ -35,6 +37,11 @@ def get_anonymous_service(
     session: AsyncSession = Depends(get_session),
 ) -> AnonymousService:
     return AnonymousService(session=session)
+
+def get_home_service(
+    session: AsyncSession = Depends(get_session),
+) -> HomeService:
+    return HomeService(session=session)
 
 def get_auth_service(
     session: AsyncSession = Depends(get_session),
@@ -179,7 +186,7 @@ async def get_support_ticket_service(
 # WHATSAPP
 # -------------------------------------
 
-def get_cases_service_webhook(
+async def get_cases_service_webhook(
     session: AsyncSession = Depends(get_session),
     _ = Depends(get_current_user_webhook),
 ) -> CasesService:
@@ -190,3 +197,23 @@ async def get_calendar_service_webhook(
     _ = Depends(get_current_user_webhook),
 ) -> CalendarService:
     return CalendarService(session=session)
+
+async def get_dashboard_service_webhook(
+    session: AsyncSession = Depends(get_session),
+    _ = Depends(get_current_user_webhook),
+) -> DashboardService:
+    return DashboardService(session=session)
+
+async def get_whatsapp_service_webhook(
+        session: AsyncSession = Depends(get_session),
+        cases_service: CasesService = Depends(get_cases_service_webhook),
+        calendar_service:CalendarService = Depends(get_calendar_service_webhook),
+        dashboard_service:DashboardService = Depends(get_dashboard_service_webhook),
+        _ = Depends(get_current_user_webhook),
+) -> WhatsAppService:
+    return WhatsAppService(
+        session=session,
+        cases_service=cases_service,
+        calendar_service=calendar_service,
+        dashboard_service=dashboard_service,
+    )
