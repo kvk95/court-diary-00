@@ -325,7 +325,7 @@ class DashboardService(BaseSecuredService):
                 actor_name=actor_map.get(r.actor_user_id) if r.actor_user_id else "System",
             )
             for r in activity_rows
-        ]    
+        ]
     
 
     async def get_recent_activity_paged(

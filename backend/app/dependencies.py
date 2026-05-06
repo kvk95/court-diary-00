@@ -21,6 +21,7 @@ from app.services.calendar_service import CalendarService
 from app.services.cases_service import CasesService
 from app.services.clients_service import ClientsService
 from app.services.notification_settings_service import NotificationSettingsService
+from app.services.reports_service import ReportsService
 from app.services.role_permissions_service import RolePermissionsService
 from app.services.roles_service import RolesService
 from app.services.suad_service import SuadService
@@ -132,6 +133,16 @@ async def get_suad_service(
     __: None = Depends(validate_csrf),
 ) -> SuadService:
     return SuadService(session=session)
+
+def get_reports_service(
+    session: AsyncSession = Depends(get_session),
+    _=Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.READ)),
+    __: None = Depends(validate_csrf),
+):
+
+    return ReportsService(
+        session=session,
+    )
 
 async def get_dashboard_service(
     session: AsyncSession = Depends(get_session),

@@ -32,14 +32,14 @@ class UsersController(BaseController):
     #-- Heart beat --
     
     @BaseController.get(
-        "/ht/{needed}",
+        "/ht/{key}",
         summary="Heart Beat",
         response_model=BaseOutDto[str],
     )
     async def ht(
         self,
         _: UserOut = Depends(get_current_user),
-        needed: str = Path(description="needed"),
+        __ : str = Path(description="key"),
     ) -> BaseOutDto[str]: 
         return self.success(result="beating")
 

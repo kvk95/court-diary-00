@@ -23,9 +23,10 @@ from typing import (
 from fastapi import HTTPException
 from sqlalchemy import (
     Exists, Join, MetaData, 
-    Table, and_, false, func, insert, 
+    Table, and_, false, func, 
     select, update, Select
 )
+from sqlalchemy.dialects.mysql import insert
 from sqlalchemy import Boolean
 from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.ext.asyncio import AsyncSession

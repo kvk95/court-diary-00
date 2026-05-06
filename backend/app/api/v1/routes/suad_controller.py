@@ -413,4 +413,19 @@ class SuadController(BaseController):
     ):
         return self.success(
             result=await service.push_permission(payload)
-        )
+        )  
+    
+    
+    @BaseController.get(
+        "/audit-log",
+        summary="",
+        response_model=BaseOutDto[PagingData[RecentActivityItem]],
+        dependencies=[Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.READ))],
+    )
+    async def get_recent_activity_paged(
+        self,
+        page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
+        limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
+        service: SuadService = Depends(get_suad_service),
+    ) -> BaseOutDto[PagingData[RecentActivityItem]]:
+        return self.success(result=await service.get_recent_activity_paged(page=page, limit=limit))

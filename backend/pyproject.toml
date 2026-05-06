@@ -29,6 +29,7 @@ requests = "^2.32.5"
 uuid6 = "^2025.0.1"
 google-auth = "^2.49.2"
 apscheduler = "^3.11.2"
+python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

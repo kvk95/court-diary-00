@@ -13,6 +13,7 @@ from app.database.models.activity_log import ActivityLog
 from app.database.models.refm_announcement_status import RefmAnnouncementStatusConstants
 from app.database.models.security_roles import SecurityRoles
 from app.database.models.users import Users
+from app.database.repositories.activity_log_repository import ActivityLogRepository
 from app.database.repositories.announcements_repository import AnnouncementsRepository
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
@@ -73,6 +74,7 @@ class SuadService(BaseSecuredService):
         role_permission_master_repo: Optional[RolePermissionMasterRepository] = None,
         chamber_modules_repo: Optional[ChamberModulesRepository] = None,
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
+        activity_log_repo: Optional[ActivityLogRepository] = None,
     ):
         super().__init__(session)
         self.suad_repo = suad_repo or SuadRepository()
@@ -83,6 +85,7 @@ class SuadService(BaseSecuredService):
         self.role_permission_master_repo = role_permission_master_repo or RolePermissionMasterRepository()
         self.chamber_modules_repo = chamber_modules_repo or ChamberModulesRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
+        self.activity_log_repo = activity_log_repo or ActivityLogRepository()
 
     # ---------------------------------------------------------------------
     # HELPERS
@@ -1087,3 +1090,39 @@ class SuadService(BaseSecuredService):
             "updated": True,
             "total": len(bulk_rows),
         }
+
+    async def get_recent_activity_paged(
+        self, 
+        page: int,
+        limit: int,
+    ) -> PagingData[RecentActivityItem]:
+        activity_rows, total = await self.activity_log_repo.get_all_chamber_recent_activity_paged(
+            session=self.session,
+            page=page,
+            limit=limit)
+        # Load actor names efficiently
+        actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
+        actor_map = await self._load_map(
+            actor_ids,
+            lambda ids: select(
+                Users.user_id,
+                Users.first_name,
+                Users.last_name,
+            ).where(Users.user_id.in_(ids)),
+            lambda r: r.user_id,
+            lambda r: self.full_name(r.first_name, r.last_name),
+        )
+
+        recent_activities = [
+            format_activity(
+                log=r,
+                actor_name=actor_map.get(r.actor_user_id) if r.actor_user_id else "System",
+            )
+            for r in activity_rows
+        ]
+
+        return PagingBuilder(
+            total_records=total,
+            page=page,
+            limit=limit,
+        ).build(records=recent_activities)
