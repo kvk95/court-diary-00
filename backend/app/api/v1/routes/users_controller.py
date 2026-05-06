@@ -39,9 +39,9 @@ class UsersController(BaseController):
     async def ht(
         self,
         _: UserOut = Depends(get_current_user),
-        __ : str = Path(description="key"),
+        key : str = Path(...),
     ) -> BaseOutDto[str]: 
-        return self.success(result="beating")
+        return self.success(result=f"beating :: {key}")
 
     # ── List/Paged (FIRST - before parameterized routes) ─────────────────────
 
