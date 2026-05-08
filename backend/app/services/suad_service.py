@@ -1098,11 +1098,18 @@ class SuadService(BaseSecuredService):
         self, 
         page: int,
         limit: int,
+        search: Optional[str],
+        module_code: Optional[str],
+        date_filter_code: Optional[str],
     ) -> PagingData[RecentActivityItem]:
-        activity_rows, total = await self.activity_log_repo.get_all_chamber_recent_activity_paged(
+        activity_rows, total = await self.activity_log_repo.get_recent_activity_paged(
             session=self.session,
             page=page,
-            limit=limit)
+            limit=limit,
+            search=search,
+            module_code=module_code,
+            date_filter_code=date_filter_code,
+            include_chamber_id=False)   
         # Load actor names efficiently
         actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
         actor_map = await self._load_map(

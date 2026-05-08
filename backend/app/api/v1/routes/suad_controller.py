@@ -426,6 +426,26 @@ class SuadController(BaseController):
         self,
         page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
+        search: str | None = Query(None),
+        module_code: str | None = Query(None),        
+        date_filter_code: str | None = Query(
+            None,
+            description="Filter by date range: " \
+            "   'T' = Today, " \
+            "   'W' = This Week, " \
+            "   'M' = This Month," \
+            "   'Y' = This Year," \
+            "   'LW' = Last Week," \
+            "   'LM' = Last Month," \
+            "   'LY' = Last Year," \
+            ""
+        ),
         service: SuadService = Depends(get_suad_service),
     ) -> BaseOutDto[PagingData[RecentActivityItem]]:
-        return self.success(result=await service.get_recent_activity_paged(page=page, limit=limit))
+        return self.success(result=await service.get_recent_activity_paged(
+            page=page, 
+            limit=limit, 
+            search=search,
+            module_code=module_code,
+            date_filter_code=date_filter_code
+        ))
