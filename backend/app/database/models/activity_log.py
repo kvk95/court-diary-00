@@ -39,6 +39,9 @@ class ActivityLog(BaseModel):
     # created_date : TIMESTAMP
     created_date: Mapped[Optional[datetime]] = mapped_column(DateTime, server_default=func.current_timestamp())
 
+    # module_code : CHAR(8) COLLATE "utf8mb4_unicode_ci"
+    module_code: Mapped[Optional[str]] = mapped_column(CHAR(8), ForeignKey("refm_modules.code", ondelete="SET NULL"))
+
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
@@ -54,6 +57,13 @@ class ActivityLog(BaseModel):
         "Users",
         foreign_keys=[actor_user_id], 
         backref=backref("activity_log_actor_user_id_userss", cascade="all, delete-orphan")
+    )
+
+    # activity_log.module_code -> refm_modules.code
+    activity_log_module_code_refm_modules = relationship(
+        "RefmModules",
+        foreign_keys=[module_code], 
+        backref=backref("activity_log_module_code_refm_moduless", cascade="all, delete-orphan")
     )
 
     # FORWARD RELATIONSHIPS ------------------------------------------------------------

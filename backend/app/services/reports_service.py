@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.refm_billing_status import RefmBillingStatusConstants
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.reports_repository import ReportsRepository
 from app.services.base.base_service import BaseService
 
@@ -36,9 +37,10 @@ class ReportsService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         reports_repo: Optional[ReportsRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.reports_repo = reports_repo or ReportsRepository()
 
     async def get_chamber_growth_report(self) -> ChamberGrowthReportOut:

@@ -3,6 +3,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.home_repository import HomeRepository
 from app.dtos.home_dtos import HomeStatsOut
 from app.services.base.base_service import BaseService
@@ -13,9 +14,10 @@ class HomeService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         home_repo: Optional[HomeRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.repo: HomeRepository = home_repo or HomeRepository()
 
     async def get_home_stats(self) -> HomeStatsOut:

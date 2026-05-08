@@ -21,6 +21,7 @@ from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_party_roles import RefmPartyRoles
 from app.database.models.refm_party_type import RefmPartyType
 from app.database.models.users import Users
@@ -63,13 +64,14 @@ class CasesService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         cases_repo: Optional[CasesRepository] = None,
         hearings_repo: Optional[HearingsRepository] = None,
         case_notes_repo: Optional[CaseNotesRepository] = None,
         case_clients_repo: Optional[CaseClientsRepository] = None,
         court_repo: Optional[CourtsRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.cases_repo = cases_repo or CasesRepository()
         self.hearings_repo = hearings_repo or HearingsRepository()
         self.case_notes_repo = case_notes_repo or CaseNotesRepository()
@@ -1298,6 +1300,7 @@ class CasesService(BaseSecuredService):
                     ActivityLog.actor_user_id,
                     ActivityLog.created_date,
                     ActivityLog.metadata_json,
+                    ActivityLog.module_code,
                 )
                 .where(
                     ActivityLog.actor_chamber_id == self.chamber_id,

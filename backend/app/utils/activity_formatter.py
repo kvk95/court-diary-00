@@ -32,14 +32,17 @@ def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivit
     if action in explicit_map:
         title, _, _ = explicit_map[action]
 
-        module_code = _resolve_module_code(action)
+        module_code = log.module_code or RefmModulesConstants.DASHBOARD
+        base = {
+            **base,
+            "module_code": module_code
+        }
         type_ = _resolve_type(action)
 
         description = (
             metadata.get("description")
             or f"{base['actor_name']} {title.lower()}"
         )
-
         return RecentActivityItem(
             **base,
             title=title,
@@ -51,6 +54,12 @@ def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivit
     # ------------------------------------------------------------------
     # 🔥 2. EXISTING SUFFIX HANDLERS
     # ------------------------------------------------------------------
+    module_code = log.module_code or RefmModulesConstants.DASHBOARD    
+    base = {
+        **base,
+        'module_code': module_code
+    }
+    type_ = _resolve_type(action)
     handlers: Dict[str, Callable] = {
         "CREATED": _format_create,
         "UPDATED": _format_update,
@@ -71,8 +80,6 @@ def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivit
     # ------------------------------------------------------------------
     # 🔥 3. FALLBACK
     # ------------------------------------------------------------------
-    module_code = _resolve_module_code(action)
-    type_ = _resolve_type(action)
     
     return RecentActivityItem(
         **base,
@@ -81,26 +88,6 @@ def format_activity(log: Any, actor_name: Optional[str] = None) -> RecentActivit
         type=type_,
         icon=module_code,  # 🔥 now module-driven
     )
-
-def _resolve_module_code(action: str) -> str:
-    action = action.upper()
-
-    if "USER" in action:
-        return RefmModulesConstants.USER_MANAGEMENT
-    if "CLIENT" in action:
-        return RefmModulesConstants.CLIENTS
-    if "CASE" in action:
-        return RefmModulesConstants.CASES
-    if "HEARING" in action:
-        return RefmModulesConstants.HEARINGS
-    if "CALENDAR" in action:
-        return RefmModulesConstants.CALENDAR
-    if "SETTING" in action:
-        return RefmModulesConstants.SETTINGS
-    if "CHAMBER" in action or "SUBSCRIPTION" in action or "LOGIN" in action:
-        return RefmModulesConstants.SUPER_USER
-
-    return RefmModulesConstants.DASHBOARD
 
 def _resolve_type(action: str) -> str:
     action = action.upper()

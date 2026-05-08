@@ -2,6 +2,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.profile_images_repository import ProfileImagesRepository
 from app.database.models.profile_images import ProfileImages
 from app.services.base.secured_base_service import BaseSecuredService
@@ -11,9 +12,10 @@ class ImageService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         profile_images_repo: Optional[ProfileImagesRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
 
     async def handle_image(

@@ -6,10 +6,12 @@ from email.mime.base import MIMEBase
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 
 from app.core.runtime_settings import get_runtime_setting
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplates, RefmEmailTemplatesEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.services.base.base_service import BaseService
 
 
@@ -17,8 +19,9 @@ class EmailUtil (BaseService):
 
     def __init__(self,                 
             session,
+            module_code: Optional[RefmModulesEnum],
                  ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.smtp_server = get_runtime_setting("SMTP_SERVER")
         self.smtp_server_port = get_runtime_setting("SMTP_SERVER_PORT")
         self.smtp_server_username = get_runtime_setting("SMTP_SERVER_USERNAME")

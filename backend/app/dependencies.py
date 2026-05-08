@@ -37,22 +37,22 @@ from app.whatsapp.handler import WhatsAppService
 def get_anonymous_service(
     session: AsyncSession = Depends(get_session),
 ) -> AnonymousService:
-    return AnonymousService(session=session)
+    return AnonymousService(session=session, module_code=None)
 
 def get_home_service(
     session: AsyncSession = Depends(get_session),
 ) -> HomeService:
-    return HomeService(session=session)
+    return HomeService(session=session,module_code=None)
 
 def get_auth_service(
     session: AsyncSession = Depends(get_session),
 ) -> AuthService:
-    return AuthService(session)
+    return AuthService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT)
 
 async def get_contact_messages_service(
     session: AsyncSession = Depends(get_session),
 ) -> ContactMessagesService:
-    return ContactMessagesService(session=session)
+    return ContactMessagesService(session=session, module_code=None)
 
 
 # ── Auth-only services (no specific module restriction) ───────────────────────
@@ -62,14 +62,14 @@ async def get_chamber_service(
     _ = Depends(get_current_user),
     __: None = Depends(validate_csrf),
 ) -> ChamberService:
-    return ChamberService(session=session)
+    return ChamberService(session=session, module_code=RefmModulesEnum.CASES)
 
 def get_image_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(get_current_user),
     __: None = Depends(validate_csrf),
 ) -> ImageService:
-    return ImageService(session=session)
+    return ImageService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT)
 
 
 # ── Module-gated services ─────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ def get_cases_service(
     _=Depends(require_permission(RefmModulesEnum.CASES, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> CasesService:
-    return CasesService(session=session)
+    return CasesService(session=session, module_code=RefmModulesEnum.CASES)
 
 
 def get_aor_service(
@@ -87,14 +87,14 @@ def get_aor_service(
     _=Depends(require_permission(RefmModulesEnum.CASES, PType.READ)),     
     __: None = Depends(validate_csrf),
 ) -> AorService:
-    return AorService(session=session)
+    return AorService(session=session, module_code=RefmModulesEnum.CASES)
 
 async def get_clients_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.CLIENTS, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> ClientsService:
-    return ClientsService(session=session, image_service=get_image_service())
+    return ClientsService(session=session, module_code=RefmModulesEnum.CLIENTS, image_service=get_image_service())
 
 # async def get_billing_service(
 #     session: AsyncSession = Depends(get_session),
@@ -106,14 +106,14 @@ async def get_chamber_subscription_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.BILLING, PType.READ)),
 ) -> ChamberSubscriptionService:
-    return ChamberSubscriptionService(session=session)
+    return ChamberSubscriptionService(session=session, module_code=RefmModulesEnum.BILLING)
 
 async def get_calendar_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.CALENDAR, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> CalendarService:
-    return CalendarService(session=session)
+    return CalendarService(session=session, module_code=RefmModulesEnum.CALENDAR)
 
 # async def get_collaborations_service(
 #     session: AsyncSession = Depends(get_session),
@@ -121,77 +121,68 @@ async def get_calendar_service(
 # ) -> CollaborationsService:
 #     return CollaborationsService(session=session)
 
-# async def get_reports_service(
-#     session: AsyncSession = Depends(get_session),
-#     _=Depends(require_permission(RefmModulesEnum.REPORTS, PType.READ)),
-# ) -> ReportsService:
-#     return ReportsService(session=session)
-
 async def get_suad_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> SuadService:
-    return SuadService(session=session)
+    return SuadService(session=session, module_code=RefmModulesEnum.SUPER_USER)
 
-def get_reports_service(
+def get_suad_reports_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.SUPER_USER, PType.READ)),
     __: None = Depends(validate_csrf),
 ):
-
-    return ReportsService(
-        session=session,
-    )
+    return ReportsService(session=session, module_code=RefmModulesEnum.SUPER_USER)
 
 async def get_dashboard_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.DASHBOARD, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> DashboardService:
-    return DashboardService(session=session)
+    return DashboardService(session=session, module_code=RefmModulesEnum.DASHBOARD)
 
 async def get_suad_service_dash(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.DASHBOARD, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> SuadService:
-    return SuadService(session=session)
+    return SuadService(session=session, module_code=RefmModulesEnum.SUPER_USER)
 
 async def get_users_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),
     __: None = Depends(validate_csrf),
 ) -> UsersService:
-    return UsersService(session=session, image_service=get_image_service())
+    return UsersService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT, image_service=get_image_service())
     
 async def get_notification_settings_service(
     session: AsyncSession = Depends(get_session),
     _ = Depends(get_current_user),
     __: None = Depends(validate_csrf),
 ) -> NotificationSettingsService:
-    return NotificationSettingsService(session=session)
+    return NotificationSettingsService(session=session, module_code=None)
 
 async def get_roles_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),  # roles live under USER
     __: None = Depends(validate_csrf),
 ) -> RolesService:
-    return RolesService(session=session)
+    return RolesService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT)
 
 async def get_role_permissions_service(
     session: AsyncSession = Depends(get_session),
     _=Depends(require_permission(RefmModulesEnum.USER_MANAGEMENT, PType.READ)),  # same
     __: None = Depends(validate_csrf),
 ) -> RolePermissionsService:
-    return RolePermissionsService(session=session)
+    return RolePermissionsService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT)
 
 async def get_support_ticket_service(
     session: AsyncSession = Depends(get_session),
     _ = Depends(get_current_user),
     __: None = Depends(validate_csrf),
 ) -> SupportTicketService:
-    return SupportTicketService(session=session)
+    return SupportTicketService(session=session, module_code=RefmModulesEnum.SUPER_USER)
 
 # -------------------------------------
 # WHATSAPP
@@ -201,19 +192,19 @@ async def get_cases_service_webhook(
     session: AsyncSession = Depends(get_session),
     _ = Depends(get_current_user_webhook),
 ) -> CasesService:
-    return CasesService(session=session)
+    return CasesService(session=session, module_code=RefmModulesEnum.CASES)
 
 async def get_calendar_service_webhook(
     session: AsyncSession = Depends(get_session),
     _ = Depends(get_current_user_webhook),
 ) -> CalendarService:
-    return CalendarService(session=session)
+    return CalendarService(session=session, module_code=RefmModulesEnum.CALENDAR)
 
 async def get_dashboard_service_webhook(
     session: AsyncSession = Depends(get_session),
     _ = Depends(get_current_user_webhook),
 ) -> DashboardService:
-    return DashboardService(session=session)
+    return DashboardService(session=session, module_code=RefmModulesEnum.DASHBOARD)
 
 async def get_whatsapp_service_webhook(
         session: AsyncSession = Depends(get_session),
@@ -223,7 +214,8 @@ async def get_whatsapp_service_webhook(
         _ = Depends(get_current_user_webhook),
 ) -> WhatsAppService:
     return WhatsAppService(
-        session=session,
+        session=session, 
+        module_code=None,
         cases_service=cases_service,
         calendar_service=calendar_service,
         dashboard_service=dashboard_service,

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.hearings import Hearings
-from app.database.models.refm_modules import RefmModulesConstants
+from app.database.models.refm_modules import RefmModulesConstants, RefmModulesEnum
 from app.database.models.users import Users
 from app.database.repositories.activity_log_repository import ActivityLogRepository
 from app.database.repositories.dashboard_repository import DashboardRepository
@@ -35,10 +35,11 @@ class DashboardService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         dashboard_repo: Optional[DashboardRepository] = None,
         activity_log_repo: Optional[ActivityLogRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.dashboard_repo = dashboard_repo or DashboardRepository()
         self.activity_log_repo = activity_log_repo or ActivityLogRepository()
 
@@ -332,11 +333,17 @@ class DashboardService(BaseSecuredService):
         self, 
         page: int,
         limit: int,
+        search: Optional[str],
+        module_code: Optional[str],
+        date_filter_code: Optional[str],
     ) -> PagingData[RecentActivityItem]:
         activity_rows, total = await self.activity_log_repo.get_recent_activity_paged(
             session=self.session,
             page=page,
-            limit=limit)        
+            limit=limit,
+            search=search,
+            module_code=module_code,
+            date_filter_code=date_filter_code)        
         # Load actor names efficiently
         actor_ids = [r.actor_user_id for r in activity_rows if r.actor_user_id]
         actor_map = await self._load_map(

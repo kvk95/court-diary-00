@@ -240,6 +240,7 @@ class RecentActivityItem(BaseRecordData):
     description: Optional[str] = None
     type: Optional[str] = None
     icon: Optional[str] = None
+    module_code:str
 
 from app.dtos.clients_dto import ClientDetailsOut
 CaseClientLinkedOut.model_rebuild()

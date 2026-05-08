@@ -273,14 +273,14 @@ SET @user_suad_lokesh = (SELECT user_id FROM users WHERE email = 'mani.lokesh@gm
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 17.2 Chambers
 -- ─────────────────────────────────────────────────────────────────────────────
-INSERT INTO chamber (chamber_name, email, phone, city, state_code, plan_code, created_by) VALUES
-('Chennai & Associates', 'office@vkchamber.in', '9876543210', 'Chennai', 'TN', 'PTPR', @user_caadmin);
+INSERT INTO chamber (chamber_name, email, phone, city, state_code, created_by) VALUES
+('Chennai & Associates', 'office@vkchamber.in', '9876543210', 'Chennai', 'TN', @user_caadmin);
 
 SET @chamber_ca = (SELECT chamber_id FROM chamber WHERE chamber_name = 'Chennai & Associates');
 
 -- System chamber
-INSERT INTO chamber (chamber_name, email, city, state_code, plan_code, created_by)
-VALUES ('SYSTEM', 'system@internal', 'NA', 'TN', 'PTEN', @user_suad_vijay);
+INSERT INTO chamber (chamber_name, email, city, state_code, created_by)
+VALUES ('SYSTEM', 'system@internal', 'NA', 'TN', @user_suad_vijay);
 
 SET @chamber_system = (SELECT chamber_id FROM chamber WHERE chamber_name = 'SYSTEM');
 

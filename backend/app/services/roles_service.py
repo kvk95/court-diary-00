@@ -4,6 +4,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_roles import ChamberRoles
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.user_roles import UserRoles
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
@@ -23,9 +24,10 @@ class RolesService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         chamber_roles_repo: Optional[ChamberRolesRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
 
     async def roles_get_paged(

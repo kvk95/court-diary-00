@@ -66,3 +66,4 @@ class ActivityLogPayload(BaseModel):
     actor_user_id: Optional[str] = None
     actor_chamber_id: Optional[int] = None
     ip_address: Optional[str] = None
+    module_code: Optional[str]

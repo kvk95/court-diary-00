@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber_modules import ChamberModules
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.role_permissions import RolePermissions
 from app.database.models.chamber_roles import ChamberRoles
 from app.database.repositories.role_permissions_repository import RolePermissionsRepository
@@ -25,11 +26,12 @@ class RolePermissionsService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
         chamber_roles_repo: Optional[ChamberRolesRepository] = None,
         chamber_modules_repo: Optional[ChamberModulesRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
         self.chamber_modules_repo = chamber_modules_repo or ChamberModulesRepository()

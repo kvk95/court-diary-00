@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import create_access_token, create_refresh_token, decode_token
 from app.database.models.chamber import Chamber
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.user_chamber_link_repository import UserChamberLinkRepository
 from app.utils.logging_framework.audit_queue  import audit_queue
@@ -33,20 +34,21 @@ class AuthService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         users_repo: UsersRepository | None = None,
         user_profiles_repo: UserProfilesRepository | None = None,
         role_permissions_repo: RolePermissionsRepository | None = None,
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,              
         chamber_repo: Optional[ChamberRepository] = None,
-        users_service: UsersService | None = None,  # ← Inject UsersService
+        users_service: Optional[UsersService] = None, 
     ):
-        super().__init__(session)        
+        super().__init__(session=session, module_code=module_code) 
         self.chamber_repo = chamber_repo or ChamberRepository()
         self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
         self.users_repo = users_repo or UsersRepository()
         self.user_profiles_repo = user_profiles_repo or UserProfilesRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
-        self.users_service = users_service  # ← Use for get_user_full_details
+        self.users_service = users_service or UsersService(session=session, module_code=module_code)
     
     def _to_out(self, chamber: Chamber, chamber_link_data) -> ChamberDetails:
         return ChamberDetails(
@@ -210,13 +212,8 @@ class AuthService(BaseService):
         access_token = create_access_token(subject=str(user.user_id), extra_claims=extra_claims)
         refresh_token = create_refresh_token(subject=str(user.user_id), extra_claims=extra_claims)
 
-        # 6. Get user details via UsersService (single source of truth)
-        # Create temporary UsersService with the resolved chamber_id
-        users_service = UsersService(
-            session=self.session
-        )
         try:
-            user_details = await users_service.get_user_full_details(user_id=user.user_id,
+            user_details = await self.users_service.get_user_full_details(user_id=user.user_id,
                                                                  chamber_id=chamber_id)
         except ValidationErrorDetail as ve:
             failure_reason = f"User not available in given chamber: {chamber_id}" if loginRequest.chamber_id else ve.message

@@ -12,6 +12,7 @@ from app.database.models.chamber_subscriptions import ChamberSubscriptions
 from app.database.models.refm_billing_cycle import RefmBillingCycle, RefmBillingCycleConstants
 from app.database.models.refm_currency import RefmCurrencyConstants
 from app.database.models.refm_invoice_status import RefmInvoiceStatus, RefmInvoiceStatusConstants
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_subscription_status import RefmSubscriptionStatus, RefmSubscriptionStatusConstants
 from app.database.repositories.billing_invoices_repository import BillingInvoicesRepository
 from app.database.repositories.chamber_repository import ChamberRepository
@@ -30,11 +31,12 @@ class ChamberSubscriptionService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         chamber_repo: Optional[ChamberRepository] = None,
         chamber_subscription_repo: Optional[ChamberSubscriptionsRepository] = None,
         billing_invoice_repo: Optional[BillingInvoicesRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.chamber_repo = chamber_repo or ChamberRepository()
         self.chamber_subscription_repo = chamber_subscription_repo or ChamberSubscriptionsRepository()
         self.billing_invoice_repo = billing_invoice_repo or BillingInvoicesRepository()

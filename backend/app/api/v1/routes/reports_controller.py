@@ -4,7 +4,7 @@ from fastapi import Depends
 
 from app.api.v1.routes.base.base_controller import BaseController
 
-from app.dependencies import get_reports_service
+from app.dependencies import get_suad_reports_service
 
 from app.dtos.base.base_out_dto import BaseOutDto
 
@@ -37,7 +37,7 @@ class ReportsController(BaseController):
     async def get_chamber_growth_report(
         self,
         service: ReportsService = Depends(
-            get_reports_service
+            get_suad_reports_service
         ),
     ):
         return self.success(
@@ -53,7 +53,7 @@ class ReportsController(BaseController):
     async def get_login_analytics_report(
         self,
         service: ReportsService = Depends(
-            get_reports_service
+            get_suad_reports_service
         ),
     ):
         return self.success(
@@ -69,7 +69,7 @@ class ReportsController(BaseController):
     async def get_case_filing_trend_report(
         self,
         service: ReportsService = Depends(
-            get_reports_service
+            get_suad_reports_service
         ),
     ):
         return self.success(

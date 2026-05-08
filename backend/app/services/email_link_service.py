@@ -4,6 +4,7 @@ from typing import Optional
 
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.email_link_repository import EmailLinkRepository
 from app.services.base.base_service import BaseService
 from app.utils.email_util import EmailUtil
@@ -16,13 +17,14 @@ class EmailLinkService(BaseService):
 
     def __init__(
             self, 
-            session,            
+            session,
+            module_code: Optional[RefmModulesEnum],
             email_link_repo: Optional[EmailLinkRepository] = None,
             email_util: Optional[EmailUtil] = None,
             ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.email_link_repo = email_link_repo or EmailLinkRepository()
-        self.email_util = email_util or EmailUtil(session)
+        self.email_util = email_util or EmailUtil(session=session,module_code=module_code)
 
     # ─────────────────────────────────────────────
     # 🔗 CREATE LINK

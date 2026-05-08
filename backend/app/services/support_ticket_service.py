@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.support_tickets import SupportTickets
-from app.database.models.refm_modules import RefmModules
+from app.database.models.refm_modules import RefmModules, RefmModulesEnum
 from app.database.models.refm_ticket_status import RefmTicketStatus, RefmTicketStatusConstants
 from app.database.models.users import Users
 from app.database.repositories.support_tickets_repository import SupportTicketsRepository
@@ -32,9 +32,10 @@ class SupportTicketService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         tickets_repo: Optional[SupportTicketsRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.tickets_repo = tickets_repo or SupportTicketsRepository()
     
     # ─────────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.case_aors import CaseAors
 from app.database.models.refm_aor_status import RefmAorStatus, RefmAorStatusConstants
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.users import Users
 from app.database.repositories.case_aors_repository import CaseAorsRepository
@@ -25,13 +26,14 @@ class AorService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         aors_repo: Optional[CaseAorsRepository] = None,
         cases_repo: Optional[CasesRepository] = None,
         users_repo: Optional[UsersRepository] = None,
         users_chamer_repo: Optional[UserChamberLinkRepository] = None,
         profile_images_repo: Optional[ProfileImagesRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.aors_repo = aors_repo or CaseAorsRepository()
         self.cases_repo = cases_repo or CasesRepository()
         self.users_repo = users_repo or UsersRepository()

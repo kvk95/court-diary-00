@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models.delete_account_requests import DeleteAccountRequests
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_user_deletion_status import RefmUserDeletionStatusConstants
 from app.database.models.user_chamber_link import UserChamberLink
 from app.database.models.users import Users
@@ -53,6 +54,7 @@ class UsersService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         chamber_roles_repo: Optional[ChamberRolesRepository] = None,
         users_repo: Optional[UsersRepository] = None,
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
@@ -63,7 +65,7 @@ class UsersService(BaseSecuredService):
         image_service: Optional[ImageService] = None,
         email_link_service: Optional[EmailLinkService] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
         self.users_repo = users_repo or UsersRepository()
         self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
@@ -71,8 +73,8 @@ class UsersService(BaseSecuredService):
         self.delete_account_repo = delete_account_repo or DeleteAccountRequestsRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
-        self.image_service = image_service or ImageService(session)
-        self.email_link_service = email_link_service or EmailLinkService(session=self.session)
+        self.image_service = image_service or ImageService(session=self.session,module_code=module_code)
+        self.email_link_service = email_link_service or EmailLinkService(session=self.session, module_code=module_code)
 
     # ─────────────────────────────────────────────────────────────────────────
     # HELPERS (Now Just Call Repository Methods - No Query Logic)

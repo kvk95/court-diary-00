@@ -3,12 +3,14 @@ from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession    
 
 from app.core.config import settings
+from app.database.models.refm_modules import RefmModulesEnum
 from app.utils.logging_framework.activity_logger import log_activity
 from app.utils.refm.refm_resolver import RefmResolver
 
 class BaseService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, module_code: Optional[RefmModulesEnum]):
         self._session: AsyncSession = session
+        self.module_code: Optional[RefmModulesEnum] = module_code
         self.refm_resolver:RefmResolver = RefmResolver(session=self.session)
         self.settings = settings
 
@@ -61,4 +63,8 @@ class BaseService:
         if case_id:
             target = f"case:{case_id}:{entity_type}:{entity_id}"
         
-        await log_activity(action=action, target=target, metadata=metadata)
+        await log_activity(
+            action=action, 
+            target=target, 
+            metadata=metadata,
+            module_code=self.module_code)

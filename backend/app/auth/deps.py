@@ -6,6 +6,7 @@ from typing import cast
 from app.auth.jwt import decode_token
 from app.core.context import get_request_context, set_request_context
 from app.database.models.base.session import get_session
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.users_repository import UsersRepository
 from app.services.users_service import UsersService
 from app.dtos.oauth_dtos import CurrentUserContext
@@ -96,7 +97,7 @@ async def get_current_user(
         is_email_verified=bool(user.email_verified_ind),
     )
 
-    user_service = UsersService(session=session)
+    user_service = UsersService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT)
     user_details = await user_service.get_user_full_details(user_id=user_context.user_id,
                                                                  chamber_id=user_context.chamber_id)
         

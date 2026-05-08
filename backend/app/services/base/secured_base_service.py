@@ -2,19 +2,20 @@
 Docstring for app.services.base.secured_base_service
 """
 
-from typing import cast
+from typing import Optional, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.context import get_request_context
+from app.database.models.refm_modules import RefmModulesEnum
 from app.dtos.oauth_dtos import CurrentUserContext
 from app.dtos.users_dto import UserOut
 from app.services.base.base_service import BaseService
 
 
 class BaseSecuredService(BaseService):
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
+    def __init__(self, session: AsyncSession, module_code: Optional[RefmModulesEnum]):
+        super().__init__(session=session, module_code=module_code)
 
     @property
     def current_user(self) -> CurrentUserContext:

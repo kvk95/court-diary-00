@@ -8,6 +8,7 @@ import logging
 from typing import Optional
 
 from app.core.config import settings
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.notification_log_repository import NotificationRepository
 from app.services.base.base_service import BaseService
 from app.dtos.scheduler_dto import NotificationLogCreate
@@ -24,10 +25,11 @@ class NotificationService(BaseService):
 
     def __init__(self, 
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         repo: Optional[NotificationRepository] = None
     ):
 
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.repo = repo or NotificationRepository()
         self.purpose_map = None
         self.status_map = None

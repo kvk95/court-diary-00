@@ -13,6 +13,7 @@ from app.database.models.refm_case_types import RefmCaseTypes
 from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_party_roles import RefmPartyRoles
 from app.database.models.refm_party_type import RefmPartyType
 from app.database.repositories.case_clients_repository import CaseClientsRepository
@@ -38,16 +39,17 @@ class ClientsService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         clients_repo: Optional[ClientsRepository] = None,
         case_clients_repo: Optional[CaseClientsRepository] = None,
         profile_images_repo: Optional[ProfileImagesRepository] = None,
         image_service: Optional[ImageService] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.clients_repo = clients_repo or ClientsRepository()
         self.case_clients_repo = case_clients_repo or CaseClientsRepository()
         self.profile_images_repo = profile_images_repo or ProfileImagesRepository()
-        self.image_service = image_service or ImageService(session)
+        self.image_service = image_service or ImageService(session=session,module_code=module_code)
 
     # ─────────────────────────────────────────────────────────────────────
     # HELPERS

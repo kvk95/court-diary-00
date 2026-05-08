@@ -78,6 +78,7 @@ class LoggingRepo:
                 id = ActivityLog.generate_uuid(),
                 timestamp=activity_payload.timestamp,
                 action=activity_payload.action,
+                module_code=activity_payload.module_code,
                 target=activity_payload.target,
                 metadata_json=(
                     activity_payload.metadata_json.model_dump()

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.runtime_settings import set_runtime_settings
 from app.database.models.activity_log import ActivityLog
 from app.database.models.refm_announcement_status import RefmAnnouncementStatusConstants
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.security_roles import SecurityRoles
 from app.database.models.users import Users
 from app.database.repositories.activity_log_repository import ActivityLogRepository
@@ -66,6 +67,7 @@ class SuadService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         suad_repo: Optional[SuadRepository] = None,
         global_settings_repo: Optional[GlobalSettingsRepository] = None,
         announcement_repo: Optional[AnnouncementsRepository] = None,
@@ -76,7 +78,7 @@ class SuadService(BaseSecuredService):
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
         activity_log_repo: Optional[ActivityLogRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.suad_repo = suad_repo or SuadRepository()
         self.global_settings_repo = global_settings_repo or GlobalSettingsRepository()
         self.announcement_repo = announcement_repo or AnnouncementsRepository()
@@ -403,6 +405,7 @@ class SuadService(BaseSecuredService):
                     ActivityLog.actor_user_id,
                     ActivityLog.created_date,
                     ActivityLog.metadata_json,
+                    ActivityLog.module_code,
                 )
                 # ✅ NO chamber filter (SUAD)
                 .order_by(ActivityLog.created_date.desc())

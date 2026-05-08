@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.chamber import Chamber
 from app.database.models.chamber_modules import ChamberModules
-from app.database.models.refm_modules import RefmModulesConstants
+from app.database.models.refm_modules import RefmModulesConstants, RefmModulesEnum
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.security_roles import SecurityRoles
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
@@ -32,7 +32,8 @@ class ChamberService(BaseSecuredService):
 
     def __init__(
             self, 
-            session: AsyncSession,                 
+            session: AsyncSession,
+            module_code: Optional[RefmModulesEnum],
             chamber_repo: Optional[ChamberRepository] = None,
             users_repo: Optional[UsersRepository] | None = None,
             user_chamber_link_repo: Optional[UserChamberLinkRepository] | None = None,
@@ -44,7 +45,7 @@ class ChamberService(BaseSecuredService):
             role_permission_repo: Optional[RolePermissionsRepository] = None,
             chamber_subscriptions_service: Optional[ChamberSubscriptionService] = None,
         ) -> None:
-        super().__init__(session=session)
+        super().__init__(session=session, module_code=module_code)
         self.chamber_repo = chamber_repo or ChamberRepository()
         self.users_repo = users_repo or UsersRepository()
         self.user_chamber_link_repo = user_chamber_link_repo or UserChamberLinkRepository()
@@ -54,7 +55,7 @@ class ChamberService(BaseSecuredService):
         self.user_role_repo: UserRolesRepository = user_role_repo or UserRolesRepository()
         self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
-        self.chamber_subscriptions_service = chamber_subscriptions_service or ChamberSubscriptionService(session=session)
+        self.chamber_subscriptions_service = chamber_subscriptions_service or ChamberSubscriptionService(session=session, module_code=module_code)
 
     # ------------------------------------------------------------------
     # Internal helpers

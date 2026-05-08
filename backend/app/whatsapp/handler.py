@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.refm_modules import RefmModulesEnum
 from app.services.base.secured_base_service import BaseSecuredService
 from app.services.calendar_service import CalendarService
 from app.services.cases_service import CasesService
@@ -27,14 +28,15 @@ class WhatsAppService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         cases_service: Optional[CasesService] = None,
         calendar_service: Optional[CalendarService] = None,
         dashboard_service: Optional[DashboardService] = None,
     ):
-        super().__init__(session)
-        self.cases_service = cases_service or CasesService(session=session)
-        self.calendar_service = calendar_service or CalendarService(session=session)
-        self.dashboard_service = dashboard_service or DashboardService(session=session)
+        super().__init__(session=session, module_code=module_code)
+        self.cases_service = cases_service or CasesService(session=session, module_code=module_code)
+        self.calendar_service = calendar_service or CalendarService(session=session, module_code=module_code)
+        self.dashboard_service = dashboard_service or DashboardService(session=session, module_code=module_code)
 
     async def handle_message(self, phone: str, message: str) -> str:
         msg = message.strip()

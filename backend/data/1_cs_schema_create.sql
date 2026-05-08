@@ -1503,6 +1503,7 @@ CREATE TABLE activity_log (
     id            CHAR(36)     PRIMARY KEY, 
     timestamp     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     action        VARCHAR(255) NOT NULL,
+    module_code   CHAR(8) NULL,
     target        VARCHAR(255) NULL,
     metadata_json JSON         NULL,
     ip_address    VARCHAR(45)  NULL,  
@@ -1513,6 +1514,9 @@ CREATE TABLE activity_log (
         FOREIGN KEY (actor_chamber_id) REFERENCES chamber(chamber_id) ON DELETE CASCADE,
     CONSTRAINT fk_activity_user
         FOREIGN KEY (actor_user_id)    REFERENCES users(user_id)      ON DELETE SET NULL
+    
+    CONSTRAINT fk_activity_log_module
+        FOREIGN KEY (module_code) REFERENCES refm_modules(code) ON DELETE SET NULL,
 ) ENGINE=InnoDB COMMENT='User actions audit';
 
 -- ─────────────────────────────────────────────────────────────────────────────

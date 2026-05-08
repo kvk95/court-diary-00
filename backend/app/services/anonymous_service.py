@@ -8,6 +8,7 @@ from app.database.cache.refm_cache import RefmCache, RefmData
 from app.database.models.email_link import EmailLink
 from app.database.models.refm_email_templates import RefmEmailTemplatesEnum
 from app.database.models.refm_img_upload_for import RefmImgUploadForEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_plan_types import RefmPlanTypesConstants
 from app.database.models.users import Users
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
@@ -40,6 +41,7 @@ class AnonymousService(BaseService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         chamber_repo: Optional[ChamberRepository] = None,
         users_repo: Optional[UsersRepository] = None,
         user_chamber_link_repo: Optional[UserChamberLinkRepository] = None,
@@ -55,7 +57,7 @@ class AnonymousService(BaseService):
         chamber_service: Optional[ChamberService] = None,
         
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.chamber_repo: ChamberRepository = chamber_repo or ChamberRepository()
         self.users_repo: UsersRepository = users_repo or UsersRepository()
         self.user_chamber_link_repo: UserChamberLinkRepository = user_chamber_link_repo or UserChamberLinkRepository()
@@ -66,9 +68,9 @@ class AnonymousService(BaseService):
         self.role_permission_master_repo: RolePermissionMasterRepository = role_permission_master_repo or RolePermissionMasterRepository()
         self.role_permission_repo: RolePermissionsRepository = role_permission_repo or RolePermissionsRepository()
         self.global_settings_repo = global_settings_repo or GlobalSettingsRepository()
-        self.email_link_service = email_link_service or EmailLinkService(session=self.session)
-        self.image_service = image_service or ImageService(session) 
-        self.chamber_service: ChamberService = chamber_service or ChamberService(session=self.session)
+        self.email_link_service = email_link_service or EmailLinkService(session=self.session, module_code=module_code)
+        self.image_service = image_service or ImageService(session=self.session,module_code=self.module_code) 
+        self.chamber_service: ChamberService = chamber_service or ChamberService(session=self.session, module_code=module_code)
 
     async def _check_user_chamber_membership(self, email: str) -> dict:
         """

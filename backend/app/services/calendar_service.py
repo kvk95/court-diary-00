@@ -11,6 +11,7 @@ from app.database.models.courts import Courts
 from app.database.models.hearings import Hearings
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.refm_hearing_status import RefmHearingStatus, RefmHearingStatusConstants
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.hearings_repository import HearingsRepository
 from app.dtos.calendar_dto import CalendarEventOut, CalendarMonthOut
 from app.services.base.secured_base_service import BaseSecuredService
@@ -20,9 +21,10 @@ class CalendarService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         hearings_repo: Optional[HearingsRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.hearings_repo = hearings_repo or HearingsRepository()
 
     # ─────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.contact_messages import ContactMessages
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.models.refm_ticket_status import RefmTicketStatus
 from app.database.repositories.contact_messages_repository import ContactMessagesRepository
 from app.dtos.base.paginated_out import PagingBuilder, PagingData
@@ -26,9 +27,10 @@ class ContactMessagesService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         contact_messages_repo: Optional[ContactMessagesRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.contact_messages_repo = contact_messages_repo or ContactMessagesRepository()
 
     # ─────────────────────────────────────

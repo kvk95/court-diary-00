@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.chamber_resolver import resolve_user_chamber
 from app.database.models.base.session import get_session
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.users_repository import UsersRepository
 from app.services.users_service import UsersService
 from app.core.context import set_request_context
@@ -59,7 +60,7 @@ async def get_current_user_webhook(
     )
 
     # 🔥 load full user details
-    user_service = UsersService(session=session)
+    user_service = UsersService(session=session, module_code=RefmModulesEnum.USER_MANAGEMENT)
     user_details = await user_service.get_user_full_details(
         user_id=user.user_id,
         chamber_id=chamber_id,

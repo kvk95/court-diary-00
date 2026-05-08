@@ -10,6 +10,7 @@ from app.database.models.client_documents import ClientDocuments
 from app.database.models.client_payments import ClientPayments
 from app.database.models.clients import Clients
 from app.database.models.refm_billing_status import RefmBillingStatusConstants
+from app.database.models.refm_modules import RefmModulesEnum
 from app.database.repositories.client_bills_repository import ClientBillsRepository
 from app.database.repositories.client_documents_repository import ClientDocumentsRepository
 from app.database.repositories.client_payments_repository import ClientPaymentsRepository
@@ -41,12 +42,13 @@ class BillingService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         bills_repo: Optional[ClientBillsRepository] = None,
         payments_repo: Optional[ClientPaymentsRepository] = None,
         documents_repo: Optional[ClientDocumentsRepository] = None,
         clients_repo: Optional[ClientsRepository] = None,
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.bills_repo = bills_repo or ClientBillsRepository()
         self.payments_repo = payments_repo or ClientPaymentsRepository()
         self.documents_repo = documents_repo or ClientDocumentsRepository()

@@ -57,7 +57,7 @@ async def queue_worker():
 async def enqueue_summary_job():
     async for session in get_session():
 
-        service = NotificationService(session=session)
+        service = NotificationService(session=session, module_code=None)
         users = await service.get_users_settings(session)
 
         today = date.today()
@@ -95,7 +95,7 @@ async def enqueue_summary_job():
 async def enqueue_reminder_job():
     async for session in get_session():        
 
-        service = NotificationService(session=session)
+        service = NotificationService(session=session, module_code=None)
         users = await service.get_users_settings(session)
 
         now = datetime.now()
@@ -121,8 +121,8 @@ async def process_notification(job):
     async with semaphore:
         async for session in get_session():
 
-            service = NotificationService(session=session)
-            email_util = EmailUtil(session=session)
+            service = NotificationService(session=session,module_code=None)
+            email_util = EmailUtil(session=session, module_code=None)
 
             if job["type"] == "SUMMARY":
                 await service.process_summary(email_util, job)

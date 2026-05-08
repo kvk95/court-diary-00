@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models.notification_settings import NotificationSettings
 from app.database.models.refm_email_summary_frequency import RefmEmailSummaryFrequencyConstants, RefmEmailSummaryFrequencyEnum
+from app.database.models.refm_modules import RefmModulesEnum
 from app.dtos.notification_settings_dto import (
     NotificationSettingsOut,
     NotificationSettingsEdit
@@ -25,9 +26,10 @@ class NotificationSettingsService(BaseSecuredService):
     def __init__(
         self,
         session: AsyncSession,
+        module_code: Optional[RefmModulesEnum],
         notification_repo: Optional[NotificationSettingsRepository] = None
     ):
-        super().__init__(session)
+        super().__init__(session=session, module_code=module_code)
         self.notification_repo = notification_repo or NotificationSettingsRepository()
 
     async def _get_by_id(self):
