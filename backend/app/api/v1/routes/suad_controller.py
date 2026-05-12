@@ -310,6 +310,19 @@ class SuadController(BaseController):
     ) -> BaseOutDto[PagingData[SecurityRoleItem]]:
         result = await service.get_security_roles(page, limit, search)
         return self.success(result=result)
+
+    @BaseController.get(
+        "/roles/all",
+        summary="List all global roles",
+        response_model=BaseOutDto[list[SecurityRoleItem]],
+        dependencies=[Depends(require_permission(_SUAD, PType.READ))]
+    )
+    async def get_all_roles(
+        self,
+        service: SuadService = Depends(get_suad_service),
+    ) -> BaseOutDto[List[SecurityRoleItem]]:
+        result = await service.get_all_roles()
+        return self.success(result=result)
     
     @BaseController.post(
         "/roles",

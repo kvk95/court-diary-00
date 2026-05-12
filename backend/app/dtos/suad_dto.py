@@ -166,6 +166,8 @@ class SecurityRoleItem(BaseRecordData):
     admin_ind: bool
     status_ind: bool
     chambers_count: int
+    user_count: int = 0
+    chamber_user_count: int = 0
 
 class SecurityRoleStats(BaseRecordData):
     total_roles: int

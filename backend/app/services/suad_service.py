@@ -698,6 +698,16 @@ class SuadService(BaseSecuredService):
             page=page,
             limit=limit
         ).build(records=records)
+
+    async def get_all_roles(self) -> list[SecurityRoleItem]:
+        # Read-only: No logging
+        roles = await self.chamber_roles_repo.list_all(
+            session=self.session,
+            where=[SecurityRoles.deleted_ind.is_(False), 
+                   SecurityRoles.status_ind.is_(True)],
+            order_by=[SecurityRoles.role_name.asc()],
+        )
+        return [self._to_roles_out(row) for row in roles]
     
     async def create_security_role(self, payload: SecurityRoleCreate) -> SecurityRoleItem:
 
