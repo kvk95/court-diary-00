@@ -701,7 +701,7 @@ class SuadService(BaseSecuredService):
 
     async def get_all_roles(self) -> list[SecurityRoleItem]:
         # Read-only: No logging
-        roles = await self.chamber_roles_repo.list_all(
+        roles = await self.security_roles_repo.list_all(
             session=self.session,
             where=[SecurityRoles.deleted_ind.is_(False), 
                    SecurityRoles.status_ind.is_(True)],
