@@ -165,7 +165,7 @@ class SecurityRoleItem(BaseRecordData):
     system_ind: bool
     admin_ind: bool
     status_ind: bool
-    chambers_count: int
+    chambers_count: int = 0
     user_count: int = 0
     chamber_user_count: int = 0
 

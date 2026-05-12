@@ -707,7 +707,18 @@ class SuadService(BaseSecuredService):
                    SecurityRoles.status_ind.is_(True)],
             order_by=[SecurityRoles.role_name.asc()],
         )
-        return [self._to_roles_out(row) for row in roles]
+        return [
+            SecurityRoleItem(
+                role_id = r.role_id,
+                role_code = r.role_code,
+                role_name = r.role_name,
+                description = r.description,
+                system_ind = r.system_ind,
+                admin_ind = r.admin_ind,
+                status_ind = r.status_ind,
+            )
+            for r in roles
+        ]
     
     async def create_security_role(self, payload: SecurityRoleCreate) -> SecurityRoleItem:
 
