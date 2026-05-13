@@ -708,24 +708,13 @@ class SuadService(BaseSecuredService):
         ).build(records=records)
 
     async def get_all_roles(self) -> list[SecurityRoleItem]:
-        # Read-only: No logging
-        roles = await self.security_roles_repo.list_all(
+        rows = await self.suad_repo.get_all_roles_with_stats(
             session=self.session,
-            where=[SecurityRoles.deleted_ind.is_(False), 
-                   SecurityRoles.status_ind.is_(True)],
-            order_by=[SecurityRoles.role_name.asc()],
         )
+
         return [
-            SecurityRoleItem(
-                role_id = r.role_id,
-                role_code = r.role_code,
-                role_name = r.role_name,
-                description = r.description,
-                system_ind = r.system_ind,
-                admin_ind = r.admin_ind,
-                status_ind = r.status_ind,
-            )
-            for r in roles
+            SecurityRoleItem(**r)
+            for r in rows
         ]
     
     async def create_security_role(self, payload: SecurityRoleCreate) -> SecurityRoleItem:

@@ -10,6 +10,7 @@ from app.database.models.chamber import Chamber
 from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.login_audit import LoginAudit
 from app.database.models.profile_images import ProfileImages
+from app.database.models.security_roles import SecurityRoles
 from app.database.models.user_roles import UserRoles
 from app.database.models.users import Users
 from app.database.models.cases import Cases
@@ -373,3 +374,111 @@ class SuadRepository(BaseRepository[Chamber]):
             })
 
         return result, total
+    
+    async def get_all_roles_with_stats(
+        self,
+        session: AsyncSession,
+    ):
+
+        stmt = (
+            select(
+
+                SecurityRoles.role_id,
+                SecurityRoles.role_code,
+                SecurityRoles.role_name,
+                SecurityRoles.description,
+
+                SecurityRoles.system_ind,
+                SecurityRoles.admin_ind,
+                SecurityRoles.status_ind,
+
+                # -----------------------------------
+                # chambers_count
+                # chambers where template pushed
+                # -----------------------------------
+                func.count(
+                    func.distinct(
+                        ChamberRoles.chamber_id
+                    )
+                ).label("chambers_count"),
+
+                # -----------------------------------
+                # total assigned users
+                # -----------------------------------
+                func.count(
+                    func.distinct(
+                        UserRoles.link_id
+                    )
+                ).label("user_count"),
+
+                # -----------------------------------
+                # distinct chambers actively using
+                # this role via users
+                # -----------------------------------
+                func.count(
+                    func.distinct(
+                        case(
+                            (
+                                UserRoles.user_role_id.is_not(None),
+                                UserChamberLink.chamber_id
+                            ),
+                            else_=None
+                        )
+                    )
+                ).label("chamber_user_count"),
+
+            )
+
+            # -----------------------------------
+            # TEMPLATE → CHAMBER ROLE
+            # -----------------------------------
+            .outerjoin(
+                ChamberRoles,
+                ChamberRoles.security_role_id ==
+                SecurityRoles.role_id
+            )
+
+            # -----------------------------------
+            # CHAMBER ROLE → USER ROLE
+            # -----------------------------------
+            .outerjoin(
+                UserRoles,
+                UserRoles.role_id ==
+                ChamberRoles.role_id
+            )
+
+            # -----------------------------------
+            # USER ROLE → CHAMBER LINK
+            # -----------------------------------
+            .outerjoin(
+                UserChamberLink,
+                UserChamberLink.link_id ==
+                UserRoles.link_id
+            )
+
+            .where(
+                SecurityRoles.deleted_ind.is_(False),
+                SecurityRoles.status_ind.is_(True),
+            )
+
+            .group_by(
+                SecurityRoles.role_id,
+                SecurityRoles.role_code,
+                SecurityRoles.role_name,
+                SecurityRoles.description,
+                SecurityRoles.system_ind,
+                SecurityRoles.admin_ind,
+                SecurityRoles.status_ind,
+            )
+
+            .order_by(
+                SecurityRoles.role_name.asc()
+            )
+        )
+
+        result = await self.execute(
+            session=session,
+            stmt=stmt
+        )
+
+        return result.mappings().all()
