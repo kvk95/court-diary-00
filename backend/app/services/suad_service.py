@@ -970,19 +970,19 @@ class SuadService(BaseSecuredService):
                 session=self.session,
                 data={
 
-                    RolePermissions.security_role_id.key: new_role.role_id,
+                    "security_role_id": new_role.role_id,
 
-                    RolePermissions.module_code.key: p.module_code,
+                    "module_code": p.module_code,
 
-                    RolePermissions.allow_all_ind.key: p.allow_all_ind,
+                    "allow_all_ind": p.allow_all_ind,
 
-                    RolePermissions.read_ind.key: p.read_ind,
-                    RolePermissions.write_ind.key: p.write_ind,
-                    RolePermissions.create_ind.key: p.create_ind,
-                    RolePermissions.delete_ind.key: p.delete_ind,
+                    "read_ind": p.read_ind,
+                    "write_ind": p.write_ind,
+                    "create_ind": p.create_ind,
+                    "delete_ind": p.delete_ind,
 
-                    RolePermissions.import_ind.key: p.import_ind,
-                    RolePermissions.export_ind.key: p.export_ind,
+                    "import_ind": p.import_ind,
+                    "export_ind": p.export_ind,
                 }
             )
             
@@ -1023,19 +1023,19 @@ class SuadService(BaseSecuredService):
                 session=self.session,
                 id_values=p.permission_id,
                 data={
-                    RolePermissions.security_role_id.key: payload.role_id,
+                    "security_role_id": payload.role_id,
 
-                    RolePermissions.module_code.key: p.module_code,
+                    "module_code": p.module_code,
 
-                    RolePermissions.allow_all_ind.key: p.allow_all_ind,
+                    "allow_all_ind": p.allow_all_ind,
 
-                    RolePermissions.read_ind.key: p.read_ind,
-                    RolePermissions.write_ind.key: p.write_ind,
-                    RolePermissions.create_ind.key: p.create_ind,
-                    RolePermissions.delete_ind.key: p.delete_ind,
+                    "read_ind": p.read_ind,
+                    "write_ind": p.write_ind,
+                    "create_ind": p.create_ind,
+                    "delete_ind": p.delete_ind,
 
-                    RolePermissions.import_ind.key: p.import_ind,
-                    RolePermissions.export_ind.key: p.export_ind,
+                    "import_ind": p.import_ind,
+                    "export_ind": p.export_ind,
                 }
             )
             
