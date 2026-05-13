@@ -22,8 +22,8 @@ class ChamberRoles(BaseModel, TimestampMixin):
     # security_role_id : INTEGER
     security_role_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("security_roles.role_id", ondelete="SET NULL"))
 
-    # role_code : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
-    role_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    # role_code : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
+    role_code: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # role_name : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
     role_name: Mapped[str] = mapped_column(String(80), nullable=False)

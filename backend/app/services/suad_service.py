@@ -10,13 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.runtime_settings import set_runtime_settings
 from app.database.models.activity_log import ActivityLog
+from app.database.models.chamber_roles import ChamberRoles
 from app.database.models.refm_announcement_status import RefmAnnouncementStatusConstants
 from app.database.models.refm_modules import RefmModulesEnum
+from app.database.models.role_permissions import RolePermissions
 from app.database.models.security_roles import SecurityRoles
 from app.database.models.users import Users
 from app.database.repositories.activity_log_repository import ActivityLogRepository
 from app.database.repositories.announcements_repository import AnnouncementsRepository
 from app.database.repositories.chamber_modules_repository import ChamberModulesRepository
+from app.database.repositories.chamber_repository import ChamberRepository
 from app.database.repositories.chamber_roles_repository import ChamberRolesRepository
 from app.database.repositories.global_settings_repository import GlobalSettingsRepository
 from app.database.repositories.role_permission_master_repository import RolePermissionMasterRepository
@@ -75,6 +78,7 @@ class SuadService(BaseSecuredService):
         chamber_roles_repo: Optional[ChamberRolesRepository] = None,
         role_permission_master_repo: Optional[RolePermissionMasterRepository] = None,
         chamber_modules_repo: Optional[ChamberModulesRepository] = None,
+        chamber_repo: Optional[ChamberRepository] = None,
         role_permissions_repo: Optional[RolePermissionsRepository] = None,
         activity_log_repo: Optional[ActivityLogRepository] = None,
     ):
@@ -86,6 +90,7 @@ class SuadService(BaseSecuredService):
         self.chamber_roles_repo = chamber_roles_repo or ChamberRolesRepository()
         self.role_permission_master_repo = role_permission_master_repo or RolePermissionMasterRepository()
         self.chamber_modules_repo = chamber_modules_repo or ChamberModulesRepository()
+        self.chamber_repo = chamber_repo or ChamberRepository()
         self.role_permissions_repo = role_permissions_repo or RolePermissionsRepository()
         self.activity_log_repo = activity_log_repo or ActivityLogRepository()
 
@@ -189,16 +194,18 @@ class SuadService(BaseSecuredService):
         session,
         rows: list[dict],
     ):
-        return await self.role_permission_master_repo.bulk_upsert(
+        dict= await self.role_permissions_repo.bulk_upsert(
             session=session,
             rows=rows,
 
-            unique_columns=[
-                "role_id",
-                "chamber_module_id",
-            ],
+            # unique_columns=[
+            #     "role_id",
+            #     "chamber_module_id",
+            # ],
 
             update_columns=[
+                "role_id",
+                "chamber_module_id",
                 "allow_all_ind",
 
                 "read_ind",
@@ -213,6 +220,7 @@ class SuadService(BaseSecuredService):
                 "updated_date",
             ]
         )
+        return dict
     
     def _resolve_status(self, payload, now: datetime) -> str:
         # publish override
@@ -972,19 +980,20 @@ class SuadService(BaseSecuredService):
             permission = await self.role_permission_master_repo.create(
                 session=self.session,
                 data={
-                    "security_role_id": new_role.role_id,
 
-                    "module_code": p.module_code,
+                    RolePermissions.security_role_id.key: new_role.role_id,
 
-                    "allow_all_ind": p.allow_all_ind,
+                    RolePermissions.module_code.key: p.module_code,
 
-                    "read_ind": p.read_ind,
-                    "write_ind": p.write_ind,
-                    "create_ind": p.create_ind,
-                    "delete_ind": p.delete_ind,
+                    RolePermissions.allow_all_ind.key: p.allow_all_ind,
 
-                    "import_ind": p.import_ind,
-                    "export_ind": p.export_ind,
+                    RolePermissions.read_ind.key: p.read_ind,
+                    RolePermissions.write_ind.key: p.write_ind,
+                    RolePermissions.create_ind.key: p.create_ind,
+                    RolePermissions.delete_ind.key: p.delete_ind,
+
+                    RolePermissions.import_ind.key: p.import_ind,
+                    RolePermissions.export_ind.key: p.export_ind,
                 }
             )
             
@@ -1025,19 +1034,19 @@ class SuadService(BaseSecuredService):
                 session=self.session,
                 id_values=p.permission_id,
                 data={
-                    "security_role_id": payload.role_id,
+                    RolePermissions.security_role_id.key: payload.role_id,
 
-                    "module_code": p.module_code,
+                    RolePermissions.module_code.key: p.module_code,
 
-                    "allow_all_ind": p.allow_all_ind,
+                    RolePermissions.allow_all_ind.key: p.allow_all_ind,
 
-                    "read_ind": p.read_ind,
-                    "write_ind": p.write_ind,
-                    "create_ind": p.create_ind,
-                    "delete_ind": p.delete_ind,
+                    RolePermissions.read_ind.key: p.read_ind,
+                    RolePermissions.write_ind.key: p.write_ind,
+                    RolePermissions.create_ind.key: p.create_ind,
+                    RolePermissions.delete_ind.key: p.delete_ind,
 
-                    "import_ind": p.import_ind,
-                    "export_ind": p.export_ind,
+                    RolePermissions.import_ind.key: p.import_ind,
+                    RolePermissions.export_ind.key: p.export_ind,
                 }
             )
             
@@ -1062,24 +1071,64 @@ class SuadService(BaseSecuredService):
     
     async def push_permission(self, payload: PermissionPushIn):
 
+        security_roles = await self.security_roles_repo.get_first(
+            self.session,
+            where=[
+                SecurityRoles.deleted_ind.is_(False),
+                or_(
+                    SecurityRoles.role_id == payload.role_id,
+                ),
+            ],
+        )
+
+        if not security_roles:
+            raise ValidationErrorDetail(code=ErrorCodes.NOT_FOUND, message="Settings not Found")
+
         perms = await self.role_permission_master_repo.get_by_role(
             self.session,
             payload.role_id
         )
 
-        chamber_roles = await self.chamber_roles_repo.get_by_security_role(
-            self.session,
-            payload.role_id
-        )
+        chambers = await self.chamber_repo.list_all(session=self.session)
 
-        bulk_rows = []
+        for ch in chambers:
+            chamber_roles = await self.chamber_roles_repo.get_first(
+                self.session,
+                where=[
+                    ChamberRoles.deleted_ind.is_(False),
+                    ChamberRoles.chamber_id == ch.chamber_id,
+                    ChamberRoles.role_name == security_roles.role_name,
+                    ChamberRoles.role_code == security_roles.role_code,
+                ],
+            )
 
-        for cr in chamber_roles:
+            if not chamber_roles:                
+                chamber_roles = await self.chamber_roles_repo.create(
+                    session=self.session,
+                    data={
+                        ChamberRoles.role_code.key: security_roles.role_code,
+                        ChamberRoles.role_name.key: security_roles.role_name,
+                        ChamberRoles.description.key: security_roles.description,
+                        ChamberRoles.status_ind.key: security_roles.status_ind,
+                        ChamberRoles.chamber_id.key :ch.chamber_id,
+                    },
+                )
+            
+
+            bulk_rows = []
 
             module_map = await self.chamber_modules_repo.get_modules_by_chamber(
                 self.session,
-                cr.chamber_id
+                ch.chamber_id
             )
+
+            chamber_perm = await self.role_permissions_repo.get_first(
+                session=self.session,
+                filters={RolePermissions.role_id: chamber_roles.role_id}
+            )
+
+            if chamber_perm:
+                continue
 
             for p in perms:
 
@@ -1089,7 +1138,7 @@ class SuadService(BaseSecuredService):
                     continue
 
                 bulk_rows.append({
-                    "role_id": cr.role_id,
+                    "role_id": chamber_roles.role_id,
                     "chamber_module_id": chamber_module_id,
 
                     "allow_all_ind": p.allow_all_ind,
@@ -1105,10 +1154,10 @@ class SuadService(BaseSecuredService):
                     "updated_by": self.user_id,
                 })
 
-        await self.__bulk_upsert_role_permission(
-            session=self.session,
-            rows=bulk_rows,
-        )
+            await self.__bulk_upsert_role_permission(
+                session=self.session,
+                rows=bulk_rows,
+            )
 
         return {
             "updated": True,

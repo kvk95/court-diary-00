@@ -22,7 +22,7 @@ class ChamberModulesRepository(BaseRepository[ChamberModules]):
 
         result = await self.execute(session=session, stmt=stmt)
 
-        rows = result.scalars().all()
+        rows = result.mappings().all()
 
         return {
             r["module_code"]: r["chamber_module_id"]

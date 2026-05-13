@@ -632,7 +632,7 @@ DROP TABLE IF EXISTS security_roles;
 CREATE TABLE security_roles (
     role_id INT AUTO_INCREMENT PRIMARY KEY,
 
-    role_code VARCHAR(20) NOT NULL UNIQUE,
+    role_code VARCHAR(50) NOT NULL UNIQUE,
     role_name VARCHAR(80) NOT NULL,
     description TEXT NULL,
 
@@ -670,7 +670,7 @@ CREATE TABLE chamber_roles (
 
     chamber_id CHAR(36) NOT NULL,
     security_role_id INT NULL,
-	role_code VARCHAR(20) NOT NULL,
+	role_code VARCHAR(50) NOT NULL,
     role_name VARCHAR(80) NOT NULL,
     description TEXT NULL,
 

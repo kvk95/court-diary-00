@@ -16,8 +16,8 @@ class SecurityRoles(BaseModel, TimestampMixin):
     # role_id : INTEGER
     role_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
 
-    # role_code : VARCHAR(20) COLLATE "utf8mb4_unicode_ci"
-    role_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    # role_code : VARCHAR(50) COLLATE "utf8mb4_unicode_ci"
+    role_code: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # role_name : VARCHAR(80) COLLATE "utf8mb4_unicode_ci"
     role_name: Mapped[str] = mapped_column(String(80), nullable=False)

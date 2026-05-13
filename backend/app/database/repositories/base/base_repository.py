@@ -959,7 +959,7 @@ class BaseRepository(Generic[ModelType]):
         session: AsyncSession,
         *,
         rows: List[Dict[str, Any]],
-        unique_columns: List[str],
+        unique_columns:  Optional[List[str]] = None,
         update_columns: Optional[List[str]] = None,
     ):
 
