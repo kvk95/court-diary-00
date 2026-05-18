@@ -12,7 +12,7 @@ from app.dtos.base.base_out_dto import BaseOutDto
 from app.dtos.base.paginated_out import PagingData
 from app.dtos.cases_dto import (
     CaseClientLinkPayload, CaseClientLinkedOut, CaseClientOut,
-    CaseCreate, CaseDelete, CaseDetailOut, CaseEdit, CaseListOut,
+    CaseCreate, CaseDelete, CaseDetailOut, CaseEdit, CaseFilterOptionsOut, CaseListOut,
     CaseNoteCreate, CaseNoteDelete, CaseNoteEdit, CaseNoteOut,
     CaseQuickHearingOut, CaseSummaryStats, CourtItem, HearingCreate, HearingDelete,
     HearingEdit, HearingOut, RecentActivityItem,
@@ -88,20 +88,54 @@ class CasesController(BaseController):
         summary="Get cases (paginated)",
         response_model=BaseOutDto[PagingData[CaseListOut]],
     )
+    
     async def cases_get_paged(
         self,
         page: int = Query(PAGINATION_DEFAULT_PAGE, ge=1),
         limit: int = Query(PAGINATION_DEFAULT_LIMIT, ge=1, le=500),
         search: Optional[str] = Query(None, description="Search case number, petitioner, respondent"),
-        status_code: Optional[str] = Query(None, description="AC | ADJ | DIS | CLO | OVD"),
+        status_code: Optional[str] = Query(None),
         court_code: Optional[int] = Query(None),
+        petitioner: Optional[str] = Query(None),
+        respondent: Optional[str] = Query(None),
+        opponent_council: Optional[str] = Query(None),
+        filing_year: Optional[int] = Query(None),
+        case_type_code: Optional[str] = Query(None),
+        aor_user_id: Optional[str] = Query(None),
+        party_role_code: Optional[str] = Query(None),
+        hearing_status_code: Optional[str] = Query(None),
         sort_by: str = Query("updated_date", description="updated_date | hearing_date | case_number"),
-        service: CasesService = Depends(get_cases_service),  # read enforced in factory
+        service: CasesService = Depends( get_cases_service ),
     ) -> BaseOutDto[PagingData[CaseListOut]]:
         return self.success(result=await service.cases_get_paged(
-            page=page, limit=limit, search=search,
-            status_code=status_code, court_code=court_code, sort_by=sort_by,
+            page=page, 
+            limit=limit, 
+            search=search,
+            status_code = status_code,
+            court_code = court_code,
+            petitioner = petitioner,
+            respondent = respondent,
+            opponent_council = opponent_council,
+            filing_year = filing_year,
+            case_type_code = case_type_code,
+            aor_user_id = aor_user_id,
+            party_role_code = party_role_code,
+            hearing_status_code = hearing_status_code,
+            sort_by = sort_by,
         ))
+    
+    @BaseController.get(
+        "/filter-options",
+        summary="Get case filter options",
+        response_model=BaseOutDto[CaseFilterOptionsOut],
+    )
+    async def cases_get_filter_options(
+        self,
+        service: CasesService = Depends(get_cases_service),
+    ):
+        return self.success(
+            result=await service.cases_get_filter_options()
+        )
 
     # ── Single ────────────────────────────────────────────────────────────
 

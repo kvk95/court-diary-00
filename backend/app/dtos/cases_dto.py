@@ -15,6 +15,21 @@ if TYPE_CHECKING:
 # ─────────────────────────────────────────────────────────────────────────────
 # CASES — List / Detail
 # ─────────────────────────────────────────────────────────────────────────────
+class FilterOptionItem(BaseRecordData):
+
+    code: Optional[str] = None
+    label: str
+
+class CaseFilterOptionsOut(BaseRecordData):
+
+    petitioners: list[str]
+    respondents: list[str]
+    opponent_counsels: list[str]
+    filing_years: list[int]
+    courts: list[FilterOptionItem]
+    case_types: list[FilterOptionItem]
+    statuses: list[FilterOptionItem]
+    aors: list[FilterOptionItem]
 
 class CaseBasicInfoOut(BaseRecordData):
     case_id: str
@@ -27,6 +42,7 @@ class CaseBasicInfoOut(BaseRecordData):
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
+    opponent_council: Optional[str]
     case_summary: Optional[str] = None
     status_code: Optional[str] = None
     status_description: Optional[str] = None
@@ -64,6 +80,7 @@ class CaseCreate(BaseInData):
     filing_year: Optional[int] = None
     petitioner: str
     respondent: str
+    opponent_council: Optional[str] = None
     case_summary: Optional[str] = None
     status_code: str = RefmCaseStatusConstants.ACTIVE
     next_hearing_date: Optional[date] = None

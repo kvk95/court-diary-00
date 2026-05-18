@@ -18,6 +18,7 @@ from app.database.models.refm_plan_types import RefmPlanTypes
 from app.database.models.users import Users
 from app.database.repositories.base.base_repository import BaseRepository
 from app.database.repositories.base.repo_context import apply_repo_context
+from app.dtos.cases_dto import FilterOptionItem
 
 
 @apply_repo_context
@@ -226,7 +227,15 @@ class CasesRepository(BaseRepository[Cases]):
         chamber_id: str,
         search: Optional[str] = None,
         status_code: Optional[str] = None,
-        court_code: Optional[int] = None,
+        court_code: Optional[str] = None,
+        petitioner: Optional[str] = None,
+        respondent: Optional[str] = None,
+        opponent_council: Optional[str] = None,
+        filing_year: Optional[int] = None,
+        case_type_code: Optional[str] = None,
+        aor_user_id: Optional[str] = None,
+        party_role_code: Optional[str] = None,
+        hearing_status_code: Optional[str] = None,        
         sort_by: str = "updated_date",
     ):
         # ------------------------------------------------
@@ -333,6 +342,46 @@ class CasesRepository(BaseRepository[Cases]):
                 )
             )
 
+        if petitioner:
+            base_filters.append(
+                Cases.petitioner == petitioner
+            )
+
+        if respondent:
+            base_filters.append(
+                Cases.respondent == respondent
+            )
+
+        if opponent_council:
+            base_filters.append(
+                Cases.opponent_council == opponent_council
+            )
+
+        if filing_year:
+            base_filters.append(
+                Cases.filing_year == filing_year
+            )
+
+        if case_type_code:
+            base_filters.append(
+                Cases.case_type_code == case_type_code
+            )
+
+        if aor_user_id:
+            base_filters.append(
+                aor_subq.c.user_id == aor_user_id
+            )
+
+        if party_role_code:
+            base_filters.append(
+                primary_role.c.party_role_code == party_role_code
+            )
+
+        if hearing_status_code:
+            base_filters.append(
+                latest_hearing.c.status_code == hearing_status_code
+            )
+
         # ------------------------------------------------
         # 🔹 RECORDS QUERY
         # ------------------------------------------------
@@ -387,6 +436,186 @@ class CasesRepository(BaseRepository[Cases]):
         )
 
         return rows, total
+    
+    async def get_distinct_column_values(
+        self,
+        session: AsyncSession,
+        column,
+        *,
+        chamber_id: str,
+    ):
+
+        stmt = (
+            select(
+                func.distinct(column)
+            )
+            .where(
+                Cases.chamber_id == chamber_id,
+                Cases.deleted_ind.is_(False),
+                column.is_not(None),
+            )
+            .order_by(column.asc())
+        )
+
+        result = await self.execute(
+            session=session,
+            stmt=stmt
+        )
+
+        return [
+            r[0]
+            for r in result.fetchall()
+            if r[0]
+        ]
+    
+    async def get_case_courts(
+        self,
+        session: AsyncSession,
+        *,
+        chamber_id: str,
+    ):
+        stmt = (
+            select(
+                func.distinct(Courts.court_code),
+                Courts.court_name,
+            )
+            .join(
+                Cases,
+                Cases.court_code == Courts.court_code
+            )
+            .where(
+                Cases.chamber_id == chamber_id,
+                Cases.deleted_ind.is_(False),
+            )
+            .order_by(Courts.court_name.asc())
+        )
+
+        result = await self.execute(
+            session=session,
+            stmt=stmt
+        )
+
+        return [
+            FilterOptionItem(
+                code=r[0],
+                label=r[1],
+            )
+            for r in result.fetchall()
+            if r[0]
+        ]
+    
+    async def get_case_types(
+        self,
+        session: AsyncSession,
+        *,
+        chamber_id: str,
+    ):
+
+        stmt = (
+            select(
+                func.distinct(RefmCaseTypes.code),
+                RefmCaseTypes.description,
+            )
+            .join(
+                Cases,
+                Cases.case_type_code == RefmCaseTypes.code
+            )
+            .where(
+                Cases.chamber_id == chamber_id,
+                Cases.deleted_ind.is_(False),
+            )
+            .order_by(
+                RefmCaseTypes.description.asc()
+            )
+        )
+
+        result = await self.execute(
+            session=session,
+            stmt=stmt
+        )
+
+        return [
+            FilterOptionItem(
+                code=r[0],
+                label=r[1],
+            )
+            for r in result.fetchall()
+            if r[0]
+        ]
+    
+    async def get_case_statuses(
+        self,
+        session: AsyncSession,
+        *,
+        chamber_id: str,
+    ):
+        stmt = (
+            select(
+                func.distinct(RefmCaseStatus.code),
+                RefmCaseStatus.description,
+            )
+            .join(
+                Cases,
+                Cases.status_code == RefmCaseStatus.code
+            )
+            .where(
+                Cases.chamber_id == chamber_id,
+                Cases.deleted_ind.is_(False),
+            )
+            .order_by(RefmCaseStatus.code.asc())
+        )
+
+        result = await self.execute(
+            session=session,
+            stmt=stmt
+        )
+
+        return [
+            FilterOptionItem(
+                code=r[0],
+                label=r[1],
+            )
+            for r in result.fetchall()
+            if r[0]
+        ]
+
+    async def get_case_advocates(
+        self,
+        session: AsyncSession,
+        *,
+        chamber_id: str,
+    ):
+
+        stmt = (
+            select(
+                func.distinct(Users.user_id).label("user_id"),
+                Users.first_name,
+                Users.last_name,
+            )
+            .join(
+                CaseAors,
+                CaseAors.user_id == Users.user_id
+            )
+            .join(
+                Cases,
+                Cases.case_id == CaseAors.case_id
+            )
+            .where(
+                Cases.chamber_id == chamber_id,
+                Cases.deleted_ind.is_(False),
+            )
+            .order_by(
+                Users.first_name.asc()
+            )
+        )
+
+        result = await self.execute(
+            session=session,
+            stmt=stmt
+        )
+
+        return result.mappings().all()
+        
     
     async def get_case_details(
         self,

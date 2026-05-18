@@ -122,7 +122,8 @@ INSERT IGNORE INTO refm_client_type (code, description, sort_order) VALUES
 
 INSERT IGNORE INTO refm_party_type (code, description, sort_order) VALUES
 ('PTCL', 'Client', 10),
-('PTCP', 'Party to Case', 20);
+('PTCP', 'Party to Case', 20),
+('PTOC', 'Opposite Council', 30);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 15.4  Email & Communication

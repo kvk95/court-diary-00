@@ -22,12 +22,13 @@ from app.database.models.refm_client_type import RefmClientType
 from app.database.models.refm_hearing_status import RefmHearingStatus
 from app.database.models.refm_hearing_purpose import RefmHearingPurpose
 from app.database.models.refm_modules import RefmModulesEnum
-from app.database.models.refm_party_roles import RefmPartyRoles
-from app.database.models.refm_party_type import RefmPartyType
+from app.database.models.refm_party_roles import RefmPartyRoles, RefmPartyRolesConstants
+from app.database.models.refm_party_type import RefmPartyType, RefmPartyTypeConstants
 from app.database.models.users import Users
 from app.database.repositories.case_clients_repository import CaseClientsRepository
 from app.database.repositories.case_notes_repository import CaseNotesRepository
 from app.database.repositories.cases_repository import CasesRepository
+from app.database.repositories.clients_repository import ClientsRepository
 from app.database.repositories.courts_repository import CourtsRepository
 from app.database.repositories.hearings_repository import HearingsRepository
 from app.dtos.aor_dto import AorOut
@@ -39,6 +40,7 @@ from app.dtos.cases_dto import (
     CaseCreate,
     CaseDelete,
     CaseDetailOut,
+    CaseFilterOptionsOut,
     CaseListOut,
     CaseEdit,
     CaseNoteCreate,
@@ -48,6 +50,7 @@ from app.dtos.cases_dto import (
     CaseQuickHearingOut,
     CaseSummaryStats,
     CourtItem,
+    FilterOptionItem,
     HearingCreate,
     HearingDelete,
     HearingEdit,
@@ -65,6 +68,7 @@ class CasesService(BaseSecuredService):
         self,
         session: AsyncSession,
         module_code: Optional[RefmModulesEnum],
+        clients_repo: Optional[ClientsRepository] = None,
         cases_repo: Optional[CasesRepository] = None,
         hearings_repo: Optional[HearingsRepository] = None,
         case_notes_repo: Optional[CaseNotesRepository] = None,
@@ -75,6 +79,7 @@ class CasesService(BaseSecuredService):
         self.cases_repo = cases_repo or CasesRepository()
         self.hearings_repo = hearings_repo or HearingsRepository()
         self.case_notes_repo = case_notes_repo or CaseNotesRepository()
+        self.clients_repo = clients_repo or ClientsRepository()
         self.case_clients_repo = case_clients_repo or CaseClientsRepository()
         self.court_repo = court_repo or CourtsRepository()        
         
@@ -295,8 +300,8 @@ class CasesService(BaseSecuredService):
                 case_client_id=cc.case_client_id,
                 client_id=cl.client_id,
                 chamber_id=cl.chamber_id,
-                client_type_code=cl.client_type_code,
-                client_type_description=client_type_map.get(cl.client_type_code, ""),
+                client_type_code=cl.client_type_code or '',
+                client_type_description=client_type_map.get(cl.client_type_code or '', ""),
                 party_type_code=cl.party_type_code,
                 party_type_description=party_type_map.get(cl.party_type_code, ""),
                 client_name=cl.client_name,
@@ -391,6 +396,7 @@ class CasesService(BaseSecuredService):
             filing_year=case.filing_year,
             petitioner=case.petitioner,
             respondent=case.respondent,
+            opponent_council=case.opponent_council,
             case_summary=case.case_summary,
             status_code=case.status_code,
             status_description=maps["status_map"].get(case.status_code),
@@ -424,6 +430,65 @@ class CasesService(BaseSecuredService):
             state_code=row.state_code,
             state_name=row.state_name,
         )
+    
+    async def _create_case_client(
+        self,
+        *,
+        client_name: str,
+        party_role_code: str,
+        party_type_code: str,
+        case_id: str,
+    ):
+
+        # -----------------------------------
+        # CHECK EXISTING CLIENT
+        # chamber scoped
+        # -----------------------------------
+
+        existing = await self.clients_repo.get_first(
+            session=self.session,
+            filters={
+                Clients.chamber_id: self.chamber_id,
+                Clients.client_name: client_name,
+            },
+        )
+
+        if existing:
+            client = existing
+        else:
+            client = await self.clients_repo.create(
+                session=self.session,
+                data={
+                    "chamber_id": self.chamber_id,
+                    "client_name": client_name,
+                    "display_name": client_name,
+                    # optional now
+                    "client_type_code": None,
+                    "party_type_code": party_type_code,
+                }
+            )
+
+        # -----------------------------------
+        # LINK TO CASE
+        # -----------------------------------
+
+        await self.case_clients_repo.upsert(
+            session=self.session,
+            filters={
+                CaseClients.case_id: case_id,
+                CaseClients.client_id: client.client_id,
+                CaseClients.party_role_code: party_role_code,
+            },
+            data={
+                "chamber_id": self.chamber_id,
+                "case_id": case_id,
+                "client_id": client.client_id,
+                "party_role_code": party_role_code,
+                "primary_ind": True,
+            }
+        )
+
+        return client
 
     # ─────────────────────────────────────────────────────────────────────
     # CASES — Stats
@@ -515,6 +580,7 @@ class CasesService(BaseSecuredService):
                 filing_year=r.Cases.filing_year,
                 petitioner=r.Cases.petitioner,
                 respondent=r.Cases.respondent,
+                opponent_council=r.Cases.opponent_council,
                 aor_user_id='',
                 aor_name=self.full_name(r.first_name, r.last_name),
                 party_role_code='',
@@ -522,6 +588,73 @@ class CasesService(BaseSecuredService):
             )
             for r in rows
         ]
+
+    # ─────────────────────────────────────────────────────────────────────
+    # CASES — Filter Options
+    # ─────────────────────────────────────────────────────────────────────
+
+    async def cases_get_filter_options(
+        self,
+    ) -> CaseFilterOptionsOut:
+        
+        advocate_rows = await self.cases_repo.get_case_advocates(
+                session=self.session,
+                chamber_id=self.chamber_id,
+            )
+        
+        return CaseFilterOptionsOut(
+
+            petitioners=await self.cases_repo.get_distinct_column_values(
+                session=self.session,
+                column=Cases.petitioner,
+                chamber_id=self.chamber_id,
+            ),
+
+            respondents=await self.cases_repo.get_distinct_column_values(
+                session=self.session,
+                column=Cases.respondent,
+                chamber_id=self.chamber_id,
+            ),
+
+            opponent_counsels=await self.cases_repo.get_distinct_column_values(
+                session=self.session,
+                column=Cases.opponent_council,
+                chamber_id=self.chamber_id,
+            ),
+
+            filing_years=await self.cases_repo.get_distinct_column_values(
+                session=self.session,
+                column=Cases.filing_year,
+                chamber_id=self.chamber_id,
+            ),
+
+            courts=await self.cases_repo.get_case_courts(
+                session=self.session,
+                chamber_id=self.chamber_id,
+            ),
+
+            case_types=await self.cases_repo.get_case_types(
+                session=self.session,
+                chamber_id=self.chamber_id,
+            ),
+
+            statuses=await self.cases_repo.get_case_statuses(
+                session=self.session,
+                chamber_id=self.chamber_id,
+            ),
+
+            aors=[
+                FilterOptionItem(
+                    code=r["user_id"],
+                    label=self.full_name(
+                        r["first_name"],
+                        r["last_name"],
+                    ),
+                )
+                for r in advocate_rows
+                if r["user_id"]
+            ],
+        )
 
     # ─────────────────────────────────────────────────────────────────────
     # CASES — Paginated list
@@ -533,8 +666,17 @@ class CasesService(BaseSecuredService):
         limit: int,
         search: Optional[str] = None,
         status_code: Optional[str] = None,
-        court_code: Optional[int] = None,
+        court_code: Optional[str] = None,
+        petitioner: Optional[str] = None,
+        respondent: Optional[str] = None,
+        opponent_council: Optional[str] = None,
+        filing_year: Optional[int] = None,
+        case_type_code: Optional[str] = None,
+        aor_user_id: Optional[str] = None,
+        party_role_code: Optional[str] = None,
+        hearing_status_code: Optional[str] = None,
         sort_by: str = "updated_date",
+
     ) -> PagingData[CaseListOut]:
 
         rows, total = await self.cases_repo.list_cases_with_details(
@@ -543,9 +685,17 @@ class CasesService(BaseSecuredService):
             limit=limit,
             chamber_id=self.chamber_id,
             search=search,
-            status_code=status_code,
-            court_code=court_code,
-            sort_by=sort_by,
+            status_code = status_code,
+            court_code = court_code,
+            petitioner = petitioner,
+            respondent = respondent,
+            opponent_council = opponent_council,
+            filing_year = filing_year,
+            case_type_code = case_type_code,
+            aor_user_id = aor_user_id,
+            party_role_code = party_role_code,
+            hearing_status_code = hearing_status_code,
+            sort_by = sort_by,
         )
 
         used_court_codes = {r.Cases.court_code for r in rows if r.Cases.court_code}
@@ -609,6 +759,7 @@ class CasesService(BaseSecuredService):
                 case_summary=c.case_summary,
                 petitioner=c.petitioner,
                 respondent=c.respondent,
+                opponent_council=c.opponent_council,
                 aor_user_id=aor_user_id or '',
                 aor_name=self.full_name(first_name, last_name),
                 party_role_code=party_role_code or '',
@@ -653,11 +804,55 @@ class CasesService(BaseSecuredService):
             )
         data = payload.model_dump(exclude_unset=True, exclude_none=True)
         data["chamber_id"] = self.chamber_id
-        print(f"CASE CREATE ******************************* : {data}")
+        
         case = await self.cases_repo.create(
             session=self.session,
             data=self.cases_repo.map_fields_to_db_column(data),
         )
+
+        # -----------------------------------
+        # AUTO CREATE PETITIONER CLIENT
+        # -----------------------------------
+
+        await self._create_case_client(
+            client_name=payload.petitioner,
+
+            party_role_code=RefmPartyRolesConstants.PETITIONER,
+
+            party_type_code=RefmPartyTypeConstants.PARTY_TO_CASE,
+
+            case_id=case.case_id,
+        )
+
+        # -----------------------------------
+        # AUTO CREATE RESPONDENT CLIENT
+        # -----------------------------------
+
+        await self._create_case_client(
+            client_name=payload.respondent,
+
+            party_role_code=RefmPartyRolesConstants.RESPONDENT,
+
+            party_type_code=RefmPartyTypeConstants.PARTY_TO_CASE,
+
+            case_id=case.case_id,
+        )
+
+        # -----------------------------------
+        # AUTO CREATE OPPONENT COUNSEL
+        # -----------------------------------
+
+        if payload.opponent_council:
+
+            await self._create_case_client(
+                client_name=payload.opponent_council,
+
+                party_role_code=RefmPartyRolesConstants.ADVOCATE_ON_RECORD,
+
+                party_type_code=RefmPartyTypeConstants.OPPOSITE_COUNCIL,
+
+                case_id=case.case_id,
+            )
         
         # Build metadata with optional case client info
         metadata = case.to_dict(exclude_none=True)
@@ -1152,6 +1347,7 @@ class CasesService(BaseSecuredService):
                 filing_year=ca.filing_year,
                 petitioner=ca.petitioner,
                 respondent=ca.respondent,
+                opponent_council=ca.opponent_council,
                 case_summary=ca.case_summary,
                 status_code=ca.status_code,
                 status_description=case_status_map.get(ca.status_code),
@@ -1173,8 +1369,8 @@ class CasesService(BaseSecuredService):
                 case_client_id=cc.case_client_id,
                 client_id=cl.client_id,
                 chamber_id=cl.chamber_id,
-                client_type_code=cl.client_type_code,
-                client_type_description=client_type_map.get(cl.client_type_code, ""),
+                client_type_code=cl.client_type_code or '',
+                client_type_description=client_type_map.get(cl.client_type_code or '', ""),
                 party_type_code=cl.party_type_code,
                 party_type_description=party_type_map.get(cl.party_type_code, ""),
                 client_name=cl.client_name,

@@ -20,7 +20,7 @@ class Clients(BaseModel, TimestampMixin):
     chamber_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("chamber.chamber_id", ondelete="CASCADE"), nullable=False)
 
     # client_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
-    client_type_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_client_type.code", ondelete="RESTRICT"), nullable=False)
+    client_type_code: Mapped[Optional[str]] = mapped_column(CHAR(4), ForeignKey("refm_client_type.code", ondelete="RESTRICT"))
 
     # party_type_code : CHAR(4) COLLATE "utf8mb4_unicode_ci"
     party_type_code: Mapped[str] = mapped_column(CHAR(4), ForeignKey("refm_party_type.code", ondelete="RESTRICT"), nullable=False)

@@ -820,6 +820,7 @@ CREATE TABLE cases (
 
     petitioner        TEXT         NOT NULL,
     respondent        TEXT         NOT NULL,
+	opponent_council   TEXT         NULL,
     case_summary      TEXT         NULL,
 
     status_code       CHAR(4)      DEFAULT 'CSAC',
@@ -1001,8 +1002,8 @@ DROP TABLE IF EXISTS clients;
 CREATE TABLE clients (
     client_id       CHAR(36)     PRIMARY KEY,  
     chamber_id      CHAR(36)     NOT NULL,  
-    client_type_code  CHAR(4)      NOT NULL,
-	party_type_code  CHAR(4)      NOT NULL,
+    client_type_code  CHAR(4)    NULL,
+	party_type_code  CHAR(4)     NOT NULL,
     client_name     VARCHAR(200) NOT NULL,
     display_name    VARCHAR(200) NULL,
     contact_person  VARCHAR(150) NULL,

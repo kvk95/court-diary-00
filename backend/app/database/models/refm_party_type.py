@@ -34,7 +34,9 @@ class RefmPartyType(BaseModel):
 class RefmPartyTypeConstants:
     CLIENT = 'PTCL'
     PARTY_TO_CASE = 'PTCP'
+    OPPOSITE_COUNCIL = 'PTOC'
 
 class RefmPartyTypeEnum(str, PyEnum):
     CLIENT = RefmPartyTypeConstants.CLIENT
     PARTY_TO_CASE = RefmPartyTypeConstants.PARTY_TO_CASE
+    OPPOSITE_COUNCIL = RefmPartyTypeConstants.OPPOSITE_COUNCIL

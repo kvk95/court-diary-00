@@ -64,6 +64,9 @@ class Cases(BaseModel, TimestampMixin):
     # updated_by : CHAR(36) COLLATE "utf8mb4_unicode_ci"
     updated_by: Mapped[Optional[str]] = mapped_column(CHAR(36))
 
+    # opponent_council : TEXT COLLATE "utf8mb4_unicode_ci"
+    opponent_council: Mapped[Optional[str]] = mapped_column(Text)
+
     # FORWARD RELATIONSHIPS ------------------------------------------------------------
     # A forward relationship is defined in the table that contains the foreign key.
 
